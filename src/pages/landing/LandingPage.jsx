@@ -230,58 +230,58 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Pricing */}
-      <section id="قیمت‌گذاری" className="bg-olive-900/30 border-y border-olive-800">
-        <div className="max-w-6xl mx-auto px-6 py-24">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl text-olive-100 mb-4" style={{ fontWeight: 700 }}>پلن‌های قیمت‌گذاری</h2>
-            <p className="text-olive-400">از رایگان شروع کنید، هر زمان که خواستید ارتقا دهید</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-            {plans.map((plan) => (
-              <div
-                key={plan.name}
-                className={[
-                  'rounded-2xl p-6 flex flex-col border transition-all duration-200',
-                  plan.highlight
-                    ? 'bg-olive-500/10 border-olive-500/50 shadow-lg shadow-olive-500/10'
-                    : 'bg-olive-900 border-olive-700 hover:border-olive-600',
-                ].join(' ')}
-              >
-                {plan.highlight && (
-                  <div className="text-xs text-olive-950 bg-olive-500 px-2 py-0.5 rounded-full self-start mb-3 font-medium">
-                    محبوب‌ترین
-                  </div>
-                )}
-                <h3 className="text-olive-100 mb-1">{plan.name}</h3>
-                <div className="mb-5">
-                  <span className="text-2xl text-olive-300" style={{ fontWeight: 700 }}>{plan.price}</span>
-                  {plan.unit && <span className="text-olive-600 text-sm mr-1">{plan.unit}</span>}
-                </div>
-                <ul className="flex-1 flex flex-col gap-2.5 mb-6">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-olive-400 text-sm">
-                      <Check className="w-4 h-4 text-olive-500 shrink-0" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <Link
-                  to="/register"
-                  className={[
-                    'text-center py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
-                    plan.highlight
-                      ? 'bg-olive-500 text-olive-950 hover:bg-olive-400'
-                      : 'border border-olive-700 text-olive-300 hover:bg-olive-800',
-                  ].join(' ')}
-                >
-                  {plan.cta}
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/*/!* Pricing *!/*/}
+      {/*<section id="قیمت‌گذاری" className="bg-olive-900/30 border-y border-olive-800">*/}
+      {/*  <div className="max-w-6xl mx-auto px-6 py-24">*/}
+      {/*    <div className="text-center mb-14">*/}
+      {/*      <h2 className="text-3xl text-olive-100 mb-4" style={{ fontWeight: 700 }}>پلن‌های قیمت‌گذاری</h2>*/}
+      {/*      <p className="text-olive-400">از رایگان شروع کنید، هر زمان که خواستید ارتقا دهید</p>*/}
+      {/*    </div>*/}
+      {/*    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">*/}
+      {/*      {plans.map((plan) => (*/}
+      {/*        <div*/}
+      {/*          key={plan.name}*/}
+      {/*          className={[*/}
+      {/*            'rounded-2xl p-6 flex flex-col border transition-all duration-200',*/}
+      {/*            plan.highlight*/}
+      {/*              ? 'bg-olive-500/10 border-olive-500/50 shadow-lg shadow-olive-500/10'*/}
+      {/*              : 'bg-olive-900 border-olive-700 hover:border-olive-600',*/}
+      {/*          ].join(' ')}*/}
+      {/*        >*/}
+      {/*          {plan.highlight && (*/}
+      {/*            <div className="text-xs text-olive-950 bg-olive-500 px-2 py-0.5 rounded-full self-start mb-3 font-medium">*/}
+      {/*              محبوب‌ترین*/}
+      {/*            </div>*/}
+      {/*          )}*/}
+      {/*          <h3 className="text-olive-100 mb-1">{plan.name}</h3>*/}
+      {/*          <div className="mb-5">*/}
+      {/*            <span className="text-2xl text-olive-300" style={{ fontWeight: 700 }}>{plan.price}</span>*/}
+      {/*            {plan.unit && <span className="text-olive-600 text-sm mr-1">{plan.unit}</span>}*/}
+      {/*          </div>*/}
+      {/*          <ul className="flex-1 flex flex-col gap-2.5 mb-6">*/}
+      {/*            {plan.features.map((f) => (*/}
+      {/*              <li key={f} className="flex items-center gap-2 text-olive-400 text-sm">*/}
+      {/*                <Check className="w-4 h-4 text-olive-500 shrink-0" />*/}
+      {/*                {f}*/}
+      {/*              </li>*/}
+      {/*            ))}*/}
+      {/*          </ul>*/}
+      {/*          <Link*/}
+      {/*            to="/register"*/}
+      {/*            className={[*/}
+      {/*              'text-center py-2.5 rounded-xl text-sm font-medium transition-all duration-200',*/}
+      {/*              plan.highlight*/}
+      {/*                ? 'bg-olive-500 text-olive-950 hover:bg-olive-400'*/}
+      {/*                : 'border border-olive-700 text-olive-300 hover:bg-olive-800',*/}
+      {/*            ].join(' ')}*/}
+      {/*          >*/}
+      {/*            {plan.cta}*/}
+      {/*          </Link>*/}
+      {/*        </div>*/}
+      {/*      ))}*/}
+      {/*    </div>*/}
+      {/*  </div>*/}
+      {/*</section>*/}
 
       {/* Testimonials */}
       <section className="max-w-6xl mx-auto px-6 py-24">

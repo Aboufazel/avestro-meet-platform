@@ -1,12 +1,13 @@
 import { Toaster } from 'react-hot-toast'
 import Router from './routes/Router'
+import QueryProvider from "./providers/QueryProvider.jsx";
 
 export default function App() {
   return (
-    <>
+    <QueryProvider>
       <Router />
       <Toaster
-        position="bottom-left"
+        position="bottom-right"
         toastOptions={{
           duration: 3000,
           style: {
@@ -32,6 +33,6 @@ export default function App() {
           },
         }}
       />
-    </>
+    </QueryProvider>
   )
 }

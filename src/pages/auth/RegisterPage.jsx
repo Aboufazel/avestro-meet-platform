@@ -1,161 +1,100 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { User, Mail, Lock, Video, AtSign } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { useForm } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
+import * as yup from 'yup'
+import { Mail, Lock, User } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
-import { useAuthStore } from '../../store/authStore'
-import toast from 'react-hot-toast'
+import { useRegister } from '../../hooks/useAuth'
+import { appRoutes } from '../../routes/appRoutes'
 
-function PasswordStrength({ password }) {
-  const checks = [
-    password.length >= 8,
-    /[A-Z]/.test(password),
-    /[0-9]/.test(password),
-    /[^A-Za-z0-9]/.test(password),
-  ]
-  const score = checks.filter(Boolean).length
-  const colors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-olive-500']
-  const labels = ['ضعیف', 'متوسط', 'خوب', 'قوی']
-
-  if (!password) return null
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex gap-1">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div
-            key={i}
-            className={`h-1 flex-1 rounded-full transition-all duration-300 ${
-              i < score ? colors[score - 1] : 'bg-olive-800'
-            }`}
-          />
-        ))}
-      </div>
-      <p className="text-xs text-olive-500">قدرت رمز: {labels[score - 1] || 'ضعیف'}</p>
-    </div>
-  )
-}
+const schema = yup.object({
+  display_name: yup.string().required('نام نمایشی الزامی است'),
+  username: yup.string()
+    .required('نام کاربری الزامی است')
+    .min(3, 'حداقل ۳ کاراکتر')
+    .matches(/^[a-zA-Z0-9._]+$/, 'فقط حروف انگلیسی، اعداد، نقطه و آندرلاین'),
+  email: yup.string().required('ایمیل الزامی است').email('ایمیل معتبر وارد کنید'),
+  password: yup.string().required('رمز عبور الزامی است').min(8, 'حداقل ۸ کاراکتر'),
+  confirm_password: yup.string()
+    .required('تکرار رمز عبور الزامی است')
+    .oneOf([yup.ref('password')], 'رمز عبور مطابقت ندارد'),
+})
 
 export default function RegisterPage() {
-  const [form, setForm] = useState({
-    displayName: '',
-    username: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
+  const { mutate: register, isPending } = useRegister()
+
+  const { register: formRegister, handleSubmit, formState: { errors } } = useForm({
+    resolver: yupResolver(schema),
   })
-  const [errors, setErrors] = useState({})
-  const [loading, setLoading] = useState(false)
-  const { login } = useAuthStore()
-  const navigate = useNavigate()
 
-  const validate = () => {
-    const e = {}
-    if (!form.displayName.trim()) e.displayName = 'نام نمایشی الزامی است'
-    if (!form.username.trim()) e.username = 'نام کاربری الزامی است'
-    if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'ایمیل معتبر وارد کنید'
-    if (form.password.length < 6) e.password = 'رمز عبور حداقل ۶ کاراکتر باشد'
-    if (form.password !== form.confirmPassword) e.confirmPassword = 'رمز عبور تطابق ندارد'
-    setErrors(e)
-    return Object.keys(e).length === 0
+  function onSubmit({ confirm_password, ...data }) {
+    register(data)
   }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!validate()) return
-    setLoading(true)
-    await new Promise((r) => setTimeout(r, 1400))
-    login(
-      { displayName: form.displayName, username: form.username, email: form.email },
-      'mock-token-456'
-    )
-    toast.success('ثبت‌نام با موفقیت انجام شد!')
-    navigate('/dashboard')
-    setLoading(false)
-  }
-
-  const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }))
 
   return (
     <div className="min-h-screen bg-olive-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-olive-500 flex items-center justify-center">
-              <Video className="w-5 h-5 text-olive-950" />
-            </div>
-            <span className="text-olive-100 font-medium">اَوسترو میت</span>
-          </Link>
-          <h1 className="text-olive-100 mb-2" style={{ fontWeight: 700 }}>ایجاد حساب کاربری</h1>
-          <p className="text-olive-500 text-sm">رایگان شروع کنید</p>
+      <div className="w-full max-w-md">
+        <div className="flex flex-col items-center mb-8">
+          <img src="/avestro-logo.png" alt="اَوسترو" className="w-16 h-16 mb-4" />
+          <h1 className="text-olive-100 text-2xl font-bold">اَوسترو میت</h1>
+          <p className="text-olive-500 text-sm mt-1">سمینارهای آنلاین حرفه‌ای</p>
         </div>
 
-        <div className="bg-olive-900 border border-olive-700 rounded-2xl p-6">
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <div className="bg-olive-900 border border-olive-700 rounded-2xl p-8">
+          <h2 className="text-olive-100 font-bold text-lg mb-6">ایجاد حساب جدید</h2>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
             <Input
               label="نام نمایشی"
+              placeholder="نامی که دیگران می‌بینند"
               icon={User}
-              placeholder="مثال: علی رضایی"
-              value={form.displayName}
-              onChange={set('displayName')}
-              error={errors.displayName}
-              name="displayName"
+              error={errors.display_name?.message}
+              {...formRegister('display_name')}
             />
             <Input
               label="نام کاربری"
-              icon={AtSign}
-              placeholder="مثال: ali_rezaei"
-              value={form.username}
-              onChange={set('username')}
-              error={errors.username}
-              name="username"
+              placeholder="username"
+              icon={User}
+              error={errors.username?.message}
+              {...formRegister('username')}
             />
             <Input
               label="ایمیل"
-              icon={Mail}
               type="email"
-              placeholder="email@example.com"
-              value={form.email}
-              onChange={set('email')}
-              error={errors.email}
-              name="email"
+              placeholder="example@email.com"
+              icon={Mail}
+              error={errors.email?.message}
+              {...formRegister('email')}
             />
-            <div className="flex flex-col gap-1.5">
-              <Input
-                label="رمز عبور"
-                icon={Lock}
-                type="password"
-                placeholder="حداقل ۶ کاراکتر"
-                value={form.password}
-                onChange={set('password')}
-                error={errors.password}
-                name="password"
-              />
-              <PasswordStrength password={form.password} />
-            </div>
+            <Input
+              label="رمز عبور"
+              type="password"
+              placeholder="حداقل ۸ کاراکتر"
+              icon={Lock}
+              error={errors.password?.message}
+              {...formRegister('password')}
+            />
             <Input
               label="تکرار رمز عبور"
-              icon={Lock}
               type="password"
-              placeholder="رمز عبور را دوباره وارد کنید"
-              value={form.confirmPassword}
-              onChange={set('confirmPassword')}
-              error={errors.confirmPassword}
-              name="confirmPassword"
+              placeholder="رمز عبور را تکرار کنید"
+              icon={Lock}
+              error={errors.confirm_password?.message}
+              {...formRegister('confirm_password')}
             />
-
-            <Button type="submit" loading={loading} fullWidth>
-              ایجاد حساب
+            <Button type="submit" fullWidth size="lg" loading={isPending}>
+              ثبت‌نام
             </Button>
           </form>
-        </div>
 
-        <p className="text-center text-olive-500 text-sm mt-5">
-          حساب کاربری دارید؟{' '}
-          <Link to="/login" className="text-olive-400 hover:text-olive-200 transition-colors">
-            وارد شوید
-          </Link>
-        </p>
+          <p className="text-center text-sm text-olive-600 mt-6">
+            حساب دارید؟{' '}
+            <Link to={appRoutes.auth.login} className="text-olive-400 hover:text-olive-200 transition-colors">
+              وارد شوید
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   )

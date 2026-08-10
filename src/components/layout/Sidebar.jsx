@@ -6,6 +6,7 @@ import {
   Settings,
   LogOut,
   Video,
+  X,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { Avatar } from '../ui/Avatar'
@@ -13,12 +14,12 @@ import toast from 'react-hot-toast'
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'داشبورد' },
-  { to: '/dashboard/events', icon: Calendar, label: 'رویدادها' },
+  // { to: '/dashboard/events', icon: Calendar, label: 'رویدادها' },
   { to: '/dashboard/create', icon: Plus, label: 'رویداد جدید' },
-  { to: '/dashboard/settings', icon: Settings, label: 'تنظیمات' },
+  // { to: '/dashboard/settings', icon: Settings, label: 'تنظیمات' },
 ]
 
-export function Sidebar() {
+export function Sidebar({ onClose }) {
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
 
@@ -30,7 +31,9 @@ export function Sidebar() {
 
   return (
     <aside className="w-64 h-full bg-olive-900 border-l border-olive-700 flex flex-col shrink-0">
-      <div className="p-5 border-b border-olive-700">
+
+      {/* Logo + close button */}
+      <div className="p-5 border-b border-olive-700 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-olive-500 flex items-center justify-center">
             <Video className="w-5 h-5 text-olive-950" />
@@ -40,14 +43,25 @@ export function Sidebar() {
             <p className="text-olive-600 text-xs">Austro Meet</p>
           </div>
         </div>
+        {/* فقط روی موبایل نمایش داده میشه */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg text-olive-500 hover:bg-olive-800 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
+      {/* Nav */}
       <nav className="flex-1 p-3 flex flex-col gap-1">
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/dashboard'}
+            onClick={onClose}
             className={({ isActive }) =>
               [
                 'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200',
@@ -63,12 +77,13 @@ export function Sidebar() {
         ))}
       </nav>
 
+      {/* User */}
       <div className="p-4 border-t border-olive-700">
         <div className="flex items-center gap-3 mb-3">
-          <Avatar name={user?.displayName || user?.username || 'کاربر'} size="md" />
+          <Avatar name={user?.displayName || user?.display_name || user?.username || 'کاربر'} size="md" />
           <div className="flex-1 min-w-0">
             <p className="text-olive-100 text-sm truncate">
-              {user?.displayName || user?.username || 'کاربر'}
+              {user?.displayName || user?.display_name || user?.username || 'کاربر'}
             </p>
             <p className="text-olive-600 text-xs truncate">{user?.email || ''}</p>
           </div>
@@ -81,6 +96,7 @@ export function Sidebar() {
           خروج از حساب
         </button>
       </div>
+
     </aside>
   )
 }
