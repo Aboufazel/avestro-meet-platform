@@ -1,14 +1,15 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
-import { Mail, Lock, User } from 'lucide-react'
+import { Mail, Lock, User, Phone } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { useRegister } from '../../hooks/useAuth'
 import { appRoutes } from '../../routes/appRoutes'
 
-const schema = yup.object({
+const emailSchema = yup.object({
   display_name: yup.string().required('نام نمایشی الزامی است'),
   username: yup.string()
     .required('نام کاربری الزامی است')
@@ -21,20 +22,47 @@ const schema = yup.object({
     .oneOf([yup.ref('password')], 'رمز عبور مطابقت ندارد'),
 })
 
+const phoneSchema = yup.object({
+  display_name: yup.string().required('نام نمایشی الزامی است'),
+  username: yup.string()
+    .required('نام کاربری الزامی است')
+    .min(3, 'حداقل ۳ کاراکتر')
+    .matches(/^[a-zA-Z0-9._]+$/, 'فقط حروف انگلیسی، اعداد، نقطه و آندرلاین'),
+  phone_number: yup.string()
+    .required('شماره موبایل الزامی است')
+    .matches(/^09[0-9]{9}$/, 'شماره موبایل معتبر وارد کنید (مثال: 09123456789)'),
+  password: yup.string().required('رمز عبور الزامی است').min(8, 'حداقل ۸ کاراکتر'),
+  confirm_password: yup.string()
+    .required('تکرار رمز عبور الزامی است')
+    .oneOf([yup.ref('password')], 'رمز عبور مطابقت ندارد'),
+})
+
+const tabs = [
+  { id: 'email', label: 'با ایمیل', icon: Mail },
+  { id: 'phone', label: 'با موبایل', icon: Phone },
+]
+
 export default function RegisterPage() {
   const { mutate: register, isPending } = useRegister()
+  const [activeTab, setActiveTab] = useState('email')
 
-  const { register: formRegister, handleSubmit, formState: { errors } } = useForm({
-    resolver: yupResolver(schema),
+  const { register: formRegister, handleSubmit, reset, formState: { errors } } = useForm({
+    resolver: yupResolver(activeTab === 'email' ? emailSchema : phoneSchema),
   })
 
+  function handleTabChange(tab) {
+    setActiveTab(tab)
+    reset()
+  }
+
   function onSubmit({ confirm_password, ...data }) {
-    register(data)
+    register({ ...data, register_type: activeTab })
   }
 
   return (
     <div className="min-h-screen bg-olive-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+
         <div className="flex flex-col items-center mb-8">
           <img src="/avestro-logo.png" alt="اَوسترو" className="w-16 h-16 mb-4" />
           <h1 className="text-olive-100 text-2xl font-bold">اَوسترو میت</h1>
@@ -42,7 +70,26 @@ export default function RegisterPage() {
         </div>
 
         <div className="bg-olive-900 border border-olive-700 rounded-2xl p-8">
-          <h2 className="text-olive-100 font-bold text-lg mb-6">ایجاد حساب جدید</h2>
+          <h2 className="text-olive-100 font-bold text-lg mb-5">ایجاد حساب جدید</h2>
+
+          {/* Tabs */}
+          <div className="flex bg-olive-950 rounded-xl p-1 mb-6 border border-olive-800">
+            {tabs.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => handleTabChange(id)}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all duration-200
+                  ${activeTab === id
+                    ? 'bg-olive-700 text-olive-100 shadow-sm'
+                    : 'text-olive-500 hover:text-olive-300'
+                  }`}
+              >
+                <Icon className="w-4 h-4" />
+                {label}
+              </button>
+            ))}
+          </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
             <Input
@@ -52,6 +99,7 @@ export default function RegisterPage() {
               error={errors.display_name?.message}
               {...formRegister('display_name')}
             />
+
             <Input
               label="نام کاربری"
               placeholder="username"
@@ -59,14 +107,27 @@ export default function RegisterPage() {
               error={errors.username?.message}
               {...formRegister('username')}
             />
-            <Input
-              label="ایمیل"
-              type="email"
-              placeholder="example@email.com"
-              icon={Mail}
-              error={errors.email?.message}
-              {...formRegister('email')}
-            />
+
+            {activeTab === 'email' ? (
+              <Input
+                label="ایمیل"
+                type="email"
+                placeholder="example@email.com"
+                icon={Mail}
+                error={errors.email?.message}
+                {...formRegister('email')}
+              />
+            ) : (
+              <Input
+                label="شماره موبایل"
+                type="tel"
+                placeholder="09123456789"
+                icon={Phone}
+                error={errors.phone_number?.message}
+                {...formRegister('phone_number')}
+              />
+            )}
+
             <Input
               label="رمز عبور"
               type="password"
@@ -75,6 +136,7 @@ export default function RegisterPage() {
               error={errors.password?.message}
               {...formRegister('password')}
             />
+
             <Input
               label="تکرار رمز عبور"
               type="password"
@@ -83,6 +145,7 @@ export default function RegisterPage() {
               error={errors.confirm_password?.message}
               {...formRegister('confirm_password')}
             />
+
             <Button type="submit" fullWidth size="lg" loading={isPending}>
               ثبت‌نام
             </Button>
@@ -95,6 +158,7 @@ export default function RegisterPage() {
             </Link>
           </p>
         </div>
+
       </div>
     </div>
   )
