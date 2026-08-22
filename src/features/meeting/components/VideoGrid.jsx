@@ -9,7 +9,7 @@ export const VideoGrid = memo(function VideoGrid() {
   const activeSpeakerId = useMeetingStore(selectActiveSpeakerId)
 
   const gridClass = useMemo(() => {
-    if (count <= 1) return 'grid-cols-1'
+    if (count <= 1) return 'xl:grid-cols-3 grid-cold-1'
     if (count <= 4) return 'grid-cols-2'
     if (count <= 9) return 'grid-cols-3'
     return 'grid-cols-4'

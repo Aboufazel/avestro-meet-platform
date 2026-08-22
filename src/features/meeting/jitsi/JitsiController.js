@@ -279,17 +279,35 @@ export class JitsiController {
                 this._emit(JITSI_EVENTS.TRACK_REMOVED, mapTrack(track))
             })
 
+            // this._conference.on(getJitsiMeetJS().events.conference.TRACK_MUTE_CHANGED, (track) => {
+            //     const mapped = mapTrack(track)
+            //     this._emit(track.isMuted() ? JITSI_EVENTS.TRACK_MUTED : JITSI_EVENTS.TRACK_UNMUTED, mapped)
+            //     if (!track.isLocal()) {
+            //         const participant = this._conference.getParticipantById(track.getParticipantId())
+            //         if (participant) {
+            //             this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, mapParticipant(participant))
+            //         }
+            //     }
+            // })
             this._conference.on(getJitsiMeetJS().events.conference.TRACK_MUTE_CHANGED, (track) => {
                 const mapped = mapTrack(track)
                 this._emit(track.isMuted() ? JITSI_EVENTS.TRACK_MUTED : JITSI_EVENTS.TRACK_UNMUTED, mapped)
-                if (!track.isLocal()) {
+
+                if (track.isLocal()) {
+                    // برای track لوکال، خودمون participant رو آپدیت کنیم
+                    const type = track.getType() // 'audio' | 'video'
+                    this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
+                        participantId: this._conference.myUserId(),
+                        ...(type === 'audio' ? {isAudioMuted: track.isMuted()} : {}),
+                        ...(type === 'video' ? {isVideoMuted: track.isMuted()} : {}),
+                    })
+                } else {
                     const participant = this._conference.getParticipantById(track.getParticipantId())
                     if (participant) {
                         this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, mapParticipant(participant))
                     }
                 }
             })
-
             this._conference.on(getJitsiMeetJS().events.conference.DOMINANT_SPEAKER_CHANGED, (id) => {
                 this._emit(JITSI_EVENTS.ACTIVE_SPEAKER_CHANGED, {participantId: id})
             })

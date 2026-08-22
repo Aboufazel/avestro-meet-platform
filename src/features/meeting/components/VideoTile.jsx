@@ -32,7 +32,7 @@ export const VideoTile = memo(function VideoTile({participantId, isLarge = false
         return () => {
             activeTrack.jitsiTrack.detach(videoRef.current)
         }
-    }, [activeTrack?.jitsiTrack])
+    }, [activeTrack?.jitsiTrack, activeTrack?.isMuted])
 
     if (!participant) return null
 
