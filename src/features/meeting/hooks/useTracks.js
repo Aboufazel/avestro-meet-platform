@@ -15,14 +15,17 @@ export function useLocalTracks() {
  * @param {string} participantId
  */
 export function useParticipantTracks(participantId) {
+  const isLocal = useMeetingStore((s) => s.localParticipantId === participantId)
+  const key = isLocal ? 'local' : participantId
+
   const audioTrack = useMeetingStore(
-    (s) => s.tracks.get(`${participantId}-audio`) ?? null
+    (s) => s.tracks.get(`${key}-audio`) ?? null
   )
   const videoTrack = useMeetingStore(
-    (s) => s.tracks.get(`${participantId}-video`) ?? null
+    (s) => s.tracks.get(`${key}-video`) ?? null
   )
   const desktopTrack = useMeetingStore(
-    (s) => s.tracks.get(`${participantId}-desktop`) ?? null
+    (s) => s.tracks.get(`${key}-desktop`) ?? null
   )
   return { audioTrack, videoTrack, desktopTrack }
 }

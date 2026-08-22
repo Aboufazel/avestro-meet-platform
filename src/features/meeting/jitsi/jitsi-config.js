@@ -6,10 +6,20 @@
 const JITSI_HOST = import.meta.env.VITE_JITSI_HOST || 'meet.avestro.ir'
 const JITSI_INTERNAL_DOMAIN = 'meet.jitsi'
 
+// export const CONNECTION_CONFIG = {
+//   hosts: {
+//     domain: JITSI_INTERNAL_DOMAIN,
+//     muc: `conference.${JITSI_INTERNAL_DOMAIN}`,
+//     focus: `focus.${JITSI_INTERNAL_DOMAIN}`,
+//   },
+//   serviceUrl: `wss://${JITSI_HOST}/xmpp-websocket`,
+//   clientNode: 'https://jitsi.org/jitmeet',
+// }
+
 export const CONNECTION_CONFIG = {
   hosts: {
     domain: JITSI_INTERNAL_DOMAIN,
-    muc: `conference.${JITSI_INTERNAL_DOMAIN}`,
+    muc: `muc.${JITSI_INTERNAL_DOMAIN}`,   // ← به جای conference.، از muc. استفاده کن
     focus: `focus.${JITSI_INTERNAL_DOMAIN}`,
   },
   serviceUrl: `wss://${JITSI_HOST}/xmpp-websocket`,
