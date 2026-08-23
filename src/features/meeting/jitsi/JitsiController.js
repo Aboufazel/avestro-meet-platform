@@ -128,6 +128,30 @@ export class JitsiController {
     async toggleAudio() {
         const audioTrack = this._localTracks.find((t) => t.getType() === 'audio')
 
+        // if (!audioTrack) {
+        //     try {
+        //         const [newTrack] = await getJitsiMeetJS().createLocalTracks({devices: ['audio']})
+        //         this._localTracks.push(newTrack)
+        //
+        //         newTrack.addEventListener(getJitsiMeetJS().events.track.TRACK_MUTE_CHANGED, () => {
+        //             const mapped = mapTrack(newTrack)
+        //             this._emit(newTrack.isMuted() ? JITSI_EVENTS.TRACK_MUTED : JITSI_EVENTS.TRACK_UNMUTED, mapped)
+        //         })
+        //
+        //         if (this._conference) {
+        //             await this._conference.addTrack(newTrack)
+        //         }
+        //
+        //         this._emit(JITSI_EVENTS.TRACK_ADDED, mapTrack(newTrack))
+        //         this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
+        //             participantId: this._conference.myUserId(),
+        //             isAudioMuted: false,
+        //         })
+        //     } catch (error) {
+        //         console.warn('[JitsiController] Could not get audio access:', error)
+        //     }
+        //     return
+        // }
         if (!audioTrack) {
             try {
                 const [newTrack] = await getJitsiMeetJS().createLocalTracks({devices: ['audio']})
@@ -143,6 +167,7 @@ export class JitsiController {
                 }
 
                 this._emit(JITSI_EVENTS.TRACK_ADDED, mapTrack(newTrack))
+                this._emit(JITSI_EVENTS.TRACK_UNMUTED, mapTrack(newTrack))   // ← این خط رو اضافه کن
                 this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
                     participantId: this._conference.myUserId(),
                     isAudioMuted: false,
@@ -180,6 +205,12 @@ export class JitsiController {
                 }
 
                 this._emit(JITSI_EVENTS.TRACK_ADDED, mapTrack(newTrack))
+                this._emit(JITSI_EVENTS.TRACK_ADDED, mapTrack(newTrack))
+                this._emit(JITSI_EVENTS.TRACK_UNMUTED, mapTrack(newTrack))   // ← این خط رو اضافه کن
+                this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
+                    participantId: this._conference.myUserId(),
+                    isVideoMuted: false,
+                })
                 this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
                     participantId: this._conference.myUserId(),
                     isVideoMuted: false,

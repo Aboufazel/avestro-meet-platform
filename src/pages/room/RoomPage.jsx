@@ -7,6 +7,7 @@ import {MeetingLoading} from '../../features/meeting/components/MeetingLoading'
 import {MeetingError} from '../../features/meeting/components/MeetingError'
 import {MeetingControls} from '../../features/meeting/components/MeetingControls'
 import {SidePanel} from '../../features/meeting/components/SidePanel'
+import {RoomHeader} from "../../components/shared/RoomHeader.jsx";
 
 export default function RoomPage() {
     const {slug: roomName} = useParams()
@@ -26,6 +27,11 @@ export default function RoomPage() {
         toggleVideo,
         toggleScreenShare,
     } = useJitsi(roomName)
+
+    const handleCopyLink = () => {
+        const joinUrl = window.location.href.replace('/room/', '/join/')
+        navigator.clipboard.writeText(joinUrl)
+    }
 
 
     if (isConnecting) {
@@ -48,7 +54,12 @@ export default function RoomPage() {
     }
 
     return (
-        <div className="w-screen h-screen bg-olive-950 overflow-hidden">
+        <div className="w-screen h-screen bg-olive-950 overflow-hidden flex flex-col">
+            <RoomHeader
+                slug={roomName}
+                isConnected={isConnected}
+                onCopyLink={handleCopyLink}
+            />
             <div className="flex h-full">
                 {/* Video Area */}
                 <div className="flex-1 min-w-0 relative pb-24 md:pb-0">
