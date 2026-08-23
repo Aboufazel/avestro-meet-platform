@@ -93,8 +93,8 @@ export default function LandingPage() {
       <header className="sticky top-0 z-50 border-b border-olive-800/60 bg-olive-950/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-olive-500 flex items-center justify-center">
-              <Video className="w-4 h-4 text-olive-950" />
+            <div className="w-8 h-8 rounded-[8px] bg-olive-500 flex items-center justify-center">
+              <img src="/avestro-logo.png" alt="اَوسترو" className="w-8 h-8 shrink-0" />
             </div>
             <span className="text-olive-100 font-medium">اَوسترو میت</span>
           </div>
@@ -332,8 +332,8 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
             <div className="md:col-span-2">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 rounded-xl bg-olive-500 flex items-center justify-center">
-                  <Video className="w-4 h-4 text-olive-950" />
+                <div className="w-8 h-8 rounded-[8px] bg-olive-500 flex items-center justify-center">
+                  <img src="/avestro-logo.png" alt="اَوسترو" className="w-8 h-8 shrink-0" />
                 </div>
                 <span className="text-olive-100 font-medium">اَوسترو میت</span>
               </div>
