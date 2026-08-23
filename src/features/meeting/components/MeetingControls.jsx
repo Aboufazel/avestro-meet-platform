@@ -1,14 +1,8 @@
 import { memo } from 'react'
 import {
-  Mic,
-  MicOff,
-  Video,
-  VideoOff,
-  MonitorUp,
-  PhoneOff,
-  Users,
-  MessageSquare,
+  Mic, MicOff, Video, VideoOff, MonitorUp, PhoneOff, Users, MessageSquare, Settings,
 } from 'lucide-react'
+
 
 import { useMeetingStore } from '../store/meeting-store'
 import {
@@ -30,6 +24,7 @@ export const MeetingControls = memo(function MeetingControls({
   const unreadCount = useMeetingStore(selectUnreadCount)
   const activeTab = useMeetingStore(selectActivePanelTab)
   const isPanelOpen = useMeetingStore(selectIsPanelOpen)
+  const openSettings = useMeetingStore((s) => s.openSettings)
   const togglePanel = useMeetingStore((s) => s.togglePanel)
 
   return (
@@ -75,7 +70,7 @@ export const MeetingControls = memo(function MeetingControls({
             </span>
           )}
         </div>
-
+        <ControlButton onClick={openSettings} icon={<Settings size={18} />} />
         <ControlButton
           danger
           onClick={onLeave}

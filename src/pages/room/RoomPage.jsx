@@ -8,6 +8,7 @@ import {MeetingError} from '../../features/meeting/components/MeetingError'
 import {MeetingControls} from '../../features/meeting/components/MeetingControls'
 import {SidePanel} from '../../features/meeting/components/SidePanel'
 import {RoomHeader} from "../../components/shared/RoomHeader.jsx";
+import {SettingsModal} from "../../features/meeting/components/SettingsModal.jsx";
 
 export default function RoomPage() {
     const {slug: roomName} = useParams()
@@ -79,6 +80,7 @@ export default function RoomPage() {
 
                 {/* Side Panel */}
                 <SidePanel/>
+                <SettingsModal />
             </div>
         </div>
     )

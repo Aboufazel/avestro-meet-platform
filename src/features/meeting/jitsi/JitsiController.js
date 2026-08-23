@@ -224,6 +224,98 @@ export class JitsiController {
         videoTrack.isMuted() ? await videoTrack.unmute() : await videoTrack.mute()
     }
 
+    /** لیست دستگاه‌های صوتی/تصویری موجود */
+    async getDevices() {
+        return new Promise((resolve) => {
+            getJitsiMeetJS().mediaDevices.enumerateDevices((devices) => {
+                resolve({
+                    audioInput: devices.filter((d) => d.kind === 'audioinput'),
+                    audioOutput: devices.filter((d) => d.kind === 'audiooutput'),
+                    videoInput: devices.filter((d) => d.kind === 'videoinput'),
+                })
+            })
+        })
+    }
+
+    /** تغییر میکروفون ورودی */
+    async setAudioInputDevice(deviceId) {
+        const oldTrack = this._localTracks.find((t) => t.getType() === 'audio')
+        try {
+            const [newTrack] = await getJitsiMeetJS().createLocalTracks({
+                devices: ['audio'],
+                micDeviceId: deviceId,
+            })
+
+            if (oldTrack) {
+                if (this._conference) await this._conference.replaceTrack(oldTrack, newTrack)
+                await oldTrack.dispose()
+                this._localTracks = this._localTracks.filter((t) => t !== oldTrack)
+            } else if (this._conference) {
+                await this._conference.addTrack(newTrack)
+            }
+
+            newTrack.addEventListener(getJitsiMeetJS().events.track.TRACK_MUTE_CHANGED, () => {
+                const mapped = mapTrack(newTrack)
+                this._emit(newTrack.isMuted() ? JITSI_EVENTS.TRACK_MUTED : JITSI_EVENTS.TRACK_UNMUTED, mapped)
+            })
+
+            this._localTracks.push(newTrack)
+            this._emit(JITSI_EVENTS.TRACK_ADDED, mapTrack(newTrack))
+        } catch (error) {
+            console.warn('[JitsiController] Could not switch audio input:', error)
+        }
+    }
+
+    /** تغییر دوربین ورودی */
+    async setVideoInputDevice(deviceId) {
+        const oldTrack = this._localTracks.find((t) => t.getType() === 'video')
+        try {
+            const [newTrack] = await getJitsiMeetJS().createLocalTracks({
+                devices: ['video'],
+                cameraDeviceId: deviceId,
+            })
+
+            if (oldTrack) {
+                if (this._conference) await this._conference.replaceTrack(oldTrack, newTrack)
+                await oldTrack.dispose()
+                this._localTracks = this._localTracks.filter((t) => t !== oldTrack)
+            } else if (this._conference) {
+                await this._conference.addTrack(newTrack)
+            }
+
+            newTrack.addEventListener(getJitsiMeetJS().events.track.TRACK_MUTE_CHANGED, () => {
+                const mapped = mapTrack(newTrack)
+                this._emit(newTrack.isMuted() ? JITSI_EVENTS.TRACK_MUTED : JITSI_EVENTS.TRACK_UNMUTED, mapped)
+            })
+
+            this._localTracks.push(newTrack)
+            this._emit(JITSI_EVENTS.TRACK_ADDED, mapTrack(newTrack))
+        } catch (error) {
+            console.warn('[JitsiController] Could not switch video input:', error)
+        }
+    }
+
+    /** تغییر خروجی صدا (اسپیکر) — روی عنصر audio/video اعمال میشه */
+    async setAudioOutputDevice(deviceId) {
+        try {
+            await getJitsiMeetJS().mediaDevices.setAudioOutputDevice(deviceId)
+            return true
+        } catch (error) {
+            console.warn('[JitsiController] Could not switch audio output:', error)
+            return false
+        }
+    }
+
+    /** تنظیم کیفیت ویدیوی ارسالی (پایین/متوسط/بالا) */
+    async setVideoQuality(height) {
+        if (!this._conference) return
+        try {
+            await this._conference.setSenderVideoConstraint(height)
+        } catch (error) {
+            console.warn('[JitsiController] Could not set video quality:', error)
+        }
+    }
+
     /** شروع اشتراک‌گذاری صفحه */
     async startScreenShare() {
         try {

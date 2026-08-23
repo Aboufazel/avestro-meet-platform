@@ -108,6 +108,30 @@ export function toggleVideo() {
     jitsiController.toggleVideo()
 }
 
+export async function getDevices() {
+    return jitsiController.getDevices()
+}
+
+export async function setAudioInputDevice(deviceId) {
+    await jitsiController.setAudioInputDevice(deviceId)
+}
+
+export async function setVideoInputDevice(deviceId) {
+    await jitsiController.setVideoInputDevice(deviceId)
+}
+
+export async function setAudioOutputDevice(deviceId) {
+    const success = await jitsiController.setAudioOutputDevice(deviceId)
+    if (success) {
+        useMeetingStore.getState().setSelectedAudioOutputId(deviceId)
+    }
+    return success
+}
+
+export async function setVideoQuality(height) {
+    await jitsiController.setVideoQuality(height)
+}
+
 /** شروع screen share */
 export function startScreenShare() {
     jitsiController.startScreenShare()

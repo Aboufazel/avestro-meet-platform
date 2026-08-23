@@ -41,6 +41,8 @@ export const selectParticipantTrack = (participantId, type) => (s) =>
 /** track های local */
 export const selectLocalAudioTrack = (s) => s.tracks.get('local-audio')
 export const selectLocalVideoTrack = (s) => s.tracks.get('local-video')
+export const selectIsSettingsOpen = (s) => s.isSettingsOpen
+export const selectSelectedAudioOutputId = (s) => s.selectedAudioOutputId
 
 /** participant فعال (active speaker) */
 export const selectActiveSpeaker = (s) =>
