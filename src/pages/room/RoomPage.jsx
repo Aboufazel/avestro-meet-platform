@@ -51,7 +51,7 @@ export default function RoomPage() {
         <div className="w-screen h-screen bg-olive-950 overflow-hidden">
             <div className="flex h-full">
                 {/* Video Area */}
-                <div className="flex-1 min-w-0 relative">
+                <div className="flex-1 min-w-0 relative pb-24 md:pb-0">
                     <VideoGrid/>
 
                     <div className="absolute bottom-0 left-0 right-0 z-30">

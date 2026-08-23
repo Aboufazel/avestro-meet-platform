@@ -28,11 +28,8 @@ export const MeetingControls = memo(function MeetingControls({
   onLeave,
 }) {
   const unreadCount = useMeetingStore(selectUnreadCount)
-
   const activeTab = useMeetingStore(selectActivePanelTab)
-
   const isPanelOpen = useMeetingStore(selectIsPanelOpen)
-
   const togglePanel = useMeetingStore((s) => s.togglePanel)
 
   return (
@@ -41,22 +38,16 @@ export const MeetingControls = memo(function MeetingControls({
 
         <ControlButton
           active={!isAudioMuted}
+          off={isAudioMuted}
           onClick={onToggleAudio}
-          icon={
-            isAudioMuted
-              ? <MicOff size={18} />
-              : <Mic size={18} />
-          }
+          icon={isAudioMuted ? <MicOff size={18} /> : <Mic size={18} />}
         />
 
         <ControlButton
           active={!isVideoMuted}
+          off={isVideoMuted}
           onClick={onToggleVideo}
-          icon={
-            isVideoMuted
-              ? <VideoOff size={18} />
-              : <Video size={18} />
-          }
+          icon={isVideoMuted ? <VideoOff size={18} /> : <Video size={18} />}
         />
 
         <ControlButton
@@ -79,23 +70,7 @@ export const MeetingControls = memo(function MeetingControls({
           />
 
           {unreadCount > 0 && (
-            <span
-              className="
-                absolute
-                -top-1
-                -left-1
-                min-w-5
-                h-5
-                rounded-full
-                bg-red-500
-                text-white
-                text-[10px]
-                flex
-                items-center
-                justify-center
-                px-1
-              "
-            >
+            <span className="absolute -top-1 -left-1 min-w-5 h-5 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center px-1">
               {unreadCount}
             </span>
           )}
@@ -115,29 +90,30 @@ function ControlButton({
   icon,
   active = false,
   danger = false,
+  off = false,
   onClick,
 }) {
   let classes =
-    'w-11 h-11 rounded-xl flex items-center justify-center transition-all'
+    'relative w-11 h-11 rounded-xl flex items-center justify-center transition-all'
 
   if (danger) {
-    classes +=
-      ' bg-red-600 hover:bg-red-500 text-white'
+    classes += ' bg-red-600 hover:bg-red-500 text-white'
+  } else if (off) {
+    classes += ' bg-red-500/15 text-red-400 hover:bg-red-500/25 ring-1 ring-red-500/40'
   } else if (active) {
-    classes +=
-      ' bg-olive-600 text-white'
+    classes += ' bg-olive-600 text-white'
   } else {
-    classes +=
-      ' bg-olive-800 text-olive-300 hover:bg-olive-700'
+    classes += ' bg-olive-800 text-olive-300 hover:bg-olive-700'
   }
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={classes}
-    >
+    <button type="button" onClick={onClick} className={classes}>
       {icon}
+      {off && (
+        <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <span className="w-9 h-9 rounded-lg ring-2 ring-red-500/60" />
+        </span>
+      )}
     </button>
   )
 }

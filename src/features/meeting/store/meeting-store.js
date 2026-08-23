@@ -26,8 +26,8 @@ export const useMeetingStore = create((set, get) => ({
   tracks: new Map(),
 
   // ─── Local media ───────────────────────────────────────────────────────
-  isAudioMuted: false,
-  isVideoMuted: false,
+  isAudioMuted: true,
+  isVideoMuted: true,
   isScreenSharing: false,
 
   // ─── Chat ──────────────────────────────────────────────────────────────
@@ -140,8 +140,8 @@ export const useMeetingStore = create((set, get) => ({
       participants: new Map(),
       activeSpeakerId: null,
       tracks: new Map(),
-      isAudioMuted: false,
-      isVideoMuted: false,
+      isAudioMuted: true,
+      isVideoMuted: true,
       isScreenSharing: false,
       messages: [],
       unreadCount: 0,

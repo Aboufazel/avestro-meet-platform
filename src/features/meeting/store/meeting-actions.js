@@ -34,8 +34,8 @@ export async function joinMeeting({roomName, displayName, email}) {
             store._addParticipant({
                 id: participantId,
                 displayName,
-                isAudioMuted: false,
-                isVideoMuted: false,
+                isAudioMuted: true,
+                isVideoMuted: true,
             })
         }),
 
@@ -123,16 +123,16 @@ export function sendMessage(text) {
     if (!text?.trim()) return
     jitsiController.sendMessage(text)
 
-    // پیام خودمان را هم به store اضافه کن
-    const {localParticipantId} = useMeetingStore.getState()
-    useMeetingStore.getState()._addMessage({
-        id: `local-${Date.now()}`,
-        participantId: localParticipantId || 'local',
-        displayName: 'شما',
-        text: text.trim(),
-        timestamp: Date.now(),
-        isLocal: true,
-    })
+    // // پیام خودمان را هم به store اضافه کن
+    // const {localParticipantId} = useMeetingStore.getState()
+    // useMeetingStore.getState()._addMessage({
+    //     id: `local-${Date.now()}`,
+    //     participantId: localParticipantId || 'local',
+    //     displayName: 'شما',
+    //     text: text.trim(),
+    //     timestamp: Date.now(),
+    //     isLocal: true,
+    // })
 }
 
 /** Mute همه */

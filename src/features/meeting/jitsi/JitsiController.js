@@ -46,6 +46,30 @@ export class JitsiController {
      * @param {string} params.displayName
      * @param {string} [params.email]
      */
+    // async join({roomName, displayName, email = ''}) {
+    //     if (this._status !== MEETING_STATUS.IDLE && this._status !== MEETING_STATUS.LEFT) {
+    //         console.warn('[JitsiController] Already in a meeting or connecting')
+    //         return
+    //     }
+    //
+    //     this._roomName = roomName
+    //     this._displayName = displayName
+    //
+    //     try {
+    //         this._setStatus(MEETING_STATUS.INITIALIZING)
+    //         await this._createLocalTracks()
+    //
+    //         this._setStatus(MEETING_STATUS.CONNECTING)
+    //         await this._connect()
+    //         await this._joinConference({displayName, email})
+    //
+    //         this._setStatus(MEETING_STATUS.CONNECTED)
+    //     } catch (error) {
+    //         const normalized = normalizeError(error, ERROR_CODES.ROOM_JOIN_FAILED)
+    //         this._setStatus(MEETING_STATUS.FAILED)
+    //         this._emit(JITSI_EVENTS.CONNECTION_FAILED, normalized)
+    //     }
+    // }
     async join({roomName, displayName, email = ''}) {
         if (this._status !== MEETING_STATUS.IDLE && this._status !== MEETING_STATUS.LEFT) {
             console.warn('[JitsiController] Already in a meeting or connecting')
@@ -56,9 +80,6 @@ export class JitsiController {
         this._displayName = displayName
 
         try {
-            this._setStatus(MEETING_STATUS.INITIALIZING)
-            await this._createLocalTracks()
-
             this._setStatus(MEETING_STATUS.CONNECTING)
             await this._connect()
             await this._joinConference({displayName, email})
@@ -98,16 +119,77 @@ export class JitsiController {
     }
 
     /** Toggle میکروفون */
+    // async toggleAudio() {
+    //     const audioTrack = this._localTracks.find((t) => t.getType() === 'audio')
+    //     if (!audioTrack) return
+    //     audioTrack.isMuted() ? await audioTrack.unmute() : await audioTrack.mute()
+    // }
+
     async toggleAudio() {
         const audioTrack = this._localTracks.find((t) => t.getType() === 'audio')
-        if (!audioTrack) return
+
+        if (!audioTrack) {
+            try {
+                const [newTrack] = await getJitsiMeetJS().createLocalTracks({devices: ['audio']})
+                this._localTracks.push(newTrack)
+
+                newTrack.addEventListener(getJitsiMeetJS().events.track.TRACK_MUTE_CHANGED, () => {
+                    const mapped = mapTrack(newTrack)
+                    this._emit(newTrack.isMuted() ? JITSI_EVENTS.TRACK_MUTED : JITSI_EVENTS.TRACK_UNMUTED, mapped)
+                })
+
+                if (this._conference) {
+                    await this._conference.addTrack(newTrack)
+                }
+
+                this._emit(JITSI_EVENTS.TRACK_ADDED, mapTrack(newTrack))
+                this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
+                    participantId: this._conference.myUserId(),
+                    isAudioMuted: false,
+                })
+            } catch (error) {
+                console.warn('[JitsiController] Could not get audio access:', error)
+            }
+            return
+        }
+
         audioTrack.isMuted() ? await audioTrack.unmute() : await audioTrack.mute()
     }
 
     /** Toggle دوربین */
+    // async toggleVideo() {
+    //     const videoTrack = this._localTracks.find((t) => t.getType() === 'video')
+    //     if (!videoTrack) return
+    //     videoTrack.isMuted() ? await videoTrack.unmute() : await videoTrack.mute()
+    // }
     async toggleVideo() {
         const videoTrack = this._localTracks.find((t) => t.getType() === 'video')
-        if (!videoTrack) return
+
+        if (!videoTrack) {
+            try {
+                const [newTrack] = await getJitsiMeetJS().createLocalTracks({devices: ['video']})
+                this._localTracks.push(newTrack)
+
+                newTrack.addEventListener(getJitsiMeetJS().events.track.TRACK_MUTE_CHANGED, () => {
+                    const mapped = mapTrack(newTrack)
+                    this._emit(newTrack.isMuted() ? JITSI_EVENTS.TRACK_MUTED : JITSI_EVENTS.TRACK_UNMUTED, mapped)
+                })
+
+                if (this._conference) {
+                    await this._conference.addTrack(newTrack)
+                }
+
+                this._emit(JITSI_EVENTS.TRACK_ADDED, mapTrack(newTrack))
+                this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
+                    participantId: this._conference.myUserId(),
+                    isVideoMuted: false,
+                })
+            } catch (error) {
+                console.warn('[JitsiController] Could not get video access:', error)
+            }
+            return
+        }
+
         videoTrack.isMuted() ? await videoTrack.unmute() : await videoTrack.mute()
     }
 
@@ -116,14 +198,21 @@ export class JitsiController {
         try {
             const [desktopTrack] = await getJitsiMeetJS().createLocalTracks({devices: ['desktop']})
             const videoTrack = this._localTracks.find((t) => t.getType() === 'video')
+
             if (videoTrack) {
-                await this._conference.replaceTrack(videoTrack, desktopTrack)
-            } else {
-                await this._conference.addTrack(desktopTrack)
+                await this._conference.removeTrack(videoTrack)
+                this._localTracks = this._localTracks.filter((t) => t !== videoTrack)
+                await videoTrack.dispose()
             }
+
+            await this._conference.addTrack(desktopTrack)
+            this._localTracks.push(desktopTrack)
+
             desktopTrack.addEventListener(getJitsiMeetJS().events.track.LOCAL_TRACK_STOPPED, () => {
                 this.stopScreenShare()
             })
+
+            this._emit(JITSI_EVENTS.TRACK_ADDED, mapTrack(desktopTrack))
             this._emit(JITSI_EVENTS.SCREEN_SHARE_STARTED, mapTrack(desktopTrack))
         } catch (error) {
             const normalized = normalizeError(error, ERROR_CODES.SCREEN_SHARE_FAILED)
@@ -135,10 +224,22 @@ export class JitsiController {
     async stopScreenShare() {
         const desktopTrack = this._localTracks.find((t) => t.getVideoType?.() === 'desktop')
         if (!desktopTrack) return
-        const [videoTrack] = await getJitsiMeetJS().createLocalTracks({devices: ['video']})
-        await this._conference.replaceTrack(desktopTrack, videoTrack)
-        await desktopTrack.dispose()
-        this._emit(JITSI_EVENTS.SCREEN_SHARE_STOPPED)
+
+        try {
+            await this._conference.removeTrack(desktopTrack)
+            this._localTracks = this._localTracks.filter((t) => t !== desktopTrack)
+            await desktopTrack.dispose()
+
+            const [videoTrack] = await getJitsiMeetJS().createLocalTracks({devices: ['video']})
+            await this._conference.addTrack(videoTrack)
+            this._localTracks.push(videoTrack)
+
+            this._emit(JITSI_EVENTS.TRACK_ADDED, mapTrack(videoTrack))
+            this._emit(JITSI_EVENTS.SCREEN_SHARE_STOPPED)
+        } catch (error) {
+            const normalized = normalizeError(error, ERROR_CODES.SCREEN_SHARE_FAILED)
+            this._emit(JITSI_EVENTS.CONNECTION_FAILED, normalized)
+        }
     }
 
     /** ارسال پیام چت */
@@ -289,30 +390,44 @@ export class JitsiController {
             //         }
             //     }
             // })
+            // this._conference.on(getJitsiMeetJS().events.conference.TRACK_MUTE_CHANGED, (track) => {
+            //     const mapped = mapTrack(track)
+            //     this._emit(track.isMuted() ? JITSI_EVENTS.TRACK_MUTED : JITSI_EVENTS.TRACK_UNMUTED, mapped)
+            //
+            //     if (track.isLocal()) {
+            //         // برای track لوکال، خودمون participant رو آپدیت کنیم
+            //         const type = track.getType() // 'audio' | 'video'
+            //         this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
+            //             participantId: this._conference.myUserId(),
+            //             ...(type === 'audio' ? {isAudioMuted: track.isMuted()} : {}),
+            //             ...(type === 'video' ? {isVideoMuted: track.isMuted()} : {}),
+            //         })
+            //     } else {
+            //         const participant = this._conference.getParticipantById(track.getParticipantId())
+            //         if (participant) {
+            //             this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, mapParticipant(participant))
+            //         }
+            //     }
+            // })
             this._conference.on(getJitsiMeetJS().events.conference.TRACK_MUTE_CHANGED, (track) => {
                 const mapped = mapTrack(track)
                 this._emit(track.isMuted() ? JITSI_EVENTS.TRACK_MUTED : JITSI_EVENTS.TRACK_UNMUTED, mapped)
 
-                if (track.isLocal()) {
-                    // برای track لوکال، خودمون participant رو آپدیت کنیم
-                    const type = track.getType() // 'audio' | 'video'
-                    this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
-                        participantId: this._conference.myUserId(),
-                        ...(type === 'audio' ? {isAudioMuted: track.isMuted()} : {}),
-                        ...(type === 'video' ? {isVideoMuted: track.isMuted()} : {}),
-                    })
-                } else {
-                    const participant = this._conference.getParticipantById(track.getParticipantId())
-                    if (participant) {
-                        this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, mapParticipant(participant))
-                    }
-                }
+                const type = track.getType()
+                const participantId = track.isLocal() ? this._conference.myUserId() : track.getParticipantId()
+
+                this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
+                    participantId,
+                    ...(type === 'audio' ? {isAudioMuted: track.isMuted()} : {}),
+                    ...(type === 'video' ? {isVideoMuted: track.isMuted()} : {}),
+                })
             })
             this._conference.on(getJitsiMeetJS().events.conference.DOMINANT_SPEAKER_CHANGED, (id) => {
                 this._emit(JITSI_EVENTS.ACTIVE_SPEAKER_CHANGED, {participantId: id})
             })
 
             this._conference.on(getJitsiMeetJS().events.conference.MESSAGE_RECEIVED, (id, text) => {
+                // console.log('[DEBUG] MESSAGE_RECEIVED fired', { id, text, myId: this._conference.myUserId() })
                 const participant = this._conference.getParticipantById(id)
                 const name = participant?.getDisplayName() || 'شرکت‌کننده'
                 this._emit(JITSI_EVENTS.MESSAGE_RECEIVED, mapMessage(id, name, text))
