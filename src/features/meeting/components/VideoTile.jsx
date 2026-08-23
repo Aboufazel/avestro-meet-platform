@@ -62,7 +62,9 @@ export const VideoTile = memo(function VideoTile({participantId, isLarge = false
                     autoPlay
                     playsInline
                     muted={participant.isLocal}
-                    className={`w-full h-full object-contain bg-black ${participant.isLocal && !isScreenShare ? 'scale-x-[-1]' : ''}`}
+                    className={`w-full h-full object-contain bg-black
+                     !rounded-[18px]
+                     ${participant.isLocal && !isScreenShare ? 'scale-x-[-1]' : ''}`}
                 />
             ) : (
                 <VideoPlaceholder name={participant.displayName} isLarge={isLarge}/>
