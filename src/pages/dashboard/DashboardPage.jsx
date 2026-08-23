@@ -43,7 +43,7 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
         <div>
           <h1 className="text-olive-100 font-bold text-lg sm:text-xl mb-1">
-            سلام، {user?.display_name || user?.username || 'کاربر'}! 👋
+            سلام، {user?.display_name || user?.username || 'کاربر'}
           </h1>
           <p className="text-olive-500 text-sm">داشبورد مدیریت رویدادهای شما</p>
         </div>
