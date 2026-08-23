@@ -60,11 +60,10 @@ export default function RoomPage() {
                 isConnected={isConnected}
                 onCopyLink={handleCopyLink}
             />
-            <div className="flex h-full">
+            <div className="flex flex-1 min-h-0 h-full">
                 {/* Video Area */}
                 <div className="flex-1 min-w-0 relative pb-24 md:pb-0">
                     <VideoGrid/>
-
                     <div className="absolute bottom-0 left-0 right-0 z-30">
                         <MeetingControls
                             isAudioMuted={isAudioMuted}

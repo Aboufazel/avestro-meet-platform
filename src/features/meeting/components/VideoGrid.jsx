@@ -54,26 +54,24 @@ export const VideoGrid = memo(function VideoGrid() {
   }
 
   if (count === 1) {
-    return (
-      <div className="h-full p-2">
-        <VideoTile participantId={participants[0].id} isLarge />
-      </div>
-    )
-  }
+  return (
+    <div className="h-full min-h-0 p-2">
+      <VideoTile participantId={participants[0].id} isLarge />
+    </div>
+  )
+}
 
   // هیچکس featured نیست (کسی صحبت نمی‌کنه) → گرید مساوی معمولی
   if (featured.length === 0) {
-    const gridClass =
-      count <= 4 ? 'grid-cols-2' : count <= 9 ? 'grid-cols-3' : 'grid-cols-4'
-
-    return (
-      <div className={`grid ${gridClass} gap-2 p-2 h-full`}>
-        {participants.map((participant) => (
-          <VideoTile key={participant.id} participantId={participant.id} />
-        ))}
-      </div>
-    )
-  }
+  const gridClass = count <= 4 ? 'grid-cols-2' : count <= 9 ? 'grid-cols-3' : 'grid-cols-4'
+  return (
+    <div className={`grid ${gridClass} gap-2 p-2 h-full min-h-0`}>
+      {participants.map((participant) => (
+        <VideoTile key={participant.id} participantId={participant.id} />
+      ))}
+    </div>
+  )
+}
 
   const featuredGridClass =
     featured.length <= 1
