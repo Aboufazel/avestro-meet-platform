@@ -4,6 +4,7 @@ import {useParticipant} from '../hooks/useParticipants'
 import {useParticipantTracks} from '../hooks/useTracks'
 import {useMeetingStore} from '../store/meeting-store'
 import {selectIsMeetingMuted} from '../store/meeting-selectors'
+import {selectRenegotiationTick} from '../store/meeting-selectors'
 
 /**
  * VideoTile
@@ -13,9 +14,12 @@ import {selectIsMeetingMuted} from '../store/meeting-selectors'
  */
 export const VideoTile = memo(function VideoTile({participantId, isLarge = false}) {
     const participant = useParticipant(participantId)
+    const renegotiationTick = useMeetingStore(selectRenegotiationTick)
     const {videoTrack, desktopTrack, audioTrack} = useParticipantTracks(participantId)
     const audioRef = useRef(null)
     const isMeetingMuted = useMeetingStore(selectIsMeetingMuted)
+    const isSafariOrIOS = /^((?!chrome|android).)*safari/i.test(navigator.userAgent) || /iPad|iPhone|iPod/.test(navigator.userAgent)
+
 
     useEffect(() => {
         if (audioRef.current) {
@@ -42,6 +46,16 @@ export const VideoTile = memo(function VideoTile({participantId, isLarge = false
             activeTrack.jitsiTrack.detach(videoRef.current)
         }
     }, [activeTrack?.jitsiTrack, activeTrack?.isMuted])
+
+
+    useEffect(() => {
+        if (!videoRef.current || !activeTrack?.jitsiTrack) return
+        activeTrack.jitsiTrack.attach(videoRef.current)
+        return () => {
+            activeTrack.jitsiTrack.detach(videoRef.current)
+        }
+    }, [activeTrack?.jitsiTrack, activeTrack?.isMuted, ...(isSafariOrIOS ? [renegotiationTick] : [])])
+
 
     if (!participant) return null
 

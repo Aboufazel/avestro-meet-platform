@@ -67,6 +67,8 @@ export default function RoomPage() {
                 onToggleMeetingMute={toggleMeetingMute}
             />
             <div className="flex flex-1 min-h-0 h-full">
+                {/* Side Panel */}
+                <SidePanel/>
                 {/* Video Area */}
                 <div className="flex-1 min-w-0 relative pb-24 md:pb-0">
                     <VideoGrid/>
@@ -82,8 +84,6 @@ export default function RoomPage() {
                         />
                     </div>
                 </div>
-                {/* Side Panel */}
-                <SidePanel/>
                 <SettingsModal/>
             </div>
         </div>
