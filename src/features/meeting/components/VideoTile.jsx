@@ -2,6 +2,8 @@ import {useEffect, useRef, memo} from 'react'
 import {Mic, MicOff, MonitorUp} from 'lucide-react'
 import {useParticipant} from '../hooks/useParticipants'
 import {useParticipantTracks} from '../hooks/useTracks'
+import {useMeetingStore} from '../store/meeting-store'
+import {selectIsMeetingMuted} from '../store/meeting-selectors'
 
 /**
  * VideoTile
@@ -13,6 +15,13 @@ export const VideoTile = memo(function VideoTile({participantId, isLarge = false
     const participant = useParticipant(participantId)
     const {videoTrack, desktopTrack, audioTrack} = useParticipantTracks(participantId)
     const audioRef = useRef(null)
+    const isMeetingMuted = useMeetingStore(selectIsMeetingMuted)
+
+    useEffect(() => {
+        if (audioRef.current) {
+            audioRef.current.muted = isMeetingMuted
+        }
+    }, [isMeetingMuted])
 
     useEffect(() => {
         if (!audioRef.current || !audioTrack?.jitsiTrack || participant?.isLocal) return

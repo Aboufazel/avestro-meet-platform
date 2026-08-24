@@ -32,6 +32,9 @@ export const useMeetingStore = create((set, get) => ({
     isSettingsOpen: false,
     selectedAudioOutputId: null,
 
+
+    isMeetingMuted: false,
+
     // ─── Chat ──────────────────────────────────────────────────────────────
     /** @type {import('../jitsi/jitsi-mappers.js').AppMessage[]} */
     messages: [],
@@ -128,6 +131,7 @@ export const useMeetingStore = create((set, get) => ({
             return {isPanelOpen: true, activePanelTab: tab}
         }),
 
+    toggleMeetingMute: () => set((state) => ({ isMeetingMuted: !state.isMeetingMuted })),
     openSettings: () => set({isSettingsOpen: true}),
     closeSettings: () => set({isSettingsOpen: false}),
     setSelectedAudioOutputId: (id) => set({selectedAudioOutputId: id}),
@@ -141,6 +145,7 @@ export const useMeetingStore = create((set, get) => ({
             status: MEETING_STATUS.IDLE,
             error: null,
             roomName: null,
+            isMeetingMuted: false,
             isSettingsOpen: false,
             localParticipantId: null,
             participants: new Map(),

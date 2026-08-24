@@ -9,20 +9,23 @@ import {MeetingControls} from '../../features/meeting/components/MeetingControls
 import {SidePanel} from '../../features/meeting/components/SidePanel'
 import {RoomHeader} from "../../components/shared/RoomHeader.jsx";
 import {SettingsModal} from "../../features/meeting/components/SettingsModal.jsx";
+import {useMeetingStore} from '../../features/meeting/store/meeting-store'
+import {selectIsMeetingMuted} from '../../features/meeting/store/meeting-selectors'
 
 export default function RoomPage() {
     const {slug: roomName} = useParams()
 
-    const {
-        status,
-        isConnected,
-        error,
-        isConnecting,
+    const isMeetingMuted = useMeetingStore(selectIsMeetingMuted)
+    const toggleMeetingMute = useMeetingStore((s) => s.toggleMeetingMute)
 
+    const {
+        error,
+        status,
+        isConnecting,
         isAudioMuted,
         isVideoMuted,
         isScreenSharing,
-
+        isConnected,
         leave,
         toggleAudio,
         toggleVideo,
@@ -60,6 +63,8 @@ export default function RoomPage() {
                 slug={roomName}
                 isConnected={isConnected}
                 onCopyLink={handleCopyLink}
+                isMeetingMuted={isMeetingMuted}
+                onToggleMeetingMute={toggleMeetingMute}
             />
             <div className="flex flex-1 min-h-0 h-full">
                 {/* Video Area */}
@@ -77,10 +82,9 @@ export default function RoomPage() {
                         />
                     </div>
                 </div>
-
                 {/* Side Panel */}
                 <SidePanel/>
-                <SettingsModal />
+                <SettingsModal/>
             </div>
         </div>
     )

@@ -43,7 +43,7 @@ export const selectLocalAudioTrack = (s) => s.tracks.get('local-audio')
 export const selectLocalVideoTrack = (s) => s.tracks.get('local-video')
 export const selectIsSettingsOpen = (s) => s.isSettingsOpen
 export const selectSelectedAudioOutputId = (s) => s.selectedAudioOutputId
-
+export const selectIsMeetingMuted = (s) => s.isMeetingMuted
 /** participant فعال (active speaker) */
 export const selectActiveSpeaker = (s) =>
   s.activeSpeakerId ? s.participants.get(s.activeSpeakerId) : null
