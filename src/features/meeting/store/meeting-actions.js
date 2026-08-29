@@ -1,7 +1,7 @@
 import { jitsiController } from '../jitsi/JitsiController.js'
 import { JITSI_EVENTS } from '../jitsi/jitsi-events.js'
 import { useMeetingStore } from './meeting-store.js'
-
+import { startLocalRecording, stopLocalRecording, downloadRecording } from '../jitsi/recordingService.js'
 /**
  * meeting-actions.js
  *
@@ -11,8 +11,37 @@ import { useMeetingStore } from './meeting-store.js'
  */
 
 let _unsubscribers = []
-
 let _joinGeneration = 0
+
+let _currentRoomName = null
+let _currentExternalId = null
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.avestro.ir'
+
+
+let _recordingInterval = null
+
+export async function startRecording() {
+    try {
+        await startLocalRecording()
+        useMeetingStore.getState()._setRecording(true)
+        _recordingInterval = setInterval(() => {
+            useMeetingStore.getState()._incrementRecordingSeconds()
+        }, 1000)
+    } catch (error) {
+        console.warn('[meeting-actions] Failed to start recording:', error)
+        throw error
+    }
+}
+
+export async function stopRecording() {
+    clearInterval(_recordingInterval)
+    const blob = await stopLocalRecording()
+    useMeetingStore.getState()._setRecording(false)
+    if (blob) {
+        downloadRecording(blob, `جلسه-${new Date().toISOString().slice(0, 19)}.webm`)
+    }
+}
 
 /**
  * شروع جلسه
@@ -27,6 +56,19 @@ export async function joinMeeting({ roomName, displayName, email = '' }) {
     const generation = ++_joinGeneration
 
     store.resetMeeting()
+    _currentRoomName = roomName
+
+    // شناسه‌ی ثابت این تلاش join — از اول تا آخر (چک ظرفیت، leave، beforeunload) همین می‌ماند
+    const externalId = crypto.randomUUID()
+    _currentExternalId = externalId
+
+    // قبل از اتصال واقعی به Jitsi، از بک‌اند اجازه بگیر (چک ظرفیت بر اساس پلن میزبان)
+    store._setStatus('connecting')
+    const allowed = await _checkRoomCapacity(roomName, externalId)
+    if (!allowed) {
+        store._setError({ message: 'ظرفیت این جلسه بر اساس پلن میزبان تکمیل شده است.' })
+        return
+    }
 
     /**
      * ─────────────────────────────────────────────────────────────
@@ -94,6 +136,9 @@ export async function joinMeeting({ roomName, displayName, email = '' }) {
                     isModerator: false,
                     isActiveSpeaker: false,
                 })
+
+                // توجه: به بک‌اند خبر نمی‌دیم اینجا — چون قبل از join شدن،
+                // توی _checkRoomCapacity قبلاً رکورد ساخته شده با همون externalId ثابت.
             }
         )
     )
@@ -155,9 +200,6 @@ export async function joinMeeting({ roomName, displayName, email = '' }) {
         )
     )
 
-
-
-
     /**
      * ─────────────────────────────────────────────────────────────
      * PARTICIPANT UPDATE
@@ -211,74 +253,46 @@ export async function joinMeeting({ roomName, displayName, email = '' }) {
      * وضعیت mute همان لحظه از track گرفته می‌شود.
      */
 
-    // _unsubscribers.push(
-    //     jitsiController.on(
-    //         JITSI_EVENTS.TRACK_ADDED,
-    //         (track) => {
-    //             if (generation !== _joinGeneration) return
-    //             if (!track) return
-    //
-    //             useMeetingStore
-    //                 .getState()
-    //                 ._addTrack(track)
-    //         }
-    //     )
-    // )
-
     _unsubscribers.push(
-    jitsiController.on(
-        JITSI_EVENTS.TRACK_ADDED,
-        (track) => {
-            if (generation !== _joinGeneration) return
-            if (!track) return
+        jitsiController.on(
+            JITSI_EVENTS.TRACK_ADDED,
+            (track) => {
+                if (generation !== _joinGeneration) return
+                if (!track) return
 
-            useMeetingStore
-                .getState()
-                ._addTrack(track)
+                useMeetingStore
+                    .getState()
+                    ._addTrack(track)
 
-            useMeetingStore
-                .getState()
-                ._bumpRenegotiationTick()
-        }
+                useMeetingStore
+                    .getState()
+                    ._bumpRenegotiationTick()
+            }
+        )
     )
-)
 
     /**
      * ─────────────────────────────────────────────────────────────
      * TRACK REMOVED
      */
 
-    // _unsubscribers.push(
-    //     jitsiController.on(
-    //         JITSI_EVENTS.TRACK_REMOVED,
-    //         (track) => {
-    //             if (generation !== _joinGeneration) return
-    //             if (!track) return
-    //
-    //             useMeetingStore
-    //                 .getState()
-    //                 ._removeTrack(track)
-    //         }
-    //     )
-    // )
-
     _unsubscribers.push(
-    jitsiController.on(
-        JITSI_EVENTS.TRACK_REMOVED,
-        (track) => {
-            if (generation !== _joinGeneration) return
-            if (!track) return
+        jitsiController.on(
+            JITSI_EVENTS.TRACK_REMOVED,
+            (track) => {
+                if (generation !== _joinGeneration) return
+                if (!track) return
 
-            useMeetingStore
-                .getState()
-                ._removeTrack(track)
+                useMeetingStore
+                    .getState()
+                    ._removeTrack(track)
 
-            useMeetingStore
-                .getState()
-                ._bumpRenegotiationTick()
-        }
+                useMeetingStore
+                    .getState()
+                    ._bumpRenegotiationTick()
+            }
+        )
     )
-)
 
     /**
      * ─────────────────────────────────────────────────────────────
@@ -408,11 +422,50 @@ export async function leaveMeeting() {
     // session قبلی دیگر اجازه تغییر state ندارد
     _joinGeneration++
 
+    const roomName = _currentRoomName
+    const externalId = _currentExternalId
+
     try {
         await jitsiController.leave()
     } finally {
         _unbindAll()
         useMeetingStore.getState().resetMeeting()
+        _notifyBackendLeave(roomName, externalId)
+        _currentRoomName = null
+        _currentExternalId = null
+    }
+}
+
+/**
+ * چک ظرفیت روم و ثبت اولیه‌ی حضور — قبل از اتصال واقعی به Jitsi صدا زده می‌شود
+ */
+async function _checkRoomCapacity(roomName, externalId) {
+    try {
+        const res = await fetch(`${API_BASE_URL}/rooms/${roomName}/join/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ external_participant_id: externalId }),
+        })
+        return res.ok
+    } catch (error) {
+        console.warn('[meeting-actions] Failed to check room capacity:', error)
+        return true // اگه بک‌اند در دسترس نبود، اجازه بده وارد بشه (fail-open)
+    }
+}
+
+/**
+ * خبر دادن به بک‌اند برای بستن رکورد حضور، موقع خروج
+ */
+async function _notifyBackendLeave(roomName, externalId) {
+    if (!roomName || !externalId) return
+    try {
+        await fetch(`${API_BASE_URL}/rooms/${roomName}/leave/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ external_participant_id: externalId }),
+        })
+    } catch (error) {
+        console.warn('[meeting-actions] Failed to notify backend of leave:', error)
     }
 }
 
@@ -443,8 +496,6 @@ export async function getDevices() {
 export async function setAudioInputDevice(deviceId) {
     await jitsiController.setAudioInputDevice(deviceId)
 }
-
-
 
 /**
  * تغییر camera
@@ -522,4 +573,24 @@ function _unbindAll() {
     }
 
     _unsubscribers = []
+}
+
+// ─── Browser lifecycle safety net ──────────────────────────────
+// اگر کاربر بدون leave صریح (بستن تب/رفرش) خارج بشه، این تضمین می‌کنه
+// رکورد حضورش توی بک‌اند بسته بشه. سطح ماژول است، فقط یک‌بار ثبت می‌شود.
+if (typeof window !== 'undefined') {
+    const sendLeaveBeacon = () => {
+        if (_currentRoomName && _currentExternalId) {
+            navigator.sendBeacon(
+                `${API_BASE_URL}/rooms/${_currentRoomName}/leave/`,
+                new Blob(
+                    [JSON.stringify({ external_participant_id: _currentExternalId })],
+                    { type: 'application/json' }
+                )
+            )
+        }
+    }
+
+    window.addEventListener('beforeunload', sendLeaveBeacon)
+    window.addEventListener('pagehide', sendLeaveBeacon)
 }

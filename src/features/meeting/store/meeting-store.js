@@ -1,5 +1,5 @@
-import { create } from 'zustand'
-import { MEETING_STATUS } from '../jitsi/jitsi-events.js'
+import {create} from 'zustand'
+import {MEETING_STATUS} from '../jitsi/jitsi-events.js'
 
 /**
  * Meeting Store
@@ -28,6 +28,11 @@ export const useMeetingStore = create((set, get) => ({
 
     participants: new Map(),
     activeSpeakerId: null,
+
+    // state اولیه:
+    isRecording: false,
+    recordingSeconds: 0,
+
 
     // ─────────────────────────────────────────────────────────────
     // TRACKS
@@ -210,6 +215,9 @@ export const useMeetingStore = create((set, get) => ({
     // ─────────────────────────────────────────────────────────────
     // ACTIVE SPEAKER
     // ─────────────────────────────────────────────────────────────
+    // اکشن‌ها (کنار بقیه‌ی _set...):
+    _setRecording: (isRecording) => set({isRecording, recordingSeconds: 0}),
+    _incrementRecordingSeconds: () => set((state) => ({recordingSeconds: state.recordingSeconds + 1})),
 
     _setActiveSpeaker: (participantId) =>
         set((state) => {
@@ -518,9 +526,8 @@ export const useMeetingStore = create((set, get) => ({
     // ─────────────────────────────────────────────────────────────
 
 
-
 // اکشن جدید:
-_bumpRenegotiationTick: () => set((state) => ({ renegotiationTick: state.renegotiationTick + 1 })),
+    _bumpRenegotiationTick: () => set((state) => ({renegotiationTick: state.renegotiationTick + 1})),
     _setScreenSharing: (enabled, track = null) =>
         set((state) => {
             const participants =

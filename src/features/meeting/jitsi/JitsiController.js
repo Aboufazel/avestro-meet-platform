@@ -70,6 +70,7 @@ export class JitsiController {
     //         this._emit(JITSI_EVENTS.CONNECTION_FAILED, normalized)
     //     }
     // }
+
     async join({roomName, displayName, email = ''}) {
         if (this._status !== MEETING_STATUS.IDLE && this._status !== MEETING_STATUS.LEFT) {
             console.warn('[JitsiController] Already in a meeting or connecting')
@@ -502,6 +503,43 @@ export class JitsiController {
             this._conference.on(getJitsiMeetJS().events.conference.TRACK_REMOVED, (track) => {
                 this._emit(JITSI_EVENTS.TRACK_REMOVED, mapTrack(track))
             })
+
+            this._conference.on(
+                getJitsiMeetJS().events.conference.PARTICIPANT_CONN_STATUS_CHANGED,
+                (participantId) => {
+                    const participant = this._conference.getParticipantById(participantId)
+                    if (!participant) return
+
+                    const connectionStatus = participant.getConnectionStatus()
+                    // مقادیر ممکن: 'active' | 'inactive' | 'interrupted'
+                    this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
+                        participantId,
+                        isConnectionInterrupted: connectionStatus !== 'active',
+                    })
+                }
+            )
+
+            // کیفیت اتصال خودمون (لوکال)
+            this._conference.on(
+                getJitsiMeetJS().events.connectionQuality.LOCAL_STATS_UPDATED,
+                (stats) => {
+                    this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
+                        participantId: this._conference.myUserId(),
+                        connectionQuality: stats?.connectionQuality ?? null,
+                    })
+                }
+            )
+
+// کیفیت اتصال بقیه (remote)
+            this._conference.on(
+                getJitsiMeetJS().events.connectionQuality.REMOTE_STATS_UPDATED,
+                (participantId, stats) => {
+                    this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
+                        participantId,
+                        connectionQuality: stats?.connectionQuality ?? null,
+                    })
+                }
+            )
 
             // this._conference.on(getJitsiMeetJS().events.conference.TRACK_MUTE_CHANGED, (track) => {
             //     const mapped = mapTrack(track)

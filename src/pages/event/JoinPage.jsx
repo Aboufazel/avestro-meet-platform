@@ -34,14 +34,23 @@ export default function JoinPage() {
         resolver: yupResolver(guestSchema),
     })
 
+    // function handleJoinAsUser() {
+    //     joinRoom({})
+    // }
+    //
+    // function handleJoinAsGuest(data) {
+    //     // joinRoom({guest_name: data.guest_name})
+    //     sessionStorage.setItem('guest_name', data.guest_name)
+    //     joinRoom({guest_name: data.guest_name})
+    // }
+
     function handleJoinAsUser() {
-        joinRoom({})
+        navigate(`/room/${slug}`)
     }
 
     function handleJoinAsGuest(data) {
-        // joinRoom({guest_name: data.guest_name})
         sessionStorage.setItem('guest_name', data.guest_name)
-        joinRoom({guest_name: data.guest_name})
+        navigate(`/room/${slug}`)
     }
 
     if (isLoading) {

@@ -121,6 +121,8 @@ export const selectSelectedAudioOutputId =
 
 export const selectRenegotiationTick = (s) => s.renegotiationTick
 
+export const selectIsRecording = (s) => s.isRecording
+export const selectRecordingSeconds = (s) => s.recordingSeconds
 // ─────────────────────────────────────────────────────────────
 // CONNECTION
 // ─────────────────────────────────────────────────────────────

@@ -11,6 +11,9 @@ import {RoomHeader} from "../../components/shared/RoomHeader.jsx";
 import {SettingsModal} from "../../features/meeting/components/SettingsModal.jsx";
 import {useMeetingStore} from '../../features/meeting/store/meeting-store'
 import {selectIsMeetingMuted} from '../../features/meeting/store/meeting-selectors'
+import {selectIsRecording, selectRecordingSeconds} from '../../features/meeting/store/meeting-selectors'
+import {startRecording, stopRecording} from '../../features/meeting/store/meeting-actions'
+import toast from "react-hot-toast";
 
 export default function RoomPage() {
     const {slug: roomName} = useParams()
@@ -18,6 +21,21 @@ export default function RoomPage() {
     const isMeetingMuted = useMeetingStore(selectIsMeetingMuted)
     const toggleMeetingMute = useMeetingStore((s) => s.toggleMeetingMute)
 
+
+    const isRecording = useMeetingStore(selectIsRecording)
+    const recordingSeconds = useMeetingStore(selectRecordingSeconds)
+
+    const handleToggleRecording = async () => {
+        try {
+            if (isRecording) {
+                await stopRecording()
+            } else {
+                await startRecording()
+            }
+        } catch {
+            toast.error('امکان شروع ضبط وجود نداشت.')
+        }
+    }
     const {
         error,
         status,
@@ -65,6 +83,9 @@ export default function RoomPage() {
                 onCopyLink={handleCopyLink}
                 isMeetingMuted={isMeetingMuted}
                 onToggleMeetingMute={toggleMeetingMute}
+                isRecording={isRecording}
+                recordingSeconds={recordingSeconds}
+                onToggleRecording={handleToggleRecording}
             />
             <div className="flex flex-1 min-h-0 h-full">
                 {/* Side Panel */}

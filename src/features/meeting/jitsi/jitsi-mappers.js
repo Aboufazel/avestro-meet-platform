@@ -49,6 +49,8 @@ export function mapParticipant(jitsiParticipant, isLocal = false) {
     isScreenSharing: false,
     isModerator: jitsiParticipant.isModerator(),
     isActiveSpeaker: false,
+    isConnectionInterrupted: false,
+    connectionQuality: 100,
   }
 }
 
