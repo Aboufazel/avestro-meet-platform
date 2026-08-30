@@ -2,6 +2,9 @@ import { jitsiController } from '../jitsi/JitsiController.js'
 import { JITSI_EVENTS } from '../jitsi/jitsi-events.js'
 import { useMeetingStore } from './meeting-store.js'
 import { startLocalRecording, stopLocalRecording, downloadRecording } from '../jitsi/recordingService.js'
+import {useAuthStore} from "../../../store/authStore.js";
+import { startVoiceRecording, stopVoiceRecording } from '../jitsi/recordingService.js'
+
 /**
  * meeting-actions.js
  *
@@ -10,6 +13,32 @@ import { startLocalRecording, stopLocalRecording, downloadRecording } from '../j
  * UI نباید مستقیماً با JitsiController صحبت کند.
  */
 
+
+
+
+let _voiceRecordingInterval = null
+
+export async function startVoiceRec() {
+    try {
+        await startVoiceRecording()
+        useMeetingStore.getState()._setVoiceRecording(true)
+        _voiceRecordingInterval = setInterval(() => {
+            useMeetingStore.getState()._incrementVoiceRecordingSeconds()
+        }, 1000)
+    } catch (error) {
+        console.warn('[meeting-actions] Failed to start voice recording:', error)
+        throw error
+    }
+}
+
+export async function stopVoiceRec() {
+    clearInterval(_voiceRecordingInterval)
+    const blob = await stopVoiceRecording()
+    useMeetingStore.getState()._setVoiceRecording(false)
+    if (blob) {
+        downloadRecording(blob, `صدای-جلسه-${new Date().toISOString().slice(0, 19)}.webm`)
+    }
+}
 let _unsubscribers = []
 let _joinGeneration = 0
 
@@ -64,7 +93,7 @@ export async function joinMeeting({ roomName, displayName, email = '' }) {
 
     // قبل از اتصال واقعی به Jitsi، از بک‌اند اجازه بگیر (چک ظرفیت بر اساس پلن میزبان)
     store._setStatus('connecting')
-    const allowed = await _checkRoomCapacity(roomName, externalId)
+    const allowed = await _checkRoomCapacity(roomName, externalId, displayName)
     if (!allowed) {
         store._setError({ message: 'ظرفیت این جلسه بر اساس پلن میزبان تکمیل شده است.' })
         return
@@ -436,32 +465,73 @@ export async function leaveMeeting() {
     }
 }
 
+function _authHeaders() {
+    const token = useAuthStore.getState().token
+    return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 /**
  * چک ظرفیت روم و ثبت اولیه‌ی حضور — قبل از اتصال واقعی به Jitsi صدا زده می‌شود
  */
-async function _checkRoomCapacity(roomName, externalId) {
+// async function _checkRoomCapacity(roomName, externalId) {
+//     try {
+//         const res = await fetch(`${API_BASE_URL}/rooms/${roomName}/join/`, {
+//             method: 'POST',
+//             headers: { 'Content-Type': 'application/json' },
+//             body: JSON.stringify({ external_participant_id: externalId }),
+//         })
+//         return res.ok
+//     } catch (error) {
+//         console.warn('[meeting-actions] Failed to check room capacity:', error)
+//         return true // اگه بک‌اند در دسترس نبود، اجازه بده وارد بشه (fail-open)
+//     }
+// }
+
+async function _checkRoomCapacity(roomName, externalId, displayName) {
     try {
         const res = await fetch(`${API_BASE_URL}/rooms/${roomName}/join/`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ external_participant_id: externalId }),
+            headers: {
+                'Content-Type': 'application/json',
+                ..._authHeaders(),
+            },
+            body: JSON.stringify({
+                external_participant_id: externalId,
+                guest_name: displayName || '',
+            }),
         })
         return res.ok
     } catch (error) {
         console.warn('[meeting-actions] Failed to check room capacity:', error)
-        return true // اگه بک‌اند در دسترس نبود، اجازه بده وارد بشه (fail-open)
+        return true
     }
 }
 
 /**
  * خبر دادن به بک‌اند برای بستن رکورد حضور، موقع خروج
  */
+// async function _notifyBackendLeave(roomName, externalId) {
+//     if (!roomName || !externalId) return
+//     try {
+//         await fetch(`${API_BASE_URL}/rooms/${roomName}/leave/`, {
+//             method: 'POST',
+//             headers: { 'Content-Type': 'application/json' },
+//             body: JSON.stringify({ external_participant_id: externalId }),
+//         })
+//     } catch (error) {
+//         console.warn('[meeting-actions] Failed to notify backend of leave:', error)
+//     }
+// }
+
 async function _notifyBackendLeave(roomName, externalId) {
     if (!roomName || !externalId) return
     try {
         await fetch(`${API_BASE_URL}/rooms/${roomName}/leave/`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                ..._authHeaders(),
+            },
             body: JSON.stringify({ external_participant_id: externalId }),
         })
     } catch (error) {

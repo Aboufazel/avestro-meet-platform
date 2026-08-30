@@ -1,9 +1,11 @@
-import { memo, useEffect, useState } from 'react'
-import { Wifi, WifiOff, Copy, Check, Volume2, VolumeX, Circle, Square } from 'lucide-react'
+import {memo, useEffect, useState} from 'react'
+import {Mic,Check, Circle, Copy, Volume2, VolumeX, Wifi, WifiOff} from 'lucide-react'
 import {useRoom} from "../../hooks/useRooms.js";
+import {useAuthStore} from '../../store/authStore'
 
-function Timer({ isConnected }) {
+function Timer({isConnected}) {
     const [seconds, setSeconds] = useState(0)
+
 
     useEffect(() => {
         if (!isConnected) return
@@ -26,7 +28,7 @@ function Timer({ isConnected }) {
     )
 }
 
-function RecordingTimer({ seconds }) {
+function RecordingTimer({seconds}) {
     const format = (totalSeconds) => {
         const h = Math.floor(totalSeconds / 3600)
         const m = Math.floor((totalSeconds % 3600) / 60)
@@ -43,21 +45,28 @@ function RecordingTimer({ seconds }) {
 }
 
 export const RoomHeader = memo(function RoomHeader({
-    slug,
-    isConnected,
-    onCopyLink,
-    isMeetingMuted,
-    onToggleMeetingMute,
-    isRecording,
-    recordingSeconds,
-    onToggleRecording,
-}) {
+                                                       slug,
+                                                       isConnected,
+                                                       onCopyLink,
+                                                       isMeetingMuted,
+                                                       onToggleMeetingMute,
+                                                       isRecording,
+                                                       recordingSeconds,
+                                                       onToggleRecording,
+                                                       isVoiceRecording,
+                                                       voiceRecordingSeconds,
+                                                       onToggleVoiceRecording
+                                                   }) {
     const [copied, setCopied] = useState(false)
 
     const {
         data: room,
         isLoading,
-        isError} = useRoom(slug)
+        isError
+    } = useRoom(slug)
+
+    const currentUser = useAuthStore((s) => s.user)
+    const isHost = room?.host?.id === currentUser?.id
 
     const handleCopy = () => {
         onCopyLink?.()
@@ -68,7 +77,7 @@ export const RoomHeader = memo(function RoomHeader({
     return (
         <header className="h-14 bg-olive-900 border-b border-olive-800 flex items-center justify-between px-4 shrink-0">
             <div className="flex items-center gap-2 min-w-0">
-                <img src="/avestro-logo.png" alt="اَوسترو" className="w-7 h-7 shrink-0" />
+                <img src="/avestro-logo.png" alt="اَوسترو" className="w-7 h-7 shrink-0"/>
                 <span className="text-olive-100 font-medium text-sm hidden sm:block">اَوسترو میت</span>
                 <span className="text-olive-600 text-sm hidden sm:block">·</span>
                 <span className="text-olive-500 text-sm truncate max-w-[120px] sm:max-w-none">
@@ -78,40 +87,66 @@ export const RoomHeader = memo(function RoomHeader({
             </div>
 
             <div className="flex items-center gap-2 sm:gap-4">
-                <Timer isConnected={isConnected} />
+                <Timer isConnected={isConnected}/>
 
                 <div className="flex items-center gap-1">
                     {isConnected ? (
-                        <Wifi className="w-4 h-4 text-olive-500" />
+                        <Wifi className="w-4 h-4 text-olive-500"/>
                     ) : (
-                        <WifiOff className="w-4 h-4 text-olive-600 animate-pulse" />
+                        <WifiOff className="w-4 h-4 text-olive-600 animate-pulse"/>
                     )}
                     <span className="text-xs text-olive-500 hidden sm:block">
                         {isConnected ? 'متصل' : 'در حال اتصال...'}
                     </span>
                 </div>
-
-                {/* دکمه‌ی ضبط جلسه */}
-                <button
-                    type="button"
-                    onClick={onToggleRecording}
-                    title={isRecording ? 'توقف ضبط جلسه' : 'شروع ضبط جلسه'}
-                    className={`flex items-center gap-1.5 text-xs transition-colors border rounded-lg px-2.5 py-1.5
-                        ${isRecording
+                {isHost && (
+                    <button
+                        type="button"
+                        onClick={onToggleVoiceRecording}
+                        title={isVoiceRecording ? 'توقف ضبط صدا' : 'شروع ضبط صدا'}
+                        className={`flex items-center gap-1.5 text-xs transition-colors border rounded-lg px-2.5 py-1.5
+            ${isVoiceRecording
                             ? 'text-red-400 border-red-500/50 bg-red-500/10 hover:bg-red-500/20'
                             : 'text-olive-500 border-olive-800 hover:text-olive-300'
                         }`}
-                >
-                    {isRecording ? (
-                        <>
-                            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                            <RecordingTimer seconds={recordingSeconds} />
-                        </>
-                    ) : (
-                        <Circle className="w-3.5 h-3.5" />
-                    )}
-                    <span className="hidden sm:block">{isRecording ? 'در حال ضبط' : 'ضبط جلسه'}</span>
-                </button>
+                    >
+                        {isVoiceRecording ? (
+                            <>
+                                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"/>
+                                <RecordingTimer seconds={voiceRecordingSeconds}/>
+                            </>
+                        ) : (
+                            <Mic className="w-3.5 h-3.5"/>
+                        )}
+                        <span className="hidden sm:block">{isVoiceRecording ? 'در حال ضبط صدا' : 'ضبط صدا'}</span>
+                    </button>
+                )}
+
+                {/* دکمه‌ی ضبط جلسه */}
+                {
+                    isHost && (
+                        <button
+                            type="button"
+                            onClick={onToggleRecording}
+                            title={isRecording ? 'توقف ضبط جلسه' : 'شروع ضبط جلسه'}
+                            className={`flex items-center gap-1.5 text-xs transition-colors border rounded-lg px-2.5 py-1.5
+                        ${isRecording
+                                ? 'text-red-400 border-red-500/50 bg-red-500/10 hover:bg-red-500/20'
+                                : 'text-olive-500 border-olive-800 hover:text-olive-300'
+                            }`}
+                        >
+                            {isRecording ? (
+                                <>
+                                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"/>
+                                    <RecordingTimer seconds={recordingSeconds}/>
+                                </>
+                            ) : (
+                                <Circle className="w-3.5 h-3.5"/>
+                            )}
+                            <span className="hidden sm:block">{isRecording ? 'در حال ضبط' : 'ضبط جلسه'}</span>
+                        </button>
+                    )
+                }
 
                 <button
                     type="button"
@@ -119,11 +154,11 @@ export const RoomHeader = memo(function RoomHeader({
                     title={isMeetingMuted ? 'روشن کردن صدای جلسه' : 'خاموش کردن صدای جلسه'}
                     className={`flex items-center gap-1.5 text-xs transition-colors border rounded-lg px-2.5 py-1.5
                         ${isMeetingMuted
-                            ? 'text-red-400 border-red-500/40 hover:text-red-300 hover:border-red-400'
-                            : 'text-olive-500 border-olive-800 hover:text-olive-300'
-                        }`}
+                        ? 'text-red-400 border-red-500/40 hover:text-red-300 hover:border-red-400'
+                        : 'text-olive-500 border-olive-800 hover:text-olive-300'
+                    }`}
                 >
-                    {isMeetingMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                    {isMeetingMuted ? <VolumeX className="w-3.5 h-3.5"/> : <Volume2 className="w-3.5 h-3.5"/>}
                     <span className="hidden sm:block">{isMeetingMuted ? 'صدا خاموش' : 'صدای جلسه'}</span>
                 </button>
 
@@ -132,7 +167,7 @@ export const RoomHeader = memo(function RoomHeader({
                     onClick={handleCopy}
                     className="flex items-center gap-1.5 text-xs text-olive-500 hover:text-olive-300 transition-colors border border-olive-800 rounded-lg px-2.5 py-1.5"
                 >
-                    {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copied ? <Check className="w-3.5 h-3.5 text-green-400"/> : <Copy className="w-3.5 h-3.5"/>}
                     <span className="hidden sm:block">{copied ? 'کپی شد' : 'کپی لینک'}</span>
                 </button>
             </div>

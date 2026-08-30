@@ -33,6 +33,9 @@ export const useMeetingStore = create((set, get) => ({
     isRecording: false,
     recordingSeconds: 0,
 
+    isVoiceRecording: false,
+    voiceRecordingSeconds: 0,
+
 
     // ─────────────────────────────────────────────────────────────
     // TRACKS
@@ -218,6 +221,9 @@ export const useMeetingStore = create((set, get) => ({
     // اکشن‌ها (کنار بقیه‌ی _set...):
     _setRecording: (isRecording) => set({isRecording, recordingSeconds: 0}),
     _incrementRecordingSeconds: () => set((state) => ({recordingSeconds: state.recordingSeconds + 1})),
+
+    _setVoiceRecording: (isVoiceRecording) => set({isVoiceRecording, voiceRecordingSeconds: 0}),
+    _incrementVoiceRecordingSeconds: () => set((state) => ({voiceRecordingSeconds: state.voiceRecordingSeconds + 1})),
 
     _setActiveSpeaker: (participantId) =>
         set((state) => {

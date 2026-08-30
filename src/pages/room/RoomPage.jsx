@@ -14,6 +14,8 @@ import {selectIsMeetingMuted} from '../../features/meeting/store/meeting-selecto
 import {selectIsRecording, selectRecordingSeconds} from '../../features/meeting/store/meeting-selectors'
 import {startRecording, stopRecording} from '../../features/meeting/store/meeting-actions'
 import toast from "react-hot-toast";
+import {selectIsVoiceRecording, selectVoiceRecordingSeconds} from '../../features/meeting/store/meeting-selectors'
+import {startVoiceRec, stopVoiceRec} from '../../features/meeting/store/meeting-actions'
 
 export default function RoomPage() {
     const {slug: roomName} = useParams()
@@ -22,6 +24,16 @@ export default function RoomPage() {
     const toggleMeetingMute = useMeetingStore((s) => s.toggleMeetingMute)
 
 
+    const isVoiceRecording = useMeetingStore(selectIsVoiceRecording)
+    const voiceRecordingSeconds = useMeetingStore(selectVoiceRecordingSeconds)
+
+    const handleToggleVoiceRecording = async () => {
+        try {
+            isVoiceRecording ? await stopVoiceRec() : await startVoiceRec()
+        } catch {
+            alert('امکان شروع ضبط صدا وجود نداشت.')
+        }
+    }
     const isRecording = useMeetingStore(selectIsRecording)
     const recordingSeconds = useMeetingStore(selectRecordingSeconds)
 
@@ -79,6 +91,9 @@ export default function RoomPage() {
         <div className="w-screen h-screen bg-olive-950 overflow-hidden flex flex-col">
             <RoomHeader
                 slug={roomName}
+                isVoiceRecording={isVoiceRecording}
+                voiceRecordingSeconds={voiceRecordingSeconds}
+                onToggleVoiceRecording={handleToggleVoiceRecording}
                 isConnected={isConnected}
                 onCopyLink={handleCopyLink}
                 isMeetingMuted={isMeetingMuted}

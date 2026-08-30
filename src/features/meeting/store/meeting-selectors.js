@@ -123,6 +123,9 @@ export const selectRenegotiationTick = (s) => s.renegotiationTick
 
 export const selectIsRecording = (s) => s.isRecording
 export const selectRecordingSeconds = (s) => s.recordingSeconds
+
+export const selectIsVoiceRecording = (s) => s.isVoiceRecording
+export const selectVoiceRecordingSeconds = (s) => s.voiceRecordingSeconds
 // ─────────────────────────────────────────────────────────────
 // CONNECTION
 // ─────────────────────────────────────────────────────────────
