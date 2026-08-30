@@ -1,5 +1,6 @@
 import { memo, useEffect, useState } from 'react'
 import { Wifi, WifiOff, Copy, Check, Volume2, VolumeX, Circle, Square } from 'lucide-react'
+import {useRoom} from "../../hooks/useRooms.js";
 
 function Timer({ isConnected }) {
     const [seconds, setSeconds] = useState(0)
@@ -53,6 +54,11 @@ export const RoomHeader = memo(function RoomHeader({
 }) {
     const [copied, setCopied] = useState(false)
 
+    const {
+        data: room,
+        isLoading,
+        isError} = useRoom(slug)
+
     const handleCopy = () => {
         onCopyLink?.()
         setCopied(true)
@@ -65,7 +71,10 @@ export const RoomHeader = memo(function RoomHeader({
                 <img src="/avestro-logo.png" alt="اَوسترو" className="w-7 h-7 shrink-0" />
                 <span className="text-olive-100 font-medium text-sm hidden sm:block">اَوسترو میت</span>
                 <span className="text-olive-600 text-sm hidden sm:block">·</span>
-                <span className="text-olive-500 text-sm truncate max-w-[120px] sm:max-w-none">{slug}</span>
+                <span className="text-olive-500 text-sm truncate max-w-[120px] sm:max-w-none">
+
+                    {(isLoading && !isError) ? slug : room?.title}
+                </span>
             </div>
 
             <div className="flex items-center gap-2 sm:gap-4">

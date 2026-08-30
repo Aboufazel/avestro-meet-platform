@@ -12,6 +12,7 @@ import RoomPage from '../pages/room/RoomPage'
 import LandingPage from '../pages/landing/LandingPage'
 import {AppMainPage} from "../components/layout/AppMainPage.jsx";
 import GuestRoute from '../components/shared/GuestRoute'
+import EditEventPage from '../pages/event/EditEventPage'
 
 const router = createBrowserRouter([
     {
@@ -49,6 +50,10 @@ const router = createBrowserRouter([
             {
                 path: appRoutes.dashboard.createEvent,
                 element: <CreateEventPage/>
+            },
+            {
+                path: appRoutes.dashboard.editEvent,
+                element: <EditEventPage/>
             },
         ]
     },

@@ -18,7 +18,7 @@ const schema = yup.object({
   max_participants: yup.number()
     .typeError('عدد وارد کنید')
     .min(2, 'حداقل ۲ نفر')
-    .max(500, 'حداکثر ۵۰۰ نفر')
+    .max(2000, 'حداکثر ۵۰۰ نفر')
     .required(),
   is_private: yup.boolean(),
 })
