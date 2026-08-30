@@ -39,14 +39,14 @@ export const VideoTile = memo(function VideoTile({participantId, isLarge = false
 
     const activeTrack = desktopTrack || videoTrack
 
-    // attach/detach track به video element
-    useEffect(() => {
-        if (!videoRef.current || !activeTrack?.jitsiTrack) return
-        activeTrack.jitsiTrack.attach(videoRef.current)
-        return () => {
-            activeTrack.jitsiTrack.detach(videoRef.current)
-        }
-    }, [activeTrack?.jitsiTrack, activeTrack?.isMuted])
+    // // attach/detach track به video element
+    // useEffect(() => {
+    //     if (!videoRef.current || !activeTrack?.jitsiTrack) return
+    //     activeTrack.jitsiTrack.attach(videoRef.current)
+    //     return () => {
+    //         activeTrack.jitsiTrack.detach(videoRef.current)
+    //     }
+    // }, [activeTrack?.jitsiTrack, activeTrack?.isMuted])
 
 
     useEffect(() => {

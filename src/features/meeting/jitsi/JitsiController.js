@@ -504,6 +504,21 @@ export class JitsiController {
                 this._emit(JITSI_EVENTS.TRACK_REMOVED, mapTrack(track))
             })
 
+            // this._conference.on(
+            //     getJitsiMeetJS().events.conference.PARTICIPANT_CONN_STATUS_CHANGED,
+            //     (participantId) => {
+            //         const participant = this._conference.getParticipantById(participantId)
+            //         if (!participant) return
+            //
+            //         const connectionStatus = participant.getConnectionStatus()
+            //         // مقادیر ممکن: 'active' | 'inactive' | 'interrupted'
+            //         this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
+            //             participantId,
+            //             isConnectionInterrupted: connectionStatus !== 'active',
+            //         })
+            //     }
+            // )
+
             this._conference.on(
                 getJitsiMeetJS().events.conference.PARTICIPANT_CONN_STATUS_CHANGED,
                 (participantId) => {
@@ -511,7 +526,8 @@ export class JitsiController {
                     if (!participant) return
 
                     const connectionStatus = participant.getConnectionStatus()
-                    // مقادیر ممکن: 'active' | 'inactive' | 'interrupted'
+                    console.log('[DEBUG] conn status changed:', participantId, connectionStatus, new Date().toLocaleTimeString())
+
                     this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
                         participantId,
                         isConnectionInterrupted: connectionStatus !== 'active',

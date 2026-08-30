@@ -2,7 +2,9 @@
 
 let _mediaRecorder = null
 let _recordedChunks = []
-let _stream = null
+let _displayStream = null
+let _micStream = null
+let _audioContext = null
 
 export function isRecordingSupported() {
     return typeof navigator.mediaDevices?.getDisplayMedia === 'function'
@@ -13,10 +15,35 @@ export async function startLocalRecording() {
         throw new Error('مرورگر شما از ضبط لوکال پشتیبانی نمی‌کند.')
     }
 
-    _stream = await navigator.mediaDevices.getDisplayMedia({
-        video: {displaySurface: 'browser'},
+    // ۱. گرفتن تصویر صفحه + صدای خروجی تب (صدای بقیه‌ی شرکت‌کننده‌ها)
+    _displayStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { displaySurface: 'browser' },
         audio: true,
     })
+
+    // ۲. گرفتن میکروفون خودمون جدا
+    _micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+
+    // ۳. میکس کردن دو منبع صدا با Web Audio API
+    _audioContext = new AudioContext()
+    const destination = _audioContext.createMediaStreamDestination()
+
+    const displayAudioTracks = _displayStream.getAudioTracks()
+    if (displayAudioTracks.length > 0) {
+        const displaySource = _audioContext.createMediaStreamSource(
+            new MediaStream(displayAudioTracks)
+        )
+        displaySource.connect(destination)
+    }
+
+    const micSource = _audioContext.createMediaStreamSource(_micStream)
+    micSource.connect(destination)
+
+    // ۴. ساخت یه استریم نهایی: تصویر از display + صدای میکس‌شده
+    const combinedStream = new MediaStream([
+        ..._displayStream.getVideoTracks(),
+        ...destination.stream.getAudioTracks(),
+    ])
 
     _recordedChunks = []
 
@@ -24,15 +51,19 @@ export async function startLocalRecording() {
         ? 'video/webm;codecs=vp9,opus'
         : 'video/webm'
 
-    _mediaRecorder = new MediaRecorder(_stream, {mimeType})
+    _mediaRecorder = new MediaRecorder(combinedStream, {
+        mimeType,
+        videoBitsPerSecond: 1_000_000,
+        audioBitsPerSecond: 96_000,
+    })
 
     _mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) _recordedChunks.push(e.data)
     }
 
     return new Promise((resolve, reject) => {
-        // اگه کاربر از دیالوگ مرورگر خودش "Stop sharing" رو بزنه
-        _stream.getVideoTracks()[0].addEventListener('ended', () => {
+        // اگه کاربر از دیالوگ مرورگر "Stop sharing" رو بزنه
+        _displayStream.getVideoTracks()[0].addEventListener('ended', () => {
             stopLocalRecording()
         })
 
@@ -50,11 +81,18 @@ export function stopLocalRecording() {
         }
 
         _mediaRecorder.onstop = () => {
-            const blob = new Blob(_recordedChunks, {type: 'video/webm'})
-            _stream?.getTracks().forEach((t) => t.stop())
-            _stream = null
+            const blob = new Blob(_recordedChunks, { type: 'video/webm' })
+
+            _displayStream?.getTracks().forEach((t) => t.stop())
+            _micStream?.getTracks().forEach((t) => t.stop())
+            _audioContext?.close()
+
+            _displayStream = null
+            _micStream = null
+            _audioContext = null
             _mediaRecorder = null
             _recordedChunks = []
+
             resolve(blob)
         }
 
