@@ -367,9 +367,23 @@ export class JitsiController {
     }
 
     /** ارسال پیام چت */
-    sendMessage(text) {
+    // sendMessage(text) {
+    //     if (!this._conference || !text?.trim()) return
+    //     this._conference.sendTextMessage(text.trim())
+    // }
+
+    /** ارسال پیام چت (با امکان ریپلای) */
+    sendMessage(text, replyTo = null) {
         if (!this._conference || !text?.trim()) return
-        this._conference.sendTextMessage(text.trim())
+
+        const payload = {
+            text: text.trim(),
+            replyTo: replyTo
+                ? {id: replyTo.id, displayName: replyTo.displayName, text: replyTo.text}
+                : null,
+        }
+
+        this._conference.sendTextMessage(JSON.stringify(payload))
     }
 
     /** Mute کردن همه شرکت‌کنندگان (فقط moderator) */
@@ -603,11 +617,53 @@ export class JitsiController {
                 this._emit(JITSI_EVENTS.ACTIVE_SPEAKER_CHANGED, {participantId: id})
             })
 
-            this._conference.on(getJitsiMeetJS().events.conference.MESSAGE_RECEIVED, (id, text) => {
-                // console.log('[DEBUG] MESSAGE_RECEIVED fired', { id, text, myId: this._conference.myUserId() })
-                const participant = this._conference.getParticipantById(id)
-                const name = participant?.getDisplayName() || 'شرکت‌کننده'
-                this._emit(JITSI_EVENTS.MESSAGE_RECEIVED, mapMessage(id, name, text))
+            // this._conference.on(getJitsiMeetJS().events.conference.MESSAGE_RECEIVED, (id, text) => {
+            //     // console.log('[DEBUG] MESSAGE_RECEIVED fired', { id, text, myId: this._conference.myUserId() })
+            //     const participant = this._conference.getParticipantById(id)
+            //     const name = participant?.getDisplayName() || 'شرکت‌کننده'
+            //     this._emit(JITSI_EVENTS.MESSAGE_RECEIVED, mapMessage(id, name, text))
+            // })
+
+            // this._conference.on(getJitsiMeetJS().events.conference.MESSAGE_RECEIVED, (id, rawText) => {
+            //     const participant = this._conference.getParticipantById(id)
+            //     const name = participant?.getDisplayName() || 'شرکت‌کننده'
+            //
+            //     let text = rawText
+            //     let replyTo = null
+            //
+            //     try {
+            //         const parsed = JSON.parse(rawText)
+            //         if (parsed && typeof parsed.text === 'string') {
+            //             text = parsed.text
+            //             replyTo = parsed.replyTo || null
+            //         }
+            //     } catch {
+            //         // پیام قدیمی/متن خام — همون‌طور که هست استفاده میشه
+            //     }
+            //
+            //     this._emit(JITSI_EVENTS.MESSAGE_RECEIVED, mapMessage(id, name, text, replyTo))
+            // })
+            this._conference.on(getJitsiMeetJS().events.conference.MESSAGE_RECEIVED, (id, rawText) => {
+                const myId = this._conference.myUserId()
+                const isLocal = id === myId
+
+                const participant = isLocal ? null : this._conference.getParticipantById(id)
+                const name = isLocal ? this._displayName : (participant?.getDisplayName() || 'شرکت‌کننده')
+
+                let text = rawText
+                let replyTo = null
+
+                try {
+                    const parsed = JSON.parse(rawText)
+                    if (parsed && typeof parsed.text === 'string') {
+                        text = parsed.text
+                        replyTo = parsed.replyTo || null
+                    }
+                } catch {
+                    // پیام قدیمی/متن خام
+                }
+
+                this._emit(JITSI_EVENTS.MESSAGE_RECEIVED, mapMessage(id, name, text, replyTo))
             })
 
             this._conference.join()

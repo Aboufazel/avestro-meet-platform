@@ -32,6 +32,7 @@ export const useMeetingStore = create((set, get) => ({
     // state اولیه:
     isRecording: false,
     recordingSeconds: 0,
+    replyingTo: null,
 
     isVoiceRecording: false,
     voiceRecordingSeconds: 0,
@@ -83,6 +84,8 @@ export const useMeetingStore = create((set, get) => ({
     // INTERNAL ACTIONS
     // =============================================================
 
+    setReplyingTo: (message) => set({replyingTo: message}),
+    clearReplyingTo: () => set({replyingTo: null}),
     _setStatus: (status) =>
         set({
             status,
@@ -581,21 +584,29 @@ export const useMeetingStore = create((set, get) => ({
     // PUBLIC UI ACTIONS
     // =============================================================
 
+    // togglePanel: (tab) =>
+    //     set((state) => {
+    //         if (
+    //             state.activePanelTab === tab &&
+    //             state.isPanelOpen
+    //         ) {
+    //             return {
+    //                 isPanelOpen: false,
+    //             }
+    //         }
+    //
+    //         return {
+    //             isPanelOpen: true,
+    //             activePanelTab: tab,
+    //         }
+    //     }),
+
     togglePanel: (tab) =>
         set((state) => {
-            if (
-                state.activePanelTab === tab &&
-                state.isPanelOpen
-            ) {
-                return {
-                    isPanelOpen: false,
-                }
+            if (state.activePanelTab === tab && state.isPanelOpen) {
+                return {isPanelOpen: false}
             }
-
-            return {
-                isPanelOpen: true,
-                activePanelTab: tab,
-            }
+            return {isPanelOpen: true, activePanelTab: tab}
         }),
 
     toggleMeetingMute: () =>

@@ -77,12 +77,23 @@ export function mapTrack(jitsiTrack) {
  * @param {string} text
  * @returns {AppMessage}
  */
-export function mapMessage(participantId, displayName, text) {
+// export function mapMessage(participantId, displayName, text) {
+//   return {
+//     id: `${participantId}-${Date.now()}`,
+//     participantId,
+//     displayName: displayName || 'شرکت‌کننده',
+//     text,
+//     timestamp: Date.now(),
+//   }
+// }
+
+export function mapMessage(participantId, displayName, text, replyTo = null) {
   return {
     id: `${participantId}-${Date.now()}`,
     participantId,
     displayName: displayName || 'شرکت‌کننده',
     text,
+    replyTo,
     timestamp: Date.now(),
   }
 }

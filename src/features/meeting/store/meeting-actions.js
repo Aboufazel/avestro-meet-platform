@@ -614,10 +614,16 @@ export async function stopScreenShare() {
 /**
  * ارسال پیام
  */
-export function sendMessage(text) {
-    if (!text?.trim()) return
+// export function sendMessage(text) {
+//     if (!text?.trim()) return
+//
+//     jitsiController.sendMessage(text.trim())
+// }
 
-    jitsiController.sendMessage(text.trim())
+export function sendMessage(text, replyTo = null) {
+    if (!text?.trim()) return
+    jitsiController.sendMessage(text.trim(), replyTo)
+    useMeetingStore.getState().clearReplyingTo()
 }
 
 /**

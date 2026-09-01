@@ -126,6 +126,7 @@ export const selectRecordingSeconds = (s) => s.recordingSeconds
 
 export const selectIsVoiceRecording = (s) => s.isVoiceRecording
 export const selectVoiceRecordingSeconds = (s) => s.voiceRecordingSeconds
+export const selectReplyingTo = (s) => s.replyingTo
 // ─────────────────────────────────────────────────────────────
 // CONNECTION
 // ─────────────────────────────────────────────────────────────

@@ -21,10 +21,15 @@ export function useChat() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages.length])
 
-  const send = useCallback((text) => {
+  // const send = useCallback((text) => {
+  //   if (!text?.trim()) return
+  //   sendMessage(text)
+  // }, [])
+
+  const send = useCallback((text, replyTo) => {
     if (!text?.trim()) return
-    sendMessage(text)
-  }, [])
+    sendMessage(text, replyTo)
+}, [])
 
   const openChat = useCallback(() => {
     useMeetingStore.getState().openChat()
