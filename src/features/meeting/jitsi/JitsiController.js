@@ -24,6 +24,7 @@ console.log(window.JitsiMeetJS)
 
 const JitsiMeetJS = getJitsiMeetJS()
 
+
 export class JitsiController {
     constructor() {
         this._connection = null
@@ -46,30 +47,69 @@ export class JitsiController {
      * @param {string} params.displayName
      * @param {string} [params.email]
      */
-    // async join({roomName, displayName, email = ''}) {
-    //     if (this._status !== MEETING_STATUS.IDLE && this._status !== MEETING_STATUS.LEFT) {
-    //         console.warn('[JitsiController] Already in a meeting or connecting')
-    //         return
-    //     }
-    //
-    //     this._roomName = roomName
-    //     this._displayName = displayName
-    //
-    //     try {
-    //         this._setStatus(MEETING_STATUS.INITIALIZING)
-    //         await this._createLocalTracks()
-    //
-    //         this._setStatus(MEETING_STATUS.CONNECTING)
-    //         await this._connect()
-    //         await this._joinConference({displayName, email})
-    //
-    //         this._setStatus(MEETING_STATUS.CONNECTED)
-    //     } catch (error) {
-    //         const normalized = normalizeError(error, ERROR_CODES.ROOM_JOIN_FAILED)
-    //         this._setStatus(MEETING_STATUS.FAILED)
-    //         this._emit(JITSI_EVENTS.CONNECTION_FAILED, normalized)
-    //     }
-    // }
+        // async join({roomName, displayName, email = ''}) {
+        //     if (this._status !== MEETING_STATUS.IDLE && this._status !== MEETING_STATUS.LEFT) {
+        //         console.warn('[JitsiController] Already in a meeting or connecting')
+        //         return
+        //     }
+        //
+        //     this._roomName = roomName
+        //     this._displayName = displayName
+        //
+        //     try {
+        //         this._setStatus(MEETING_STATUS.INITIALIZING)
+        //         await this._createLocalTracks()
+        //
+        //         this._setStatus(MEETING_STATUS.CONNECTING)
+        //         await this._connect()
+        //         await this._joinConference({displayName, email})
+        //
+        //         this._setStatus(MEETING_STATUS.CONNECTED)
+        //     } catch (error) {
+        //         const normalized = normalizeError(error, ERROR_CODES.ROOM_JOIN_FAILED)
+        //         this._setStatus(MEETING_STATUS.FAILED)
+        //         this._emit(JITSI_EVENTS.CONNECTION_FAILED, normalized)
+        //     }
+        // }
+
+    _lastQualityEmit = new Map()
+
+    _emitQualityThrottled(participantId, quality) {
+        const last = this._lastQualityEmit.get(participantId)
+        const now = Date.now()
+
+        // فقط هر ۵ ثانیه، یا اگه تغییر بیشتر از ۱۵ واحد بود
+        if (last && now - last.time < 5000 && Math.abs((last.quality ?? 0) - (quality ?? 0)) < 15) {
+            return
+        }
+
+        this._lastQualityEmit.set(participantId, {time: now, quality})
+        this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {participantId, connectionQuality: quality})
+    }
+
+    _handlePoorConnectionSelfLimit(quality) {
+        if (quality == null) return
+
+        const videoTrack = this._localTracks.find((t) => t.getType() === 'video')
+        if (!videoTrack) return
+
+        const POOR_THRESHOLD = 20
+        const RECOVER_THRESHOLD = 40
+
+        if (quality < POOR_THRESHOLD && !videoTrack.isMuted() && !this._autoMutedForPoorConnection) {
+            this._autoMutedForPoorConnection = true
+            videoTrack.mute()
+            this._emit(JITSI_EVENTS.CONNECTION_FAILED, {
+                message: 'به‌خاطر ضعیف بودن اینترنت شما، دوربینتان موقتاً خاموش شد تا پایداری جلسه حفظ شود.',
+                code: 'AUTO_VIDEO_MUTE',
+            })
+        }
+
+        if (quality > RECOVER_THRESHOLD && this._autoMutedForPoorConnection) {
+            this._autoMutedForPoorConnection = false
+            videoTrack.unmute()
+        }
+    }
 
     async join({roomName, displayName, email = ''}) {
         if (this._status !== MEETING_STATUS.IDLE && this._status !== MEETING_STATUS.LEFT) {
@@ -550,26 +590,57 @@ export class JitsiController {
             )
 
             // کیفیت اتصال خودمون (لوکال)
+            // this._conference.on(
+            //     getJitsiMeetJS().events.connectionQuality.LOCAL_STATS_UPDATED,
+            //     (stats) => {
+            //         this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
+            //             participantId: this._conference.myUserId(),
+            //             connectionQuality: stats?.connectionQuality ?? null,
+            //         })
+            //     }
+            // )
+
+            // this._conference.on(
+            //     getJitsiMeetJS().events.connectionQuality.LOCAL_STATS_UPDATED,
+            //     (stats) => {
+            //         const quality = stats?.connectionQuality ?? null
+            //
+            //         this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
+            //             participantId: this._conference.myUserId(),
+            //             connectionQuality: quality,
+            //         })
+            //
+            //         // اگه کیفیت شبکه‌ی خودمون خیلی ضعیف شد، خودمون ویدیومون رو موقت خاموش کنیم
+            //         this._handlePoorConnectionSelfLimit(quality)
+            //     }
+            // )
             this._conference.on(
                 getJitsiMeetJS().events.connectionQuality.LOCAL_STATS_UPDATED,
                 (stats) => {
-                    this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
-                        participantId: this._conference.myUserId(),
-                        connectionQuality: stats?.connectionQuality ?? null,
-                    })
+                    const quality = stats?.connectionQuality ?? null
+                    this._emitQualityThrottled(this._conference.myUserId(), quality)
+                    this._handlePoorConnectionSelfLimit(quality)
+                }
+            )
+
+            this._conference.on(
+                getJitsiMeetJS().events.connectionQuality.REMOTE_STATS_UPDATED,
+                (participantId, stats) => {
+                    const quality = stats?.connectionQuality ?? null
+                    this._emitQualityThrottled(participantId, quality)
                 }
             )
 
 // کیفیت اتصال بقیه (remote)
-            this._conference.on(
-                getJitsiMeetJS().events.connectionQuality.REMOTE_STATS_UPDATED,
-                (participantId, stats) => {
-                    this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
-                        participantId,
-                        connectionQuality: stats?.connectionQuality ?? null,
-                    })
-                }
-            )
+//             this._conference.on(
+//                 getJitsiMeetJS().events.connectionQuality.REMOTE_STATS_UPDATED,
+//                 (participantId, stats) => {
+//                     this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
+//                         participantId,
+//                         connectionQuality: stats?.connectionQuality ?? null,
+//                     })
+//                 }
+//             )
 
             // this._conference.on(getJitsiMeetJS().events.conference.TRACK_MUTE_CHANGED, (track) => {
             //     const mapped = mapTrack(track)
