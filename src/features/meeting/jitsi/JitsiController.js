@@ -456,7 +456,6 @@ export class JitsiController {
                 (stats) => {
                     const quality = stats?.connectionQuality ?? null
                     this._emitQualityThrottled(this._conference.myUserId(), quality)
-                    this._handlePoorConnectionSelfLimit(quality)
                 }
             )
 
@@ -534,30 +533,6 @@ export class JitsiController {
 
         this._lastQualityEmit.set(participantId, { time: now, quality })
         this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, { participantId, connectionQuality: quality })
-    }
-
-    _handlePoorConnectionSelfLimit(quality) {
-        if (quality == null) return
-
-        const videoTrack = this._localTracks.find((t) => t.getType() === 'video')
-        if (!videoTrack) return
-
-        const POOR_THRESHOLD = 20
-        const RECOVER_THRESHOLD = 40
-
-        if (quality < POOR_THRESHOLD && !videoTrack.isMuted() && !this._autoMutedForPoorConnection) {
-            this._autoMutedForPoorConnection = true
-            videoTrack.mute()
-            this._emit(JITSI_EVENTS.CONNECTION_FAILED, {
-                message: 'به‌خاطر ضعیف بودن اینترنت شما، دوربینتان موقتاً خاموش شد تا پایداری جلسه حفظ شود.',
-                code: 'AUTO_VIDEO_MUTE',
-            })
-        }
-
-        if (quality > RECOVER_THRESHOLD && this._autoMutedForPoorConnection) {
-            this._autoMutedForPoorConnection = false
-            videoTrack.unmute()
-        }
     }
 
     _emit(event, data) {
