@@ -1,9 +1,9 @@
-import { jitsiController } from '../jitsi/JitsiController.js'
-import { JITSI_EVENTS } from '../jitsi/jitsi-events.js'
-import { useMeetingStore } from './meeting-store.js'
-import { startLocalRecording, stopLocalRecording, downloadRecording } from '../jitsi/recordingService.js'
+import {jitsiController} from '../jitsi/JitsiController.js'
+import {JITSI_EVENTS} from '../jitsi/jitsi-events.js'
+import {useMeetingStore} from './meeting-store.js'
+import {startLocalRecording, stopLocalRecording, downloadRecording} from '../jitsi/recordingService.js'
 import {useAuthStore} from "../../../store/authStore.js";
-import { startVoiceRecording, stopVoiceRecording } from '../jitsi/recordingService.js'
+import {startVoiceRecording, stopVoiceRecording} from '../jitsi/recordingService.js'
 
 /**
  * meeting-actions.js
@@ -39,6 +39,7 @@ export async function stopVoiceRec() {
         downloadRecording(blob, `صدای-جلسه-${new Date().toISOString().slice(0, 19)}.webm`)
     }
 }
+
 let _unsubscribers = []
 let _joinGeneration = 0
 
@@ -75,7 +76,7 @@ export async function stopRecording() {
 /**
  * شروع جلسه
  */
-export async function joinMeeting({ roomName, displayName, email = '' }) {
+export async function joinMeeting({roomName, displayName, email = ''}) {
     const store = useMeetingStore.getState()
 
     // اگر listener های قبلی باقی مانده‌اند، پاک شوند
@@ -95,7 +96,7 @@ export async function joinMeeting({ roomName, displayName, email = '' }) {
     store._setStatus('connecting')
     const allowed = await _checkRoomCapacity(roomName, externalId, displayName)
     if (!allowed) {
-        store._setError({ message: 'ظرفیت این جلسه بر اساس پلن میزبان تکمیل شده است.' })
+        store._setError({message: 'ظرفیت این جلسه بر اساس پلن میزبان تکمیل شده است.'})
         return
     }
 
@@ -142,7 +143,7 @@ export async function joinMeeting({ roomName, displayName, email = '' }) {
     _unsubscribers.push(
         jitsiController.on(
             JITSI_EVENTS.CONFERENCE_JOINED,
-            ({ participantId, displayName }) => {
+            ({participantId, displayName}) => {
                 if (generation !== _joinGeneration) return
 
                 const store = useMeetingStore.getState()
@@ -218,7 +219,7 @@ export async function joinMeeting({ roomName, displayName, email = '' }) {
     _unsubscribers.push(
         jitsiController.on(
             JITSI_EVENTS.PARTICIPANT_LEFT,
-            ({ participantId }) => {
+            ({participantId}) => {
                 if (generation !== _joinGeneration) return
                 if (!participantId) return
 
@@ -244,7 +245,7 @@ export async function joinMeeting({ roomName, displayName, email = '' }) {
     _unsubscribers.push(
         jitsiController.on(
             JITSI_EVENTS.PARTICIPANT_UPDATED,
-            ({ participantId, ...updates }) => {
+            ({participantId, ...updates}) => {
                 if (generation !== _joinGeneration) return
                 if (!participantId) return
 
@@ -264,7 +265,7 @@ export async function joinMeeting({ roomName, displayName, email = '' }) {
     _unsubscribers.push(
         jitsiController.on(
             JITSI_EVENTS.ACTIVE_SPEAKER_CHANGED,
-            ({ participantId }) => {
+            ({participantId}) => {
                 if (generation !== _joinGeneration) return
 
                 useMeetingStore
@@ -467,7 +468,7 @@ export async function leaveMeeting() {
 
 function _authHeaders() {
     const token = useAuthStore.getState().token
-    return token ? { Authorization: `Bearer ${token}` } : {}
+    return token ? {Authorization: `Bearer ${token}`} : {}
 }
 
 /**
@@ -532,7 +533,7 @@ async function _notifyBackendLeave(roomName, externalId) {
                 'Content-Type': 'application/json',
                 ..._authHeaders(),
             },
-            body: JSON.stringify({ external_participant_id: externalId }),
+            body: JSON.stringify({external_participant_id: externalId}),
         })
     } catch (error) {
         console.warn('[meeting-actions] Failed to notify backend of leave:', error)
@@ -629,6 +630,43 @@ export function sendMessage(text, replyTo = null) {
 /**
  * Mute همه
  */
+// ─────────────────────────────────────────────────────────────
+// MODERATION
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Mute a specific participant.
+ */
+export async function muteParticipantAudio(
+    participantId
+) {
+    if (!participantId) {
+        return false
+    }
+
+    return jitsiController.muteParticipantAudio(
+        participantId
+    )
+}
+
+/**
+ * Toggle a participant's microphone.
+ */
+export async function toggleParticipantAudio(
+    participantId
+) {
+    if (!participantId) {
+        return false
+    }
+
+    return jitsiController.toggleParticipantAudio(
+        participantId
+    )
+}
+
+/**
+ * Mute everyone.
+ */
 export async function muteEveryone() {
     return jitsiController.muteEveryone()
 }
@@ -660,8 +698,8 @@ if (typeof window !== 'undefined') {
             navigator.sendBeacon(
                 `${API_BASE_URL}/rooms/${_currentRoomName}/leave/`,
                 new Blob(
-                    [JSON.stringify({ external_participant_id: _currentExternalId })],
-                    { type: 'application/json' }
+                    [JSON.stringify({external_participant_id: _currentExternalId})],
+                    {type: 'application/json'}
                 )
             )
         }
