@@ -1,8 +1,9 @@
-import {memo, useMemo} from 'react'
+import {memo, useMemo, useEffect} from 'react'
 import {useParticipants} from '../hooks/useParticipants'
 import {useMeetingStore} from '../store/meeting-store'
 import {selectActiveSpeakerId} from '../store/meeting-selectors'
 import {VideoTile} from './VideoTile'
+import {jitsiController} from '../jitsi/JitsiController'
 
 /**
  * منطق انتخاب افراد "بالا" (featured):
@@ -44,6 +45,20 @@ export const VideoGrid = memo(function VideoGrid() {
   const activeSpeakerId = useMeetingStore(selectActiveSpeakerId)
 
   const { featured, rest } = useFeaturedParticipants(participants, activeSpeakerId)
+
+  // -----------------------------------------------------------------------
+  // اعلام به Jitsi که کدام شرکت‌کننده‌ها الان featured (بزرگ) هستند.
+  //
+  // چرا این لازم است:
+  // بدون این، سرور Jitsi نمی‌داند کدام ویدیو "مهم‌تر" است، پس همه را
+  // با کیفیت مشابه می‌فرستد. با selectParticipants، فقط برای این افراد
+  // کیفیت بالا درخواست می‌شود و بقیه (در نوار کوچک پایین) کیفیت پایین‌تر
+  // دریافت می‌کنند — این مستقیماً مصرف CPU/باتری روی موبایل را کم می‌کند.
+  // -----------------------------------------------------------------------
+  useEffect(() => {
+    const featuredIds = featured.map((p) => p.id).filter((id) => id && !participants.find(p => p.id === id)?.isLocal)
+    jitsiController.setPreferredParticipants(featuredIds)
+  }, [featured, participants])
 
   if (count === 0) {
     return (

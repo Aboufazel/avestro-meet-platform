@@ -1,6 +1,7 @@
 import {
     useEffect,
     useRef,
+    useState,
     memo,
 } from 'react'
 
@@ -54,6 +55,9 @@ export const VideoTile = memo(
         const videoRef =
             useRef(null)
 
+        const containerRef =
+            useRef(null)
+
         const isMeetingMuted =
             useMeetingStore(
                 selectIsMeetingMuted
@@ -68,7 +72,65 @@ export const VideoTile = memo(
             )
 
         // ---------------------------------------------------------------------
+        // Visibility (lazy attach)
+        //
+        // چرا این بخش اضافه شد:
+        // قبلاً هر VideoTile به محض mount شدن، ویدیوی participant را
+        // attach می‌کرد — حتی تایل‌های کوچکی که در نوار افقی پایین
+        // (overflow-x-auto) هستند و عملاً دیده نمی‌شوند. یعنی مرورگر
+        // مجبور بود ویدیوهایی که کسی نگاهشان نمی‌کند را هم decode کند.
+        // این روی موبایل مصرف CPU/باتری را به‌شدت بالا می‌برد.
+        //
+        // با IntersectionObserver، تایل فقط وقتی واقعاً در viewport
+        // (یا نزدیک آن) است attach می‌شود؛ وقتی از دید خارج شود،
+        // خودش را detach می‌کند.
+        //
+        // تایل بزرگ (isLarge) همیشه به‌عنوان visible در نظر گرفته
+        // می‌شود چون معمولاً از ابتدا در دید است.
+        // ---------------------------------------------------------------------
+        const [isVisible, setIsVisible] =
+            useState(isLarge)
+
+        // isFrozen حذف شد — heuristic فریم‌شمار بیش‌ازحد حساس بود و با
+        // کوچیک‌ترین لگ چند فریمی (طبیعی روی نت موبایل) قفل می‌شد روی
+        // "ناپایدار" و دیگر true نمی‌شد false. حالا overlay فقط به سیگنال
+        // واقعی خود Jitsi (participant.isConnectionInterrupted) تکیه
+        // می‌کند که مبتنی بر وضعیت واقعی اتصال (PARTICIPANT_CONN_STATUS)
+        // است، نه گمانه‌زنی روی رندر فریم.
+
+        useEffect(() => {
+            if (isLarge) {
+                setIsVisible(true)
+                return
+            }
+
+            const node = containerRef.current
+            if (!node || typeof IntersectionObserver === 'undefined') {
+                setIsVisible(true)
+                return
+            }
+
+            const observer = new IntersectionObserver(
+                ([entry]) => {
+                    setIsVisible(entry.isIntersecting)
+                },
+                {
+                    root: null,
+                    rootMargin: '50px',
+                    threshold: 0.15,
+                }
+            )
+
+            observer.observe(node)
+
+            return () => observer.disconnect()
+        }, [isLarge])
+
+        // ---------------------------------------------------------------------
         // Audio
+        //
+        // صدا همیشه attach می‌ماند (حتی اگر ویدیو دیده نشود) چون صدا
+        // سبک است و شرکت‌کننده باید همیشه شنیده شود.
         // ---------------------------------------------------------------------
 
         useEffect(() => {
@@ -120,7 +182,7 @@ export const VideoTile = memo(
         ])
 
         // ---------------------------------------------------------------------
-        // Video
+        // Video (lazy — فقط وقتی isVisible است)
         // ---------------------------------------------------------------------
 
         const activeTrack =
@@ -130,7 +192,8 @@ export const VideoTile = memo(
         useEffect(() => {
             if (
                 !videoRef.current ||
-                !activeTrack?.jitsiTrack
+                !activeTrack?.jitsiTrack ||
+                !isVisible
             ) {
                 return
             }
@@ -159,6 +222,7 @@ export const VideoTile = memo(
         }, [
             activeTrack?.jitsiTrack,
             activeTrack?.isMuted,
+            isVisible,
 
             ...(isSafariOrIOS
                 ? [renegotiationTick]
@@ -174,8 +238,19 @@ export const VideoTile = memo(
         // ---------------------------------------------------------------------
 
         function getConnectionLevel(
-            quality
+            quality,
+            packetLoss
         ) {
+            // پکت‌لاس بالای ۱۰٪ یعنی مشکل واقعی —
+            // مستقل از اینکه quality (که با adaptive bitrate
+            // خودش را جمع‌وجور می‌کند) چه می‌گوید.
+            if (
+                packetLoss != null &&
+                packetLoss > 10
+            ) {
+                return 'weak'
+            }
+
             if (
                 quality == null
             ) {
@@ -199,7 +274,8 @@ export const VideoTile = memo(
 
         const connectionLevel =
             getConnectionLevel(
-                participant.connectionQuality
+                participant.connectionQuality,
+                participant.packetLoss
             )
 
         const ConnectionIcon =
@@ -232,7 +308,8 @@ export const VideoTile = memo(
 
         const isVideoOff =
             !activeTrack ||
-            activeTrack.isMuted
+            activeTrack.isMuted ||
+            !isVisible
 
         const isAudioMuted =
             participant.isAudioMuted
@@ -242,6 +319,7 @@ export const VideoTile = memo(
 
         return (
             <div
+                ref={containerRef}
                 className={`
                     relative
                     bg-olive-900
@@ -265,12 +343,36 @@ export const VideoTile = memo(
                 `}
             >
                 {/* --------------------------------------------------------- */}
+                {/* هشدار نت ضعیف خودِ کاربر (لوکال)                            */}
+                {/*                                                             */}
+                {/* برخلاف overlay بالا (که برای فریز شدن تصویر طرف مقابل        */}
+                {/* است)، این یک بنر غیرمسدودکننده است: تصویر خودش را کامل      */}
+                {/* می‌بیند، فقط باخبر می‌شود که آپلودش ضعیف است و ممکن است      */}
+                {/* بقیه او را بد ببینند.                                        */}
+                {/* --------------------------------------------------------- */}
+
+                {participant.isLocal &&
+                    connectionLevel === 'weak' && (
+                        <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-center gap-1.5 bg-red-500/90 py-1.5 px-2">
+                            <SignalLow className="w-3.5 h-3.5 text-white shrink-0" />
+                            <span className="text-white text-xs font-medium">
+                                اینترنت شما ضعیف است
+                            </span>
+                        </div>
+                    )}
+
+                {/* --------------------------------------------------------- */}
                 {/* Temporary connection interruption                         */}
+                {/*                                                             */}
+                {/* فقط به participant.isConnectionInterrupted (سیگنال واقعی   */}
+                {/* Jitsi، از PARTICIPANT_CONN_STATUS_CHANGED) تکیه می‌کند —    */}
+                {/* یعنی وقتی هم صدا هم تصویر واقعاً از این شرکت‌کننده متوقف     */}
+                {/* شده، نه با هر لگ کوچک چند فریمی.                            */}
                 {/* --------------------------------------------------------- */}
 
                 {participant.isConnectionInterrupted &&
                     !isVideoOff && (
-                        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/55 backdrop-blur-[1px]">
+                        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/55 backdrop-blur-md">
                             <div className="flex flex-col items-center gap-2">
                                 <span className="w-3 h-3 rounded-full bg-yellow-400 animate-pulse" />
 

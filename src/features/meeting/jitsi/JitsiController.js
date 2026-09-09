@@ -2,6 +2,8 @@ import {JITSI_EVENTS, MEETING_STATUS} from './jitsi-events.js'
 import {
     CONNECTION_CONFIG,
     CONFERENCE_CONFIG,
+    RECEIVER_QUALITY,
+    RECONNECT_CONFIG,
 } from './jitsi-config.js'
 import {
     mapParticipant,
@@ -12,6 +14,7 @@ import {
     normalizeError,
     ERROR_CODES,
 } from './jitsi-errors.js'
+
 
 /**
  * JitsiController
@@ -86,6 +89,8 @@ function ensureJitsiInitialized() {
 
 export class JitsiController {
     constructor() {
+        // نگهداری تایمرهای «قطع طولانی‌مدت» برای هر participant
+        this._disconnectWatchdogs = new Map()
         // =====================================================================
         // Jitsi objects
         // =====================================================================
@@ -114,6 +119,14 @@ export class JitsiController {
         this._displayName = ''
         this._email = ''
         this._roomName = ''
+
+        // وضعیت reconnect برای پایداری روی نت ضعیف
+        this._reconnectAttempts = 0
+        this._reconnectTimer = null
+        this._isReconnecting = false
+
+// آخرین اطلاعات join برای reconnect (بدون درخواست دوباره میکروفون/دوربین)
+        this._lastJoinParams = null
 
         // =====================================================================
         // Quality cache
@@ -359,6 +372,7 @@ export class JitsiController {
         }
 
         ++this._operationId
+        this._cancelReconnect()
 
         this._isLeaving = true
 
@@ -857,6 +871,26 @@ export class JitsiController {
                 error
             )
 
+            return false
+        }
+    }
+
+
+    /**
+     * به Jitsi اعلام می‌کند کدام شرکت‌کننده‌ها الان "بزرگ" نمایش داده
+     * می‌شوند (active speaker / کسی که صحبت می‌کند) تا سرور فقط برای
+     * آن‌ها کیفیت بالا بفرستد و برای بقیه (تایل‌های کوچک) کیفیت پایین.
+     */
+    setPreferredParticipants(participantIds = []) {
+        if (!this._conference) return false
+
+        try {
+            if (typeof this._conference.selectParticipants === 'function') {
+                this._conference.selectParticipants(participantIds)
+            }
+            return true
+        } catch (error) {
+            console.warn('[JitsiController] selectParticipants failed:', error)
             return false
         }
     }
@@ -1570,20 +1604,17 @@ export class JitsiController {
                             JITSI_EVENTS.CONNECTION_INTERRUPTED
                         )
 
-                        /**
-                         * Intentional leave should never be treated
-                         * as an unexpected connection failure.
-                         */
-                        if (
-                            !this._isLeaving &&
-                            this._status ===
-                            MEETING_STATUS.CONNECTED
-                        ) {
-                            this._setStatus(
-                                MEETING_STATUS.FAILED
-                            )
+                        // قطع عمدی (کاربر خودش leave کرده) → هیچ تلاشی برای وصل شدن نکن
+                        if (this._isLeaving || this._isDisposed) {
+                            return
                         }
+
+                        // قطعی روی نت ضعیف موبایل → سعی کن دوباره وصل شی
+                        // به‌جای اینکه بلافاصله FAILED اعلام کنی و کاربر رو از جلسه بندازی بیرون
+                        this._setStatus(MEETING_STATUS.RECONNECTING)
+                        this._scheduleReconnect()
                     }
+
 
                 connection.addEventListener(
                     JitsiMeetJS.events
@@ -1670,6 +1701,103 @@ export class JitsiController {
     // =========================================================================
     // Conference
     // =========================================================================
+
+    // =========================================================================
+// Reconnect (پایداری روی نت ضعیف)
+// =========================================================================
+
+    /**
+     * برنامه‌ریزی تلاش مجدد اتصال با exponential backoff.
+     *
+     * چرا لازم است:
+     * روی موبایل‌دیتا، افت موقت سیگنال طبیعی است. قبلاً هر قطعی XMPP
+     * بلافاصله باعث FAILED شدن کل جلسه می‌شد و کاربر باید دستی دوباره
+     * وصل می‌شد. این تجربه‌ی بدی روی نت ضعیف است.
+     *
+     * با backoff نمایی (۱، ۲، ۴، ۸... ثانیه تا سقف ۱۵ ثانیه)، به شبکه
+     * فرصت می‌دهیم خودش را جمع‌وجور کند، بدون spam کردن تلاش‌های پشت سر هم
+     * که خودش هم مصرف باتری/CPU دارد.
+     */
+    _scheduleReconnect() {
+        if (this._isReconnecting || this._isLeaving || this._isDisposed) {
+            return
+        }
+
+        if (this._reconnectAttempts >= RECONNECT_CONFIG.maxAttempts) {
+            console.warn('[JitsiController] Max reconnect attempts reached')
+            this._setStatus(MEETING_STATUS.FAILED)
+            this._emit(JITSI_EVENTS.CONNECTION_FAILED, normalizeError(
+                new Error('Reconnect attempts exhausted'),
+                ERROR_CODES.ROOM_JOIN_FAILED
+            ))
+            return
+        }
+
+        this._isReconnecting = true
+
+        const delay = Math.min(
+            RECONNECT_CONFIG.baseDelayMs * Math.pow(2, this._reconnectAttempts),
+            RECONNECT_CONFIG.maxDelayMs
+        )
+
+        this._reconnectAttempts += 1
+
+        clearTimeout(this._reconnectTimer)
+
+        this._reconnectTimer = setTimeout(() => {
+            this._attemptReconnect()
+        }, delay)
+    }
+
+    async _attemptReconnect() {
+        if (this._isLeaving || this._isDisposed || !this._lastJoinParams) {
+            this._isReconnecting = false
+            return
+        }
+
+        try {
+            // پاکسازی اتصال قبلی (بدون دیسپوز لوکال تِرک‌ها —
+            // می‌خواهیم بعد از وصل شدن دوباره همان میکروفون/دوربین
+            // را اضافه کنیم، نه اینکه کاربر دوباره اجازه بدهد)
+            const savedLocalTracks = [...this._localTracks]
+
+            this._removeAllJitsiListeners()
+            this._connection = null
+            this._conference = null
+
+            await this._connect()
+            await this._joinConference({
+                displayName: this._lastJoinParams.displayName,
+                email: this._lastJoinParams.email,
+            })
+
+            // اضافه کردن دوباره‌ی track های محلی که از قبل فعال بودند
+            for (const track of savedLocalTracks) {
+                try {
+                    await this._conference.addTrack(track)
+                } catch (err) {
+                    console.warn('[JitsiController] Re-adding local track after reconnect failed:', err)
+                }
+            }
+
+            this._reconnectAttempts = 0
+            this._isReconnecting = false
+            this._setStatus(MEETING_STATUS.CONNECTED)
+            this._emit(JITSI_EVENTS.CONNECTION_ESTABLISHED)
+        } catch (error) {
+            this._isReconnecting = false
+            console.warn('[JitsiController] Reconnect attempt failed:', error)
+            this._scheduleReconnect()
+        }
+    }
+
+    _cancelReconnect() {
+        clearTimeout(this._reconnectTimer)
+        this._reconnectTimer = null
+        this._isReconnecting = false
+        this._reconnectAttempts = 0
+    }
+
 
     _joinConference({
                         displayName,
@@ -1838,21 +1966,17 @@ export class JitsiController {
                 // =================================================================
 
                 bind(
-                    JitsiMeetJS.events
-                        .conference
-                        .USER_LEFT,
+                    JitsiMeetJS.events.conference.USER_LEFT,
                     (id) => {
-                        this._qualityCache.delete(
-                            id
-                        )
+                        this._qualityCache.delete(id)
 
-                        this._emit(
-                            JITSI_EVENTS.PARTICIPANT_LEFT,
-                            {
-                                participantId:
-                                id,
-                            }
-                        )
+                        const timer = this._disconnectWatchdogs.get(id)
+                        if (timer) {
+                            clearTimeout(timer)
+                            this._disconnectWatchdogs.delete(id)
+                        }
+
+                        this._emit(JITSI_EVENTS.PARTICIPANT_LEFT, {participantId: id})
                     }
                 )
 
@@ -1929,36 +2053,20 @@ export class JitsiController {
                 // =================================================================
 
                 bind(
-                    JitsiMeetJS.events
-                        .conference
-                        .PARTICIPANT_CONN_STATUS_CHANGED,
-                    (
-                        participantId
-                    ) => {
-                        const participant =
-                            conference.getParticipantById(
-                                participantId
-                            )
+                    JitsiMeetJS.events.conference.PARTICIPANT_CONN_STATUS_CHANGED,
+                    (participantId) => {
+                        const participant = conference.getParticipantById(participantId)
+                        if (!participant) return
 
-                        if (
-                            !participant
-                        ) {
-                            return
-                        }
+                        const connectionStatus = participant.getConnectionStatus()
+                        const isInterrupted = connectionStatus !== 'active'
 
-                        const connectionStatus =
-                            participant.getConnectionStatus()
+                        this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
+                            participantId,
+                            isConnectionInterrupted: isInterrupted,
+                        })
 
-                        this._emit(
-                            JITSI_EVENTS.PARTICIPANT_UPDATED,
-                            {
-                                participantId,
-
-                                isConnectionInterrupted:
-                                    connectionStatus !==
-                                    'active',
-                            }
-                        )
+                        this._handleConnectionStatusForWatchdog(participantId, isInterrupted)
                     }
                 )
 
@@ -1967,17 +2075,18 @@ export class JitsiController {
                 // =================================================================
 
                 bind(
-                    JitsiMeetJS.events
-                        .connectionQuality
-                        .LOCAL_STATS_UPDATED,
+                    JitsiMeetJS.events.connectionQuality.LOCAL_STATS_UPDATED,
                     (stats) => {
-                        const localId =
-                            conference.myUserId()
+                        const localId = conference.myUserId()
+
+                        // packetLoss.upload بیشترین ربط را به کیفیت آپلود خودمان دارد —
+                        // مستقل از اینکه انکودر خودش را adapt کرده یا نه.
+                        const uploadPacketLoss = stats?.packetLoss?.upload ?? null
 
                         this._emitQualityThrottled(
                             localId,
-                            stats?.connectionQuality ??
-                            null
+                            stats?.connectionQuality ?? null,
+                            uploadPacketLoss
                         )
                     }
                 )
@@ -1987,18 +2096,10 @@ export class JitsiController {
                 // =================================================================
 
                 bind(
-                    JitsiMeetJS.events
-                        .connectionQuality
-                        .REMOTE_STATS_UPDATED,
-                    (
-                        participantId,
-                        stats
-                    ) => {
-                        this._emitQualityThrottled(
-                            participantId,
-                            stats?.connectionQuality ??
-                            null
-                        )
+                    JitsiMeetJS.events.connectionQuality.REMOTE_STATS_UPDATED,
+                    (participantId, stats) => {
+                        const downloadPacketLoss = stats?.packetLoss?.download ?? null
+                        this._emitQualityThrottled(participantId, stats?.connectionQuality ?? null, downloadPacketLoss)
                     }
                 )
 
@@ -2335,6 +2436,25 @@ export class JitsiController {
                 this._videoTrackCreating =
                     false
             }
+        }
+    }
+
+    _adaptReceiverQuality(quality) {
+        if (!this._conference || typeof this._conference.setReceiverVideoConstraint !== 'function') {
+            return
+        }
+
+        const POOR_THRESHOLD = 30
+
+        try {
+            if (quality != null && quality < POOR_THRESHOLD) {
+                // شبکه ضعیف: فقط کیفیت خیلی پایین بگیر تا استریم قطع نشود
+                this._conference.setReceiverVideoConstraint(180)
+            } else {
+                this._conference.setReceiverVideoConstraint(RECEIVER_QUALITY.LARGE)
+            }
+        } catch (error) {
+            console.warn('[JitsiController] Adaptive receiver quality failed:', error)
         }
     }
 
@@ -2693,65 +2813,30 @@ export class JitsiController {
     // Quality
     // =========================================================================
 
-    _emitQualityThrottled(
-        participantId,
-        quality
-    ) {
-        if (!participantId) {
-            return
-        }
+    _emitQualityThrottled(participantId, quality, packetLoss = null) {
+        if (!participantId) return
 
-        const now =
-            Date.now()
-
-        const previous =
-            this._qualityCache.get(
-                participantId
-            )
+        const now = Date.now()
+        const previous = this._qualityCache.get(participantId)
 
         if (previous) {
-            const timePassed =
-                now -
-                previous.time
+            const timePassed = now - previous.time
+            const qualityDiff = Math.abs((previous.quality ?? 0) - (quality ?? 0))
+            const lossDiff = Math.abs((previous.packetLoss ?? 0) - (packetLoss ?? 0))
 
-            const previousQuality =
-                previous.quality
-
-            const qualityDifference =
-                Math.abs(
-                    (previousQuality ??
-                        0) -
-                    (quality ?? 0)
-                )
-
-            /**
-             * Avoid flooding React/store with tiny quality changes.
-             */
-            if (
-                timePassed < 5000 &&
-                qualityDifference < 15
-            ) {
+            // فقط وقتی هیچ‌کدام تغییر معناداری نکرده، skip کن
+            if (timePassed < 5000 && qualityDiff < 15 && lossDiff < 5) {
                 return
             }
         }
 
-        this._qualityCache.set(
+        this._qualityCache.set(participantId, {time: now, quality, packetLoss})
+
+        this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
             participantId,
-            {
-                time: now,
-                quality,
-            }
-        )
-
-        this._emit(
-            JITSI_EVENTS.PARTICIPANT_UPDATED,
-            {
-                participantId,
-
-                connectionQuality:
-                quality,
-            }
-        )
+            connectionQuality: quality,
+            packetLoss, // درصد پکت‌لاس خام — عدد قابل‌اعتمادتر برای "نت واقعاً بد است یا نه"
+        })
     }
 
     // =========================================================================
@@ -2801,6 +2886,62 @@ export class JitsiController {
         }
     }
 
+
+    /**
+     * اگر participant مدت طولانی قطع بماند، خودمان محلی فرض می‌کنیم
+     * رفته است و او را حذف می‌کنیم — مستقل از اینکه سرور XMPP کِی
+     * (یا اصلاً) USER_LEFT واقعی می‌فرستد.
+     */
+    _handleConnectionStatusForWatchdog(participantId, isInterrupted) {
+        const DISCONNECT_GRACE_MS = 30000 // ۳۰ ثانیه مهلت قبل از حذف — چون این تایمر هیچ هزینه‌ی CPU/حافظه‌ای ندارد (فقط یک setTimeout)، محتاط‌تر بودن ضرری ندارد
+
+        // اگر برگشت (دیگر interrupted نیست)، تایمر رو پاک کن
+        if (!isInterrupted) {
+            const existing = this._disconnectWatchdogs.get(participantId)
+            if (existing) {
+                clearTimeout(existing)
+                this._disconnectWatchdogs.delete(participantId)
+            }
+            return
+        }
+
+        // اگر از قبل تایمر داشت، دوباره نساز
+        if (this._disconnectWatchdogs.has(participantId)) {
+            return
+        }
+
+        const timer = setTimeout(() => {
+            this._disconnectWatchdogs.delete(participantId)
+
+            // چک کن هنوز واقعاً در کنفرانس هست و هنوز interrupted است
+            const participant = this._conference?.getParticipantById(participantId)
+
+            if (!participant) {
+                // سرور خودش حذفش کرده، کاری لازم نیست
+                return
+            }
+
+            if (participant.getConnectionStatus() !== 'active') {
+                console.warn(
+                    '[JitsiController] Participant considered disconnected after grace period (client-side):',
+                    participantId
+                )
+
+                this._qualityCache.delete(participantId)
+
+                // فرض محلی: این کاربر رفته. UI را آپدیت کن.
+                this._emit(JITSI_EVENTS.PARTICIPANT_LEFT, {participantId})
+
+                // توجه: از _conference حذفش نمی‌کنیم چون آن آبجکت را
+                // خود lib-jitsi-meet مدیریت می‌کند. اگر بعداً سرور واقعاً
+                // USER_LEFT بفرستد، آن رویداد هم می‌آید و _removeParticipant
+                // دوباره (بی‌ضرر) صدا زده می‌شود.
+            }
+        }, DISCONNECT_GRACE_MS)
+
+        this._disconnectWatchdogs.set(participantId, timer)
+    }
+
     /**
      * Cleanup after failed join/connect.
      */
@@ -2830,6 +2971,11 @@ export class JitsiController {
         this._roomName = ''
         this._displayName = ''
         this._email = ''
+
+        for (const timer of this._disconnectWatchdogs.values()) {
+            clearTimeout(timer)
+        }
+        this._disconnectWatchdogs.clear()
 
         this._qualityCache.clear()
 
