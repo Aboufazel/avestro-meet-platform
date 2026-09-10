@@ -283,33 +283,33 @@ export default function LandingPage() {
       {/*  </div>*/}
       {/*</section>*/}
 
-      {/* Testimonials */}
-      <section className="max-w-6xl mx-auto px-6 py-24">
-        <div className="text-center mb-14">
-          <h2 className="text-3xl text-olive-100 mb-4" style={{ fontWeight: 700 }}>کاربران ما چه می‌گویند</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {testimonials.map((t) => (
-            <div key={t.name} className="bg-olive-900 border border-olive-700 rounded-2xl p-6">
-              <div className="flex gap-1 mb-4">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star key={i} className="w-4 h-4 text-olive-500 fill-olive-500" />
-                ))}
-              </div>
-              <p className="text-olive-300 text-sm leading-relaxed mb-5">«{t.text}»</p>
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-olive-800 border border-olive-700 flex items-center justify-center text-olive-400 text-sm font-medium">
-                  {t.name.charAt(0)}
-                </div>
-                <div>
-                  <p className="text-olive-100 text-sm">{t.name}</p>
-                  <p className="text-olive-600 text-xs">{t.role}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/*/!* Testimonials *!/*/}
+      {/*<section className="max-w-6xl mx-auto px-6 py-24">*/}
+      {/*  <div className="text-center mb-14">*/}
+      {/*    <h2 className="text-3xl text-olive-100 mb-4" style={{ fontWeight: 700 }}>کاربران ما چه می‌گویند</h2>*/}
+      {/*  </div>*/}
+      {/*  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">*/}
+      {/*    {testimonials.map((t) => (*/}
+      {/*      <div key={t.name} className="bg-olive-900 border border-olive-700 rounded-2xl p-6">*/}
+      {/*        <div className="flex gap-1 mb-4">*/}
+      {/*          {Array.from({ length: 5 }).map((_, i) => (*/}
+      {/*            <Star key={i} className="w-4 h-4 text-olive-500 fill-olive-500" />*/}
+      {/*          ))}*/}
+      {/*        </div>*/}
+      {/*        <p className="text-olive-300 text-sm leading-relaxed mb-5">«{t.text}»</p>*/}
+      {/*        <div className="flex items-center gap-3">*/}
+      {/*          <div className="w-9 h-9 rounded-full bg-olive-800 border border-olive-700 flex items-center justify-center text-olive-400 text-sm font-medium">*/}
+      {/*            {t.name.charAt(0)}*/}
+      {/*          </div>*/}
+      {/*          <div>*/}
+      {/*            <p className="text-olive-100 text-sm">{t.name}</p>*/}
+      {/*            <p className="text-olive-600 text-xs">{t.role}</p>*/}
+      {/*          </div>*/}
+      {/*        </div>*/}
+      {/*      </div>*/}
+      {/*    ))}*/}
+      {/*  </div>*/}
+      {/*</section>*/}
 
       {/* CTA */}
       <section className="bg-olive-900/40 border-y border-olive-800">
