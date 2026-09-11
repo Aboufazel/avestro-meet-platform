@@ -951,10 +951,12 @@ export class JitsiController {
             )
 
             if (cameraTrack) {
-                await this._conference.replaceTrack(
-                    cameraTrack,
-                    desktopTrack
-                )
+                // replaceTrack بین camera و desktop در این حالت پشتیبانی نمی‌شود —
+                // باید جدا remove/add کنیم. ترتیب مهم است: اول desktop را اضافه
+                // کن، بعد camera را حذف کن، تا یک لحظه هیچ ویدیویی نفرستیم نه اینکه
+                // یک لحظه هیچ‌کدام نباشند (کاهش پرش/فلیکر در سمت بقیه).
+                await this._conference.addTrack(desktopTrack)
+                await this._conference.removeTrack(cameraTrack)
 
                 cameraReplaced = true
 
@@ -1015,20 +1017,14 @@ export class JitsiController {
             // already attached/replaced before a later operation failed.
 
             try {
-                if (
-                    cameraReplaced &&
-                    cameraTrack
-                ) {
-                    await this._conference?.replaceTrack(
-                        desktopTrack,
-                        cameraTrack
-                    )
+                if (cameraReplaced && cameraTrack) {
+                    await this._conference?.addTrack(cameraTrack)
+                    await this._conference?.removeTrack(desktopTrack)
 
                     this._replaceLocalTrack(
                         desktopTrack,
                         cameraTrack
                     )
-
                 } else if (
                     trackAttached &&
                     desktopTrack
@@ -1139,19 +1135,16 @@ export class JitsiController {
             }
 
             if (previousCamera) {
-
-                await this._conference.replaceTrack(
-                    desktopTrack,
-                    previousCamera
-                )
+                // همان محدودیت: باید جدا remove/add کنیم، نه replaceTrack.
+                // این‌بار برعکس: اول camera را برگردان، بعد desktop را حذف کن.
+                await this._conference.addTrack(previousCamera)
+                await this._conference.removeTrack(desktopTrack)
 
                 this._replaceLocalTrack(
                     desktopTrack,
                     previousCamera
                 )
-
             } else {
-
                 await this._conference.removeTrack(
                     desktopTrack
                 )
