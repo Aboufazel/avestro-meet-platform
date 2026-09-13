@@ -116,6 +116,7 @@ export class JitsiController {
 
         this._status = MEETING_STATUS.IDLE
 
+
         this._displayName = ''
         this._email = ''
         this._roomName = ''
@@ -148,7 +149,7 @@ export class JitsiController {
              * null means there was no camera enabled before
              * screen sharing started.
              */
-            replacedTrack: null,
+            wasCameraActiveBefore: false,
         }
 
         // =====================================================================
@@ -913,131 +914,80 @@ export class JitsiController {
             return false
         }
 
-        const JitsiMeetJS =
-            ensureJitsiInitialized()
-
+        const JitsiMeetJS = ensureJitsiInitialized()
         this._screenShareTransitioning = true
 
         let desktopTrack = null
-        let cameraTrack = null
         let trackAttached = false
-        let cameraReplaced = false
+        let cameraRemoved = false
 
         try {
-            // IMPORTANT:
-            // Screen-share failure is a MEDIA error, NOT a CONNECTION error.
-            // Never emit CONNECTION_FAILED here because application layers
-            // commonly interpret that event as a reason to leave/disconnect
-            // the whole meeting.
-
-            const tracks =
-                await JitsiMeetJS.createLocalTracks({
-                    devices: ['desktop'],
-                })
+            const tracks = await JitsiMeetJS.createLocalTracks({
+                devices: ['desktop'],
+            })
 
             desktopTrack = tracks?.[0]
 
             if (!desktopTrack) {
-                throw new Error(
-                    'Could not create desktop track'
-                )
+                throw new Error('Could not create desktop track')
             }
 
-            cameraTrack =
-                this._findCameraTrack()
+            const cameraTrack = this._findCameraTrack()
 
-            this._bindLocalTrackEvents(
-                desktopTrack
-            )
+            this._bindLocalTrackEvents(desktopTrack)
 
             if (cameraTrack) {
-                // replaceTrack بین camera و desktop در این حالت پشتیبانی نمی‌شود —
-                // باید جدا remove/add کنیم. ترتیب مهم است: اول desktop را اضافه
-                // کن، بعد camera را حذف کن، تا یک لحظه هیچ ویدیویی نفرستیم نه اینکه
-                // یک لحظه هیچ‌کدام نباشند (کاهش پرش/فلیکر در سمت بقیه).
-                await this._conference.addTrack(desktopTrack)
+                // مهم: اول camera را کامل از سرور حذف کن، بعد desktop را اضافه کن.
+                // سرور فقط یک اسلات ویدیو به ازای هر نفر دارد (multi-stream ندارد)؛
+                // اگر برعکس انجام شود، سرور روی camera قفل می‌ماند و بقیه هیچ‌وقت
+                // desktop را نمی‌بینند.
                 await this._conference.removeTrack(cameraTrack)
+                cameraRemoved = true
 
-                cameraReplaced = true
+                await this._safeDisposeTrack(cameraTrack)
 
-                this._replaceLocalTrack(
-                    cameraTrack,
-                    desktopTrack
-                )
-
-                this._screenShare.replacedTrack =
-                    cameraTrack
-            } else {
-                await this._conference.addTrack(
-                    desktopTrack
-                )
-
+                await this._conference.addTrack(desktopTrack)
                 trackAttached = true
 
-                this._localTracks.push(
-                    desktopTrack
-                )
+                this._replaceLocalTrack(cameraTrack, desktopTrack)
 
-                this._screenShare.replacedTrack =
-                    null
+                this._screenShare.wasCameraActiveBefore = true
+            } else {
+                await this._conference.addTrack(desktopTrack)
+                trackAttached = true
+
+                this._localTracks.push(desktopTrack)
+                this._screenShare.wasCameraActiveBefore = false
             }
 
             this._screenShare.active = true
+            this._screenShare.desktopTrack = desktopTrack
 
-            this._screenShare.desktopTrack =
-                desktopTrack
-
-            const stoppedHandler =
-                this._handleDesktopTrackStopped
+            const stoppedHandler = this._handleDesktopTrackStopped
 
             desktopTrack.addEventListener(
-                JitsiMeetJS.events.track
-                    .LOCAL_TRACK_STOPPED,
+                JitsiMeetJS.events.track.LOCAL_TRACK_STOPPED,
                 stoppedHandler
             )
 
-            desktopTrack.__jitsiControllerScreenStoppedHandler =
-                stoppedHandler
+            desktopTrack.__jitsiControllerScreenStoppedHandler = stoppedHandler
 
-            this._emit(
-                JITSI_EVENTS.TRACK_ADDED,
-                mapTrack(desktopTrack)
-            )
-
-            this._emit(
-                JITSI_EVENTS.SCREEN_SHARE_STARTED,
-                mapTrack(desktopTrack)
-            )
+            this._emit(JITSI_EVENTS.TRACK_ADDED, mapTrack(desktopTrack))
+            this._emit(JITSI_EVENTS.SCREEN_SHARE_STARTED, mapTrack(desktopTrack))
 
             return true
-
         } catch (error) {
-
-            // Roll back conference state if the track was
-            // already attached/replaced before a later operation failed.
-
             try {
-                if (cameraReplaced && cameraTrack) {
-                    await this._conference?.addTrack(cameraTrack)
+                if (trackAttached && desktopTrack) {
                     await this._conference?.removeTrack(desktopTrack)
-
-                    this._replaceLocalTrack(
-                        desktopTrack,
-                        cameraTrack
-                    )
-                } else if (
-                    trackAttached &&
-                    desktopTrack
-                ) {
-                    await this._conference?.removeTrack(
-                        desktopTrack
-                    )
-
-                    this._removeLocalTrack(
-                        desktopTrack
-                    )
+                    this._removeLocalTrack(desktopTrack)
                 }
 
+                // اگر دوربین حذف شده بود ولی بعدش خطا خوردیم، برای اینکه
+                // کاربر کاملاً بدون تصویر نماند، یک دوربین تازه می‌سازیم.
+                if (cameraRemoved) {
+                    await this._createAndAddLocalTrack('video')
+                }
             } catch (rollbackError) {
                 console.warn(
                     '[JitsiController] Screen-share rollback failed:',
@@ -1046,51 +996,24 @@ export class JitsiController {
             }
 
             if (desktopTrack) {
-                await this._safeDisposeTrack(
-                    desktopTrack
-                )
+                await this._safeDisposeTrack(desktopTrack)
             }
 
             this._screenShare = {
                 active: false,
                 desktopTrack: null,
-                replacedTrack: null,
+                wasCameraActiveBefore: false,
             }
 
-            const normalized =
-                normalizeError(
-                    error,
-                    ERROR_CODES.SCREEN_SHARE_FAILED
-                )
+            const normalized = normalizeError(error, ERROR_CODES.SCREEN_SHARE_FAILED)
 
-            console.warn(
-                '[JitsiController] Screen share failed:',
-                normalized
-            )
+            console.warn('[JitsiController] Screen share failed:', normalized)
 
-            // NEVER:
-            //
-            // this._emit(
-            //     JITSI_EVENTS.CONNECTION_FAILED,
-            //     normalized
-            // )
-            //
-            // because that can make the UI leave the meeting.
-
-            if (
-                JITSI_EVENTS.SCREEN_SHARE_FAILED
-            ) {
-                this._emit(
-                    JITSI_EVENTS.SCREEN_SHARE_FAILED,
-                    normalized
-                )
-            }
+            this._emit(JITSI_EVENTS.SCREEN_SHARE_FAILED, normalized)
 
             return false
-
         } finally {
-            this._screenShareTransitioning =
-                false
+            this._screenShareTransitioning = false
         }
     }
 
@@ -1102,102 +1025,66 @@ export class JitsiController {
      * tear down the Jitsi connection.
      */
     async stopScreenShare() {
-        if (
-            !this._conference ||
-            !this._screenShare.active
-        ) {
+        if (!this._conference || !this._screenShare.active) {
             return false
         }
 
-        if (
-            this._screenShareTransitioning
-        ) {
+        if (this._screenShareTransitioning) {
             return false
         }
 
         this._screenShareTransitioning = true
 
-        const desktopTrack =
-            this._screenShare.desktopTrack
+        const desktopTrack = this._screenShare.desktopTrack
+        const shouldRestoreCamera = this._screenShare.wasCameraActiveBefore
 
-        const previousCamera =
-            this._screenShare.replacedTrack
-
+        await this._conference.removeTrack(desktopTrack)
+        this._removeLocalTrack(desktopTrack)
+        await this._safeDisposeTrack(desktopTrack)
+        
         try {
             if (!desktopTrack) {
+
                 this._screenShare = {
                     active: false,
                     desktopTrack: null,
-                    replacedTrack: null,
+                    wasCameraActiveBefore: false,
                 }
 
                 return false
             }
 
-            if (previousCamera) {
-                // همان محدودیت: باید جدا remove/add کنیم، نه replaceTrack.
-                // این‌بار برعکس: اول camera را برگردان، بعد desktop را حذف کن.
-                await this._conference.addTrack(previousCamera)
-                await this._conference.removeTrack(desktopTrack)
-
-                this._replaceLocalTrack(
-                    desktopTrack,
-                    previousCamera
-                )
-            } else {
-                await this._conference.removeTrack(
-                    desktopTrack
-                )
-
-                this._removeLocalTrack(
-                    desktopTrack
-                )
-            }
-
-            await this._safeDisposeTrack(
-                desktopTrack
-            )
-
             this._screenShare = {
                 active: false,
                 desktopTrack: null,
-                replacedTrack: null,
+                wasCameraActiveBefore: false,
             }
 
-            this._emit(
-                JITSI_EVENTS.SCREEN_SHARE_STOPPED
-            )
+            if (shouldRestoreCamera) {
+                // دوربین را از صفر می‌سازیم — دقیقاً همان مسیر toggleVideo
+                // که همیشه درست کار کرده، نه resurrect کردن track قدیمی.
+                const restored = await this._createAndAddLocalTrack('video')
+
+                if (!restored) {
+                    console.warn(
+                        '[JitsiController] Failed to restore camera after screen share stopped'
+                    )
+                }
+            }
+
+            this._emit(JITSI_EVENTS.SCREEN_SHARE_STOPPED)
 
             return true
-
         } catch (error) {
+            const normalized = normalizeError(error, ERROR_CODES.SCREEN_SHARE_FAILED)
 
-            const normalized =
-                normalizeError(
-                    error,
-                    ERROR_CODES.SCREEN_SHARE_FAILED
-                )
+            console.warn('[JitsiController] Screen share stop failed:', normalized)
 
-            // DO NOT emit CONNECTION_FAILED.
-            console.warn(
-                '[JitsiController] Screen share stop failed:',
-                normalized
-            )
-
-            if (
-                JITSI_EVENTS.SCREEN_SHARE_FAILED
-            ) {
-                this._emit(
-                    JITSI_EVENTS.SCREEN_SHARE_FAILED,
-                    normalized
-                )
-            }
+            this._emit(JITSI_EVENTS.SCREEN_SHARE_FAILED, normalized)
 
             return false
-
         } finally {
-            this._screenShareTransitioning =
-                false
+            this._screenShareTransitioning = false
         }
     }
 
