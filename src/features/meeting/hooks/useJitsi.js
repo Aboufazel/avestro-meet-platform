@@ -1,7 +1,15 @@
-import {useEffect, useRef, useCallback} from 'react'
+import {
+    useEffect,
+    useRef,
+    useCallback,
+} from 'react'
+
 import {useNavigate} from 'react-router-dom'
+
 import {useAuthStore} from '../../../store/authStore'
+
 import {useMeetingStore} from '../store/meeting-store'
+
 import {
     joinMeeting,
     leaveMeeting,
@@ -12,6 +20,7 @@ import {
     sendMessage,
     muteEveryone,
 } from '../store/meeting-actions'
+
 import {
     selectStatus,
     selectError,
@@ -21,63 +30,74 @@ import {
     selectIsVideoMuted,
     selectIsScreenSharing,
 } from '../store/meeting-selectors'
+
 import {MEETING_STATUS} from '../jitsi/jitsi-events'
 
-/**
- * useJitsi
- *
- * hook اصلی که RoomPage از آن استفاده می‌کند.
- * تمام lifecycle جلسه (join, leave, controls) را مدیریت می‌کند.
- *
- * @param {string} roomName
- */
 export function useJitsi(roomName) {
     const navigate = useNavigate()
-    const user = useAuthStore((s) => s.user)
+
+    const user = useAuthStore(
+        (s) => s.user
+    )
+
     const joinedRef = useRef(false)
 
-    const status = useMeetingStore(selectStatus)
-    const error = useMeetingStore(selectError)
-    const isConnected = useMeetingStore(selectIsConnected)
-    const isConnecting = useMeetingStore(selectIsConnecting)
-    const isAudioMuted = useMeetingStore(selectIsAudioMuted)
-    const isVideoMuted = useMeetingStore(selectIsVideoMuted)
-    const isScreenSharing = useMeetingStore(selectIsScreenSharing)
+    const status = useMeetingStore(
+        selectStatus
+    )
 
-    // join on mount
-    // useEffect(() => {
-    //   if (!roomName || joinedRef.current) return
-    //   joinedRef.current = true
-    //
-    //   const displayName =
-    //     user?.display_name ||
-    //     user?.displayName ||
-    //     sessionStorage.getItem('guest_name') ||
-    //     'مهمان'
-    //
-    //   joinMeeting({
-    //     roomName,
-    //     displayName,
-    //     email: user?.email || '',
-    //   })
-    //
-    //   return () => {
-    //     leaveMeeting()
-    //     joinedRef.current = false
-    //   }
-    // }, [roomName])
+    const error = useMeetingStore(
+        selectError
+    )
+
+    const isConnected = useMeetingStore(
+        selectIsConnected
+    )
+
+    const isConnecting = useMeetingStore(
+        selectIsConnecting
+    )
+
+    const isAudioMuted = useMeetingStore(
+        selectIsAudioMuted
+    )
+
+    const isVideoMuted = useMeetingStore(
+        selectIsVideoMuted
+    )
+
+    const isScreenSharing =
+        useMeetingStore(
+            selectIsScreenSharing
+        )
+
+    // -------------------------------------------------------------------------
+    // Join
+    // -------------------------------------------------------------------------
 
     useEffect(() => {
-        if (!roomName || joinedRef.current) return
+        if (
+            !roomName ||
+            joinedRef.current
+        ) {
+            return
+        }
 
         const displayName =
             user?.display_name ||
             user?.displayName ||
-            sessionStorage.getItem('guest_name')
+            sessionStorage.getItem(
+                'guest_name'
+            )
 
-        // اگه نه لاگین بود نه اسم مهمون داشت → برگردون به صفحه‌ی join
         if (!displayName) {
-            navigate(`/join/${roomName}`, {replace: true})
+            navigate(
+                `/join/${roomName}`,
+                {
+                    replace: true,
+                }
+            )
+
             return
         }
 
@@ -85,54 +105,147 @@ export function useJitsi(roomName) {
 
         joinMeeting({
             roomName,
+
             displayName,
-            email: user?.email || '',
+
+            email:
+                user?.email || '',
         })
 
         return () => {
-            leaveMeeting()
             joinedRef.current = false
-        }
-    }, [roomName])
 
-    // navigate away on leave/failed
+            leaveMeeting()
+        }
+    }, [
+        roomName,
+        user?.display_name,
+        user?.displayName,
+        user?.email,
+        navigate,
+    ])
+
+    // -------------------------------------------------------------------------
+    // Leave only on REAL leave.
+    //
+    // RECONNECTING must NEVER navigate away.
+    // -------------------------------------------------------------------------
+
     useEffect(() => {
-        if (status === MEETING_STATUS.LEFT) {
-            navigate('/', {replace: true})
+        if (
+            status ===
+            MEETING_STATUS.LEFT
+        ) {
+            navigate(
+                '/',
+                {
+                    replace: true,
+                }
+            )
         }
-    }, [status, navigate])
+    }, [
+        status,
+        navigate,
+    ])
 
-    const handleLeave = useCallback(async () => {
-        await leaveMeeting()
-        navigate('/', {replace: true})
-    }, [navigate])
+    // -------------------------------------------------------------------------
+    // Actions
+    // -------------------------------------------------------------------------
 
-    const handleToggleAudio = useCallback(() => toggleAudio(), [])
-    const handleToggleVideo = useCallback(() => toggleVideo(), [])
+    const handleLeave =
+        useCallback(
+            async () => {
+                await leaveMeeting()
 
-    const handleScreenShare = useCallback(() => {
-        isScreenSharing ? stopScreenShare() : startScreenShare()
-    }, [isScreenSharing])
+                navigate(
+                    '/',
+                    {
+                        replace: true,
+                    }
+                )
+            },
+            [navigate]
+        )
 
-    const handleSendMessage = useCallback((text) => sendMessage(text), [])
-    const handleMuteEveryone = useCallback(() => muteEveryone(), [])
+    const handleToggleAudio =
+        useCallback(
+            () =>
+                toggleAudio(),
+            []
+        )
+
+    const handleToggleVideo =
+        useCallback(
+            () =>
+                toggleVideo(),
+            []
+        )
+
+    const handleScreenShare =
+        useCallback(
+            () => {
+                if (
+                    isScreenSharing
+                ) {
+                    return stopScreenShare()
+                }
+
+                return startScreenShare()
+            },
+            [isScreenSharing]
+        )
+
+    const handleSendMessage =
+        useCallback(
+            (text) =>
+                sendMessage(text),
+            []
+        )
+
+    const handleMuteEveryone =
+        useCallback(
+            () =>
+                muteEveryone(),
+            []
+        )
 
     return {
         // state
         status,
+
         error,
+
         isConnected,
+
         isConnecting,
+
+        isReconnecting:
+            status ===
+            MEETING_STATUS.RECONNECTING,
+
         isAudioMuted,
+
         isVideoMuted,
+
         isScreenSharing,
 
         // actions
-        leave: handleLeave,
-        toggleAudio: handleToggleAudio,
-        toggleVideo: handleToggleVideo,
-        toggleScreenShare: handleScreenShare,
-        sendMessage: handleSendMessage,
-        muteEveryone: handleMuteEveryone,
+        leave:
+            handleLeave,
+
+        toggleAudio:
+            handleToggleAudio,
+
+        toggleVideo:
+            handleToggleVideo,
+
+        toggleScreenShare:
+            handleScreenShare,
+
+        sendMessage:
+            handleSendMessage,
+
+        muteEveryone:
+            handleMuteEveryone,
     }
 }
