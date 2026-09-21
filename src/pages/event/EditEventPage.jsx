@@ -118,7 +118,7 @@ export default function EditEventPage() {
 
     if (isRoomLoading) {
         return (
-            <div className="min-h-full bg-olive-950 p-4 sm:p-6">
+            <div className="min-h-full bg-[#f4f7fb] p-4 sm:p-6">
                 <div className="max-w-2xl">
                     <Card>
                         <div className="flex items-center justify-center py-16">
@@ -133,15 +133,15 @@ export default function EditEventPage() {
 
     if (isError || !room) {
         return (
-            <div className="min-h-full bg-olive-950 p-4 sm:p-6">
+            <div className="min-h-full bg-[#f4f7fb] p-4 sm:p-6">
                 <div className="max-w-2xl">
                     <Card>
                         <div className="flex flex-col items-center justify-center py-14 text-center">
-                            <p className="text-olive-300 mb-2">
+                            <p className="text-[#536074] mb-2">
                                 رویداد پیدا نشد
                             </p>
 
-                            <p className="text-olive-600 text-sm mb-5">
+                            <p className="text-[#8d98aa] text-sm mb-5">
                                 ممکن است رویداد حذف شده باشد یا دسترسی لازم را نداشته باشید.
                             </p>
 
@@ -160,15 +160,15 @@ export default function EditEventPage() {
 
     if (room.status === 'ended') {
         return (
-            <div className="min-h-full bg-olive-950 p-4 sm:p-6">
+            <div className="min-h-full bg-[#f4f7fb] p-4 sm:p-6">
                 <div className="max-w-2xl">
                     <Card>
                         <div className="flex flex-col items-center justify-center py-14 text-center">
-                            <p className="text-olive-300 mb-2">
+                            <p className="text-[#536074] mb-2">
                                 این رویداد پایان یافته است
                             </p>
 
-                            <p className="text-olive-600 text-sm mb-5">
+                            <p className="text-[#8d98aa] text-sm mb-5">
                                 رویدادهای پایان‌یافته قابل ویرایش نیستند.
                             </p>
 
@@ -186,7 +186,7 @@ export default function EditEventPage() {
 
 
     return (
-        <div className="min-h-full bg-olive-950 p-4 sm:p-6">
+        <div className="min-h-full bg-[#f4f7fb] p-4 sm:p-6">
 
             <div className="max-w-2xl">
 
@@ -195,17 +195,17 @@ export default function EditEventPage() {
 
                     <Link
                         to="/dashboard"
-                        className="w-9 h-9 flex items-center justify-center rounded-xl text-olive-500 hover:bg-olive-800 hover:text-olive-300 transition-all"
+                        className="w-9 h-9 flex items-center justify-center rounded-xl text-[#8d98aa] hover:bg-[#edf2ff] hover:text-[#4f7cff] transition-all"
                     >
                         <ArrowRight className="w-5 h-5"/>
                     </Link>
 
                     <div>
-                        <h1 className="text-olive-100 font-bold text-lg">
+                        <h1 className="text-[#101827] font-bold text-lg">
                             ویرایش رویداد
                         </h1>
 
-                        <p className="text-olive-500 text-sm">
+                        <p className="text-[#8d98aa] text-sm">
                             اطلاعات رویداد خود را ویرایش کنید
                         </p>
                     </div>
@@ -222,6 +222,7 @@ export default function EditEventPage() {
 
                         {/* Title */}
                         <Input
+                                className="meet-auth-input"
                             label="عنوان رویداد"
                             placeholder="مثال: سمینار مدیریت پروژه"
                             error={errors.title?.message}
@@ -231,6 +232,7 @@ export default function EditEventPage() {
 
                         <div>
                             <Input
+                                className="meet-auth-input"
                                 label="شناسه رویداد (لینک)"
                                 placeholder="project-management"
                                 error={errors.slug?.message}
@@ -238,7 +240,7 @@ export default function EditEventPage() {
                             />
 
                             {watch('slug') && !errors.slug && (
-                                <p className="text-olive-600 text-xs mt-1.5">
+                                <p className="text-[#8d98aa] text-xs mt-1.5">
                                     لینک جلسه: meet.avestro.ir/join/{watch('slug')}
                                 </p>
                             )}
@@ -248,14 +250,14 @@ export default function EditEventPage() {
                         {/* Description */}
                         <div className="flex flex-col gap-1.5">
 
-                            <label className="text-sm text-olive-300">
+                            <label className="text-sm text-[#536074]">
                                 توضیحات (اختیاری)
                             </label>
 
                             <textarea
                                 placeholder="توضیحاتی درباره رویداد..."
                                 rows={3}
-                                className="w-full bg-olive-950 border border-olive-700 rounded-xl px-4 py-2.5 text-olive-100 placeholder:text-olive-600 outline-none focus:ring-2 focus:ring-olive-500/50 focus:border-olive-500 transition-all resize-none"
+                                className="w-full bg-[#f8faff] border border-[#e1e6ef] rounded-xl px-4 py-2.5 text-[#101827] placeholder:text-[#a6afbd] outline-none focus:ring-2 focus:ring-[#4f7cff]/15 focus:border-[#9eb6ff] transition-all resize-none"
                                 {...register('description')}
                             />
 
@@ -272,6 +274,7 @@ export default function EditEventPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
                             <Input
+                                className="meet-auth-input"
                                 label="تاریخ و ساعت برگزاری (اختیاری)"
                                 type="datetime-local"
                                 error={errors.scheduled_at?.message}
@@ -279,6 +282,7 @@ export default function EditEventPage() {
                             />
 
                             <Input
+                                className="meet-auth-input"
                                 label="حداکثر شرکت‌کنندگان"
                                 type="number"
                                 error={errors.max_participants?.message}
@@ -289,22 +293,22 @@ export default function EditEventPage() {
 
 
                         {/* Private */}
-                        <div className="flex items-center gap-3 p-4 bg-olive-950 rounded-xl border border-olive-700">
+                        <div className="flex items-center gap-3 p-4 bg-[#f8faff] rounded-xl border border-[#e5eaf2]">
 
                             <input
                                 type="checkbox"
                                 id="is_private"
-                                className="w-4 h-4 accent-olive-500 cursor-pointer"
+                                className="w-4 h-4 accent-[#4f7cff] cursor-pointer"
                                 {...register('is_private')}
                             />
 
                             <label
                                 htmlFor="is_private"
-                                className="text-olive-300 text-sm cursor-pointer"
+                                className="text-[#536074] text-sm cursor-pointer"
                             >
                                 رویداد خصوصی
 
-                                <span className="text-olive-600 text-xs mr-1">
+                                <span className="text-[#9aa4b4] text-xs mr-1">
                   (فقط با لینک مستقیم)
                 </span>
                             </label>

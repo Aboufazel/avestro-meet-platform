@@ -21,6 +21,8 @@ export const selectParticipants =
 export const selectActiveSpeakerId =
     (s) => s.activeSpeakerId
 
+export const selectPinnedParticipantId = (s) => s.pinnedParticipantId
+
 export const selectParticipantList = (s) =>
     Array.from(s.participants.values())
 

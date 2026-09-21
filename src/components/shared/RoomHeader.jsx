@@ -1,176 +1,46 @@
-import {memo, useEffect, useState} from 'react'
-import {Mic,Check, Circle, Copy, Volume2, VolumeX, Wifi, WifiOff} from 'lucide-react'
-import {useRoom} from "../../hooks/useRooms.js";
-import {useAuthStore} from '../../store/authStore'
+import { memo, useEffect, useState } from 'react'
+import { Mic, Check, Circle, Copy, Volume2, VolumeX, Wifi } from 'lucide-react'
+import { useRoom } from '../../hooks/useRooms.js'
+import { useAuthStore } from '../../store/authStore'
 
-function Timer({isConnected}) {
-    const [seconds, setSeconds] = useState(0)
-
-
-    useEffect(() => {
-        if (!isConnected) return
-        const interval = setInterval(() => setSeconds((s) => s + 1), 1000)
-        return () => clearInterval(interval)
-    }, [isConnected])
-
-    const format = (totalSeconds) => {
-        const h = Math.floor(totalSeconds / 3600)
-        const m = Math.floor((totalSeconds % 3600) / 60)
-        const s = totalSeconds % 60
-        const pad = (n) => String(n).padStart(2, '0')
-        return `${pad(h)}:${pad(m)}:${pad(s)}`
-    }
-
-    return (
-        <span className="text-xs text-olive-500 tabular-nums hidden sm:block">
-            {format(seconds)}
-        </span>
-    )
+function Timer({ isConnected }) {
+  const [seconds, setSeconds] = useState(0)
+  useEffect(() => { if (!isConnected) return; const interval = setInterval(() => setSeconds((s) => s + 1), 1000); return () => clearInterval(interval) }, [isConnected])
+  const format = (n) => `${String(Math.floor(n / 3600)).padStart(2, '0')}:${String(Math.floor((n % 3600) / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`
+  return <span className="text-[11px] text-white/45 tabular-nums hidden sm:block">{format(seconds)}</span>
+}
+function RecordingTimer({ seconds }) {
+  const format = (n) => `${String(Math.floor(n / 3600)).padStart(2, '0')}:${String(Math.floor((n % 3600) / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`
+  return <span className="text-[11px] text-[var(--room-danger)] tabular-nums">{format(seconds)}</span>
 }
 
-function RecordingTimer({seconds}) {
-    const format = (totalSeconds) => {
-        const h = Math.floor(totalSeconds / 3600)
-        const m = Math.floor((totalSeconds % 3600) / 60)
-        const s = totalSeconds % 60
-        const pad = (n) => String(n).padStart(2, '0')
-        return `${pad(h)}:${pad(m)}:${pad(s)}`
-    }
+export const RoomHeader = memo(function RoomHeader({ slug, isConnected, onCopyLink, isMeetingMuted, onToggleMeetingMute, isRecording, recordingSeconds, onToggleRecording, isVoiceRecording, voiceRecordingSeconds, onToggleVoiceRecording }) {
+  const [copied, setCopied] = useState(false)
+  const { data: room, isLoading, isError } = useRoom(slug)
+  const currentUser = useAuthStore((s) => s.user)
+  const isHost = room?.host?.id === currentUser?.id
+  const handleCopy = () => { onCopyLink?.(); setCopied(true); setTimeout(() => setCopied(false), 1500) }
 
-    return (
-        <span className="text-xs text-red-400 tabular-nums">
-            {format(seconds)}
-        </span>
-    )
-}
+  return (
+    <header className="h-[62px] bg-[var(--room-surface)]/95 backdrop-blur-xl border-b border-[var(--room-border)] flex items-center justify-between px-3 sm:px-5 shrink-0 relative z-50">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <img src="/avestro-logo.png" alt="اَوسترو" className="w-8 h-8 shrink-0 rounded-lg" />
+        <div className="hidden sm:block min-w-0"><p className="text-white text-xs font-medium">اَوسترو میت</p><p className="text-[9px] text-white/25 mt-0.5 tracking-wide">AVESTRO MEET</p></div>
+        <span className="text-white/15 hidden sm:block">/</span>
+        <span className="text-white/60 text-xs truncate max-w-[130px] sm:max-w-[250px]">{(isLoading && !isError) ? slug : room?.title}</span>
+      </div>
 
-export const RoomHeader = memo(function RoomHeader({
-                                                       slug,
-                                                       isConnected,
-                                                       onCopyLink,
-                                                       isMeetingMuted,
-                                                       onToggleMeetingMute,
-                                                       isRecording,
-                                                       recordingSeconds,
-                                                       onToggleRecording,
-                                                       isVoiceRecording,
-                                                       voiceRecordingSeconds,
-                                                       onToggleVoiceRecording
-                                                   }) {
-    const [copied, setCopied] = useState(false)
+      <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="hidden sm:flex items-center gap-2 rounded-xl bg-white/[.035] border border-white/[.06] px-3 py-2"><span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-[var(--room-mint)] shadow-[0_0_0_4px_rgba(84,217,176,.08)]' : 'bg-[var(--room-warning)] animate-pulse'}`} /><span className="text-[10px] text-white/55">{isConnected ? 'متصل' : 'در حال اتصال...'}</span><Timer isConnected={isConnected} /></div>
 
-    const {
-        data: room,
-        isLoading,
-        isError
-    } = useRoom(slug)
+        {isHost && <button type="button" onClick={onToggleVoiceRecording} title={isVoiceRecording ? 'توقف ضبط صدا' : 'شروع ضبط صدا'} className={`hidden md:flex items-center gap-1.5 text-[10px] border rounded-xl px-2.5 py-2 transition-colors ${isVoiceRecording ? 'text-[var(--room-danger)] border-[var(--room-danger)]/30 bg-[var(--room-danger)]/10' : 'text-white/45 border-[var(--room-border)] hover:text-white/80 hover:bg-white/[.07]'}`}>{isVoiceRecording ? <><span className="w-1.5 h-1.5 rounded-full bg-[var(--room-danger)] animate-pulse" /><RecordingTimer seconds={voiceRecordingSeconds} /></> : <Mic className="w-3.5 h-3.5" />}<span>{isVoiceRecording ? 'ضبط صدا' : 'ضبط صدا'}</span></button>}
+        {isHost && <button type="button" onClick={onToggleRecording} title={isRecording ? 'توقف ضبط جلسه' : 'شروع ضبط جلسه'} className={`hidden md:flex items-center gap-1.5 text-[10px] border rounded-xl px-2.5 py-2 transition-colors ${isRecording ? 'text-[var(--room-danger)] border-[var(--room-danger)]/30 bg-[var(--room-danger)]/10' : 'text-white/45 border-[var(--room-border)] hover:text-white/80 hover:bg-white/[.07]'}`}>{isRecording ? <><span className="w-1.5 h-1.5 rounded-full bg-[var(--room-danger)] animate-pulse" /><RecordingTimer seconds={recordingSeconds} /></> : <Circle className="w-3.5 h-3.5" />}<span>{isRecording ? 'در حال ضبط' : 'ضبط جلسه'}</span></button>}
 
-    const currentUser = useAuthStore((s) => s.user)
-    const isHost = room?.host?.id === currentUser?.id
+        <button type="button" onClick={onToggleMeetingMute} title={isMeetingMuted ? 'روشن کردن صدای جلسه' : 'خاموش کردن صدای جلسه'} className={`hidden sm:flex items-center gap-1.5 text-[10px] border rounded-xl px-2.5 py-2 transition-colors ${isMeetingMuted ? 'text-[var(--room-danger)] border-[var(--room-danger)]/30 bg-[var(--room-danger)]/10' : 'text-white/45 border-[var(--room-border)] hover:text-white/80 hover:bg-white/[.07]'}`}>{isMeetingMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}<span>{isMeetingMuted ? 'صدا خاموش' : 'صدای جلسه'}</span></button>
 
-    const handleCopy = () => {
-        onCopyLink?.()
-        setCopied(true)
-        setTimeout(() => setCopied(false), 1500)
-    }
-
-    return (
-        <header className="h-14 bg-olive-900 border-b border-olive-800 flex items-center justify-between px-4 shrink-0">
-            <div className="flex items-center gap-2 min-w-0">
-                <img src="/avestro-logo.png" alt="اَوسترو" className="w-7 h-7 shrink-0"/>
-                <span className="text-olive-100 font-medium text-sm hidden sm:block">اَوسترو میت</span>
-                <span className="text-olive-600 text-sm hidden sm:block">·</span>
-                <span className="text-olive-500 text-sm truncate max-w-[120px] sm:max-w-none">
-
-                    {(isLoading && !isError) ? slug : room?.title}
-                </span>
-            </div>
-
-            <div className="flex items-center gap-2 sm:gap-4">
-                <Timer isConnected={isConnected}/>
-
-                <div className="flex items-center gap-1">
-                    {isConnected ? (
-                        <Wifi className="w-4 h-4 text-olive-500"/>
-                    ) : (
-                        <WifiOff className="w-4 h-4 text-olive-600 animate-pulse"/>
-                    )}
-                    <span className="text-xs text-olive-500 hidden sm:block">
-                        {isConnected ? 'متصل' : 'در حال اتصال...'}
-                    </span>
-                </div>
-                {isHost && (
-                    <button
-                        type="button"
-                        onClick={onToggleVoiceRecording}
-                        title={isVoiceRecording ? 'توقف ضبط صدا' : 'شروع ضبط صدا'}
-                        className={`flex items-center gap-1.5 text-xs transition-colors border rounded-lg px-2.5 py-1.5
-            ${isVoiceRecording
-                            ? 'text-red-400 border-red-500/50 bg-red-500/10 hover:bg-red-500/20'
-                            : 'text-olive-500 border-olive-800 hover:text-olive-300'
-                        }`}
-                    >
-                        {isVoiceRecording ? (
-                            <>
-                                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"/>
-                                <RecordingTimer seconds={voiceRecordingSeconds}/>
-                            </>
-                        ) : (
-                            <Mic className="w-3.5 h-3.5"/>
-                        )}
-                        <span className="hidden sm:block">{isVoiceRecording ? 'در حال ضبط صدا' : 'ضبط صدا'}</span>
-                    </button>
-                )}
-
-                {/* دکمه‌ی ضبط جلسه */}
-                {
-                    isHost && (
-                        <button
-                            type="button"
-                            onClick={onToggleRecording}
-                            title={isRecording ? 'توقف ضبط جلسه' : 'شروع ضبط جلسه'}
-                            className={`flex items-center gap-1.5 text-xs transition-colors border rounded-lg px-2.5 py-1.5
-                        ${isRecording
-                                ? 'text-red-400 border-red-500/50 bg-red-500/10 hover:bg-red-500/20'
-                                : 'text-olive-500 border-olive-800 hover:text-olive-300'
-                            }`}
-                        >
-                            {isRecording ? (
-                                <>
-                                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"/>
-                                    <RecordingTimer seconds={recordingSeconds}/>
-                                </>
-                            ) : (
-                                <Circle className="w-3.5 h-3.5"/>
-                            )}
-                            <span className="hidden sm:block">{isRecording ? 'در حال ضبط' : 'ضبط جلسه'}</span>
-                        </button>
-                    )
-                }
-
-                <button
-                    type="button"
-                    onClick={onToggleMeetingMute}
-                    title={isMeetingMuted ? 'روشن کردن صدای جلسه' : 'خاموش کردن صدای جلسه'}
-                    className={`flex items-center gap-1.5 text-xs transition-colors border rounded-lg px-2.5 py-1.5
-                        ${isMeetingMuted
-                        ? 'text-red-400 border-red-500/40 hover:text-red-300 hover:border-red-400'
-                        : 'text-olive-500 border-olive-800 hover:text-olive-300'
-                    }`}
-                >
-                    {isMeetingMuted ? <VolumeX className="w-3.5 h-3.5"/> : <Volume2 className="w-3.5 h-3.5"/>}
-                    <span className="hidden sm:block">{isMeetingMuted ? 'صدا خاموش' : 'صدای جلسه'}</span>
-                </button>
-
-                <button
-                    type="button"
-                    onClick={handleCopy}
-                    className="flex items-center gap-1.5 text-xs text-olive-500 hover:text-olive-300 transition-colors border border-olive-800 rounded-lg px-2.5 py-1.5"
-                >
-                    {copied ? <Check className="w-3.5 h-3.5 text-green-400"/> : <Copy className="w-3.5 h-3.5"/>}
-                    <span className="hidden sm:block">{copied ? 'کپی شد' : 'کپی لینک'}</span>
-                </button>
-            </div>
-        </header>
-    )
+        <button type="button" onClick={handleCopy} className="flex items-center gap-1.5 text-[10px] text-white/55 hover:text-white border border-[var(--room-border)] bg-white/[.025] rounded-xl px-2.5 py-2 transition-colors">{copied ? <Check className="w-3.5 h-3.5 text-[var(--room-mint)]" /> : <Copy className="w-3.5 h-3.5" />}<span className="hidden sm:block">{copied ? 'کپی شد' : 'کپی لینک'}</span></button>
+        <div className="flex items-center gap-1.5 mr-1"><span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-[var(--room-mint)]' : 'bg-[var(--room-warning)] animate-pulse'}`} /><Wifi className={`w-4 h-4 ${isConnected ? 'text-[var(--room-mint)]' : 'text-[var(--room-warning)]'}`} /></div>
+      </div>
+    </header>
+  )
 })

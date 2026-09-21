@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect } from 'react'
+import { useCallback, useRef } from 'react'
 import { useMeetingStore } from '../store/meeting-store'
 import { sendMessage } from '../store/meeting-actions'
 import {
@@ -15,11 +15,6 @@ export function useChat() {
   const unreadCount = useMeetingStore(selectUnreadCount)
   const isChatOpen = useMeetingStore(selectIsChatOpen)
   const bottomRef = useRef(null)
-
-  // اسکرول به پایین با هر پیام جدید
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages.length])
 
   // const send = useCallback((text) => {
   //   if (!text?.trim()) return

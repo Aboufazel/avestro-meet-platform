@@ -12,6 +12,10 @@ import {
     SignalHigh,
     SignalMedium,
     SignalLow,
+    Pin,
+    PinOff,
+    ZoomIn,
+    ZoomOut,
 } from 'lucide-react'
 
 import {useParticipant} from '../hooks/useParticipants'
@@ -29,6 +33,7 @@ export const VideoTile = memo(
     function VideoTile({
         participantId,
         isLarge = false,
+        isPinned = false,
     }) {
         const participant =
             useParticipant(
@@ -88,8 +93,9 @@ export const VideoTile = memo(
         // تایل بزرگ (isLarge) همیشه به‌عنوان visible در نظر گرفته
         // می‌شود چون معمولاً از ابتدا در دید است.
         // ---------------------------------------------------------------------
-        const [isVisible, setIsVisible] =
-            useState(isLarge)
+        const [isVisible, setIsVisible] = useState(isLarge)
+        const [zoom, setZoom] = useState(100)
+        const togglePinnedParticipant = useMeetingStore((s) => s.togglePinnedParticipant)
 
         // isFrozen حذف شد — heuristic فریم‌شمار بیش‌ازحد حساس بود و با
         // کوچیک‌ترین لگ چند فریمی (طبیعی روی نت موبایل) قفل می‌شد روی
@@ -222,6 +228,9 @@ export const VideoTile = memo(
         }, [
             activeTrack?.jitsiTrack,
             activeTrack?.isMuted,
+            activeTrack?.streamingStatus === 'restoring'
+                ? renegotiationTick
+                : null,
             isVisible,
 
             ...(isSafariOrIOS
@@ -321,17 +330,11 @@ export const VideoTile = memo(
             <div
                 ref={containerRef}
                 className={`
-                    relative
-                    bg-olive-900
-                    rounded-xl
-                    overflow-hidden
-                    flex
-                    items-center
-                    justify-center
+                    group relative room-tile bg-[var(--room-bg)] rounded-[18px] overflow-hidden flex items-center justify-center border border-white/[.06]
 
                     ${
-                        participant.isActiveSpeaker
-                            ? 'ring-2 ring-olive-400'
+                        participant.isActiveSpeaker || isPinned
+                            ? 'ring-2 ring-[var(--room-blue)] room-tile-pinned'
                             : ''
                     }
 
@@ -395,20 +398,8 @@ export const VideoTile = memo(
                         muted={
                             participant.isLocal
                         }
-                        className={`
-                            w-full
-                            h-full
-                            object-contain
-                            bg-black
-                            !rounded-[18px]
-
-                            ${
-                                participant.isLocal &&
-                                !isScreenShare
-                                    ? 'scale-x-[-1]'
-                                    : ''
-                            }
-                        `}
+                        className={`w-full h-full object-contain bg-black !rounded-[18px] transition-transform duration-300 ease-out ${participant.isLocal && !isScreenShare ? 'scale-x-[-1]' : ''}`}
+                        style={{ transform: `${participant.isLocal && !isScreenShare ? 'scaleX(-1) ' : ''}scale(${zoom / 100})` }}
                     />
                 ) : (
                     <VideoPlaceholder
@@ -435,14 +426,24 @@ export const VideoTile = memo(
                 {/* --------------------------------------------------------- */}
 
                 {isScreenShare && (
-                    <div className="absolute top-2 right-2 flex items-center gap-1 bg-olive-800/80 rounded-lg px-2 py-1">
-                        <MonitorUp className="w-3 h-3 text-olive-300" />
+                    <div className="absolute top-2 right-2 flex items-center gap-1 bg-[var(--room-surface-3)]/85 rounded-lg px-2 py-1">
+                        <MonitorUp className="w-3 h-3 text-white/70" />
 
-                        <span className="text-xs text-olive-300">
+                        <span className="text-xs text-white/70">
                             اشتراک صفحه
                         </span>
                     </div>
                 )}
+
+                {/* Tile actions */}
+                <div className="absolute top-2 left-2 z-30 flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity sm:opacity-0">
+                    <button type="button" onClick={() => togglePinnedParticipant(participant.id)} className={`room-control w-8 h-8 rounded-lg flex items-center justify-center backdrop-blur-md border border-white/10 ${isPinned ? 'bg-[var(--room-blue)] text-white' : 'bg-black/35 text-white/70 hover:text-white'}`} title={isPinned ? 'برداشتن پین' : 'پین کردن'} aria-label={isPinned ? 'برداشتن پین' : 'پین کردن'}>
+                        {isPinned ? <PinOff size={14} /> : <Pin size={14} />}
+                    </button>
+                    <button type="button" onClick={() => setZoom((z) => Math.min(160, z + 10))} className="room-control w-8 h-8 rounded-lg flex items-center justify-center bg-black/35 backdrop-blur-md border border-white/10 text-white/70 hover:text-white" title="بزرگنمایی" aria-label="بزرگنمایی"><ZoomIn size={14} /></button>
+                    <button type="button" onClick={() => setZoom((z) => Math.max(100, z - 10))} className="room-control w-8 h-8 rounded-lg flex items-center justify-center bg-black/35 backdrop-blur-md border border-white/10 text-white/70 hover:text-white" title="کوچک‌نمایی" aria-label="کوچک‌نمایی"><ZoomOut size={14} /></button>
+                    {zoom !== 100 && <span className="px-2 h-8 rounded-lg bg-black/45 backdrop-blur-md border border-white/10 text-[10px] text-white/75 flex items-center">{zoom}%</span>}
+                </div>
 
                 {/* --------------------------------------------------------- */}
                 {/* Bottom bar                                                  */}
@@ -471,7 +472,7 @@ export const VideoTile = memo(
                                 <MicOff className="w-3 h-3 text-white" />
                             </div>
                         ) : (
-                            <div className="w-6 h-6 rounded-full bg-olive-600/80 flex items-center justify-center">
+                            <div className="w-6 h-6 rounded-full bg-[var(--room-mint)]/30 flex items-center justify-center">
                                 <Mic className="w-3 h-3 text-white" />
                             </div>
                         )}
@@ -495,12 +496,12 @@ function VideoPlaceholder({
             <div
                 className={`
                     rounded-full
-                    bg-olive-700
+                    bg-[var(--room-surface-3)]
                     flex
                     items-center
                     justify-center
                     font-bold
-                    text-olive-100
+                    text-white
 
                     ${
                         isLarge
@@ -512,7 +513,7 @@ function VideoPlaceholder({
                 {initial}
             </div>
 
-            <span className="text-olive-400 text-sm">
+            <span className="text-white/45 text-sm">
                 {name}
             </span>
         </div>

@@ -1,21 +1,8 @@
 import { Link } from 'react-router-dom'
 import {
-  Video,
-  Shield,
-  Globe,
-  Users,
-  Calendar,
-  Smartphone,
-  ChevronLeft,
-  Play,
-  Star,
-  Check,
-  // Twitter,
-  // Linkedin as InstagramIcon,
-  // Linkedin,
-  ArrowLeft,
+  Video, Shield, Globe, Users, Calendar, Smartphone,
+  ArrowLeft, Check, Play, Sparkles, Zap, LockKeyhole,
 } from 'lucide-react'
-// import { Button } from '../../components/ui/Button'
 
 const stats = [
   { value: '+۱۰۰۰', label: 'کاربر فعال' },
@@ -25,361 +12,259 @@ const stats = [
 ]
 
 const features = [
-  { icon: Video, title: 'کیفیت تصویر بالا', desc: 'ویدیوی HD با کمترین تأخیر و پایدارترین اتصال ممکن' },
-  { icon: Shield, title: 'امنیت و رمزگذاری', desc: 'رمزگذاری سرتاسری و حریم خصوصی کامل جلسات شما' },
-  { icon: Globe, title: 'رابط فارسی کامل', desc: 'تجربه کاربری کاملاً فارسی، از RTL تا اعداد شمسی' },
-  { icon: Users, title: 'مدیریت شرکت‌کنندگان', desc: 'کنترل کامل روی دسترسی، نقش‌ها و اجازه‌ها' },
-  { icon: Calendar, title: 'برنامه‌ریزی جلسات', desc: 'زمان‌بندی پیشرفته با یادآوری و تقویم شمسی' },
-  { icon: Smartphone, title: 'پشتیبانی از موبایل', desc: 'تجربه یکپارچه روی تمام دستگاه‌ها و مرورگرها' },
+  { icon: Video, title: 'جلسه‌ای که ساده شروع می‌شود', desc: 'ورود سریع، کنترل‌های واضح و تجربه‌ای که برای جلسه ساخته شده؛ نه برای شلوغ‌کردن صفحه.', tone: 'blue' },
+  { icon: Shield, title: 'حریم خصوصی و امنیت', desc: 'زیرساخت امن و کنترل‌های جلسه برای اینکه مدیریت دسترسی و گفتگو دست شما باشد.', tone: 'mint' },
+  { icon: Globe, title: 'کاملاً فارسی و RTL', desc: 'رابط فارسی، تاریخ و اعداد شمسی و جزئیاتی که با کاربران فارسی‌زبان هماهنگ است.', tone: 'blue' },
+  { icon: Users, title: 'مدیریت شرکت‌کنندگان', desc: 'شرکت‌کنندگان، نقش‌ها و دسترسی‌ها را بدون رفت‌وآمد بین چند صفحه مدیریت کنید.', tone: 'mint' },
+  { icon: Calendar, title: 'برنامه‌ریزی جلسات', desc: 'جلسات آینده را منظم کنید و اطلاعات مهم را از همان داشبورد ببینید.', tone: 'blue' },
+  { icon: Smartphone, title: 'تجربه یکپارچه موبایل', desc: 'همان زبان بصری روی دسکتاپ و موبایل، با چیدمان متناسب با اندازه صفحه.', tone: 'mint' },
 ]
 
 const plans = [
-  {
-    name: 'رایگان',
-    price: '۰',
-    unit: 'تومان',
-    features: ['۳۰ دقیقه هر جلسه', 'حداکثر ۱۰ نفر', 'کیفیت استاندارد', 'چت متنی'],
-    cta: 'شروع رایگان',
-    highlight: false,
-  },
-  {
-    name: 'پایه',
-    price: '۱۵۰,۰۰۰',
-    unit: 'ت/ماه',
-    features: ['۲ ساعت هر جلسه', 'حداکثر ۵۰ نفر', 'کیفیت HD', 'ضبط جلسه', 'پشتیبانی ایمیل'],
-    cta: 'خرید پلن پایه',
-    highlight: false,
-  },
-  {
-    name: 'حرفه‌ای',
-    price: '۳۵۰,۰۰۰',
-    unit: 'ت/ماه',
-    features: ['نامحدود', 'حداکثر ۱۰۰ نفر', 'کیفیت Full HD', 'ضبط ابری', 'پشتیبانی ۲۴/۷', 'گزارش‌گیری'],
-    cta: 'خرید پلن حرفه‌ای',
-    highlight: true,
-  },
-  {
-    name: 'سازمانی',
-    price: 'توافقی',
-    unit: '',
-    features: ['نامحدود', 'بیش از ۵۰۰ نفر', 'سرور اختصاصی', 'SSO', 'SLA', 'مشاور اختصاصی'],
-    cta: 'تماس با ما',
-    highlight: false,
-  },
-]
-
-const testimonials = [
-  {
-    name: 'دکتر سارا محمدی',
-    role: 'مدیر آموزش، دانشگاه تهران',
-    text: 'اَوسترو میت بهترین انتخاب برای وبینارهای آموزشی ماست. رابط فارسی و کیفیت عالی ویدیو همه چیز رو عوض کرده.',
-  },
-  {
-    name: 'علی رضایی',
-    role: 'مدیر محصول، استارتاپ نوآور',
-    text: 'تیم ما از روز اول عاشق این پلتفرم شد. سادگی استفاده و قابلیت اطمینان اون بی‌نظیره.',
-  },
-  {
-    name: 'مریم احمدی',
-    role: 'مدرس آنلاین',
-    text: 'با اَوسترو میت می‌تونم کلاس‌هام رو با اطمینان کامل برگزار کنم. دانش‌آموزام هم خیلی راضی‌ان.',
-  },
+  { name: 'رایگان', price: '۰', unit: 'تومان', features: ['۳۰ دقیقه هر جلسه', 'حداکثر ۱۰ نفر', 'کیفیت استاندارد', 'چت متنی'] },
+  { name: 'پایه', price: '۱۵۰,۰۰۰', unit: 'ت/ماه', features: ['۲ ساعت هر جلسه', 'حداکثر ۵۰ نفر', 'کیفیت HD', 'ضبط جلسه', 'پشتیبانی ایمیل'] },
+  { name: 'حرفه‌ای', price: '۳۵۰,۰۰۰', unit: 'ت/ماه', features: ['نامحدود', 'حداکثر ۱۰۰ نفر', 'کیفیت Full HD', 'ضبط ابری', 'پشتیبانی ۲۴/۷', 'گزارش‌گیری'], featured: true },
+  { name: 'سازمانی', price: 'توافقی', unit: '', features: ['نامحدود', 'بیش از ۵۰۰ نفر', 'سرور اختصاصی', 'SSO', 'SLA', 'مشاور اختصاصی'] },
 ]
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-olive-950 text-olive-100">
+    <div className="min-h-screen bg-[#f4f7fb] text-[#101827]">
       {/* Navbar */}
-      <header className="sticky top-0 z-50 border-b border-olive-800/60 bg-olive-950/80 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-[8px] bg-olive-500 flex items-center justify-center">
-              <img src="/avestro-logo.png" alt="اَوسترو" className="w-8 h-8 shrink-0" />
+      <header className="sticky top-0 z-50 border-b border-[#e5eaf2]/80 bg-white/80 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-[72px] flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-3">
+            <img src="/avestro-logo.png" alt="اَوسترو" className="w-10 h-10" />
+            <div>
+              <p className="font-bold text-sm text-[#101827]">اَوسترو میت</p>
+              <p className="text-[10px] text-[#8d98aa] tracking-wide">AVESTRO MEET</p>
             </div>
-            <span className="text-olive-100 font-medium">اَوسترو میت</span>
-          </div>
+          </Link>
 
-          <nav className="hidden md:flex items-center gap-6">
-            {['قابلیت‌ها', 'قیمت‌گذاری', 'درباره ما'].map((item) => (
-              <a
-                key={item}
-                href={`#${item}`}
-                className="text-olive-400 hover:text-olive-100 transition-colors text-sm"
-              >
-                {item}
-              </a>
-            ))}
+          <nav className="hidden md:flex items-center gap-7 text-sm text-[#68758a]">
+            <a href="#features" className="hover:text-[#101827] transition-colors">قابلیت‌ها</a>
+            <a href="#pricing" className="hover:text-[#101827] transition-colors">قیمت‌گذاری</a>
+            <a href="#security" className="hover:text-[#101827] transition-colors">امنیت</a>
           </nav>
 
-          <div className="flex items-center gap-3">
-            <Link
-              to="/login"
-              className="text-olive-400 hover:text-olive-100 transition-colors text-sm px-3 py-1.5"
-            >
+          <div className="flex items-center gap-2">
+            <Link to="/login" className="hidden sm:block px-4 py-2.5 text-sm text-[#68758a] hover:text-[#101827]">
               ورود
             </Link>
-            <Link
-              to="/register"
-              className="bg-olive-500 text-olive-950 hover:bg-olive-400 transition-all duration-200 text-sm px-4 py-2 rounded-xl font-medium"
-            >
-              شروع رایگان
+            <Link to="/register" className="meet-primary-btn rounded-xl px-4 sm:px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2">
+              شروع رایگان <ArrowLeft className="w-4 h-4" />
             </Link>
           </div>
         </div>
       </header>
 
       {/* Hero */}
-      <section className="max-w-6xl mx-auto px-6 pt-24 pb-20 text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-olive-800 border border-olive-700 text-olive-400 text-xs mb-8">
-          <span className="w-1.5 h-1.5 rounded-full bg-olive-500 animate-pulse" />
-          نسخه ۲.۰ منتشر شد
-        </div>
+      <main>
+        <section className="relative overflow-hidden">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-14">
+            <div className="grid lg:grid-cols-[.86fr_1.14fr] gap-12 lg:gap-16 items-center">
+              <div className="text-right">
+                <div className="meet-kicker inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs mb-6">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#54d9b0] shadow-[0_0_0_4px_rgba(84,217,176,.12)]" />
+                  جلسات آنلاین، با تجربه‌ای حرفه‌ای
+                </div>
 
-        <h1 className="text-4xl md:text-6xl text-olive-100 mb-6 leading-tight" style={{ fontWeight: 700 }}>
-          سمینارهای آنلاین حرفه‌ای،
-          <br />
-          <span className="text-olive-400">به سبک اَوسترو</span>
-        </h1>
+                <h1 className="text-4xl sm:text-5xl lg:text-[58px] leading-[1.22] font-bold tracking-tight text-[#101827]">
+                  جلسه حرفه‌ای،
+                  <br />
+                  <span className="meet-gradient-text">بدون پیچیدگی</span>
+                </h1>
 
-        <p className="text-olive-400 text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
-          برگزاری جلسات و وبینارهای حرفه‌ای با کیفیت بالا، رابط فارسی و امنیت کامل
-        </p>
+                <p className="mt-6 text-base sm:text-lg leading-8 text-[#68758a] max-w-xl">
+                  اَوسترو میت برای برگزاری جلسه، وبینار و کلاس آنلاین ساخته شده؛
+                  ساده برای شروع، قدرتمند برای مدیریت.
+                </p>
 
-        <div className="flex items-center justify-center gap-4 flex-wrap">
-          <Link
-            to="/register"
-            className="inline-flex items-center gap-2 bg-olive-500 text-olive-950 hover:bg-olive-400 transition-all duration-200 px-6 py-3 rounded-xl font-medium text-lg active:scale-95"
-          >
-            شروع رایگان
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <button className="inline-flex items-center gap-2 border border-olive-700 text-olive-300 hover:bg-olive-800 transition-all duration-200 px-6 py-3 rounded-xl text-lg">
-            <Play className="w-5 h-5" />
-            مشاهده نسخه نمایشی
-          </button>
-        </div>
+                <div className="mt-8 flex flex-wrap gap-3">
+                  <Link to="/register" className="meet-primary-btn inline-flex items-center gap-2 rounded-xl px-6 py-3.5 font-medium">
+                    جلسه جدید بسازید <ArrowLeft className="w-5 h-5" />
+                  </Link>
+                  <a href="#product-preview" className="meet-soft-btn inline-flex items-center gap-2 rounded-xl px-5 py-3.5 font-medium">
+                    <Play className="w-4 h-4 text-[#4f7cff]" />
+                    مشاهده محصول
+                  </a>
+                </div>
 
-        {/* Mock UI Preview */}
-        <div className="mt-16 relative">
-          <div className="bg-olive-900 border border-olive-700 rounded-2xl p-4 max-w-3xl mx-auto shadow-2xl">
-            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-olive-700">
-              <div className="flex gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-red-500/60" />
-                <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
-                <div className="w-3 h-3 rounded-full bg-green-500/60" />
+                <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs text-[#8d98aa]">
+                  <span className="inline-flex items-center gap-2"><Zap className="w-4 h-4 text-[#4f7cff]" /> ورود سریع</span>
+                  <span className="inline-flex items-center gap-2"><LockKeyhole className="w-4 h-4 text-[#54d9b0]" /> امنیت و حریم خصوصی</span>
+                  <span className="inline-flex items-center gap-2"><Smartphone className="w-4 h-4 text-[#4f7cff]" /> موبایل و دسکتاپ</span>
+                </div>
               </div>
-              <div className="flex-1 bg-olive-800 rounded-lg h-6 max-w-xs mx-auto" />
-            </div>
-            <div className="grid grid-cols-3 gap-3 h-48">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="bg-olive-800 rounded-xl border border-olive-700 flex items-center justify-center">
-                  <div className="w-10 h-10 rounded-full bg-olive-700 flex items-center justify-center">
-                    <Users className="w-5 h-5 text-olive-500" />
+
+              {/* Product preview — deliberately echoes the room's dark visual language */}
+              <div id="product-preview" className="relative">
+                <div className="meet-dark-panel rounded-[28px] p-3 sm:p-4 shadow-[0_35px_90px_rgba(13,22,38,.22)]">
+                  <div className="flex items-center justify-between px-3 py-2.5 mb-3 rounded-2xl bg-white/[.045] border border-white/[.07]">
+                    <div className="flex items-center gap-2">
+                      <img src="/avestro-logo.png" className="w-7 h-7" alt="" />
+                      <span className="text-xs text-white/85">سمینار تستی</span>
+                    </div>
+                    <span className="inline-flex items-center gap-1.5 text-[10px] text-white/60">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#54d9b0]" /> متصل
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-12 gap-3 min-h-[270px] sm:min-h-[340px]">
+                    <div className="col-span-8 rounded-2xl border border-white/[.07] bg-[#0b1220]/80 flex items-center justify-center relative overflow-hidden">
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(79,124,255,.16),transparent_35%)]" />
+                      <div className="relative text-center">
+                        <div className="w-20 h-20 rounded-full bg-[#31584f] border border-[#54d9b0]/30 flex items-center justify-center mx-auto shadow-xl">
+                          <span className="text-3xl font-medium text-white">ع</span>
+                        </div>
+                        <p className="mt-3 text-sm text-white">عباس</p>
+                        <p className="text-[10px] text-white/40 mt-1">میزبان</p>
+                      </div>
+                      <div className="absolute bottom-3 left-3 flex gap-2">
+                        <span className="w-8 h-8 rounded-xl bg-white/[.05] border border-white/[.07] flex items-center justify-center text-[#54d9b0]"><Video className="w-4 h-4" /></span>
+                        <span className="w-8 h-8 rounded-xl bg-white/[.05] border border-white/[.07] flex items-center justify-center text-[#54d9b0]"><Users className="w-4 h-4" /></span>
+                      </div>
+                    </div>
+
+                    <div className="col-span-4 rounded-2xl border border-white/[.07] bg-white/[.025] p-3">
+                      <div className="flex items-center justify-between border-b border-white/[.07] pb-3">
+                        <span className="text-xs text-white/85">شرکت‌کنندگان</span>
+                        <Users className="w-4 h-4 text-[#6c93ff]" />
+                      </div>
+                      {[['ع','عباس'],['س','سارا'],['م','مهدی']].map(([avatar, name], i) => (
+                        <div key={name} className="flex items-center gap-2 py-3 border-b border-white/[.05]">
+                          <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs ${i === 0 ? 'bg-[#31584f] text-white' : 'bg-white/10 text-white/70'}`}>{avatar}</span>
+                          <span className="text-[10px] text-white/65">{name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 h-14 rounded-2xl bg-white/[.045] border border-white/[.07] flex items-center justify-center gap-2">
+                    {['…','⌗','▢','◉'].map((x, i) => (
+                      <span key={i} className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm ${i === 3 ? 'bg-[#54d9b0] text-[#07130f]' : 'bg-white/[.06] text-white/65'}`}>{x}</span>
+                    ))}
+                    <span className="w-11 h-9 rounded-xl bg-[#ef6678] text-white flex items-center justify-center text-sm">⌕</span>
                   </div>
                 </div>
-              ))}
-            </div>
-            <div className="flex items-center justify-center gap-4 mt-4 pt-3 border-t border-olive-700">
-              {[Video, Users, Calendar].map((Icon, i) => (
-                <div key={i} className="w-10 h-10 rounded-full bg-olive-800 border border-olive-700 flex items-center justify-center">
-                  <Icon className="w-5 h-5 text-olive-500" />
+
+                <div className="hidden sm:flex absolute -bottom-6 -left-7 meet-glass rounded-2xl px-4 py-3 items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-[#e8faf4] text-[#32aa87] flex items-center justify-center"><Shield className="w-4 h-4" /></div>
+                  <div><p className="text-xs font-bold text-[#101827]">محیط امن جلسه</p><p className="text-[10px] text-[#8d98aa] mt-0.5">کنترل دسترسی و حریم خصوصی</p></div>
                 </div>
-              ))}
-              <div className="w-10 h-10 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center">
-                <div className="w-3 h-3 rounded-full bg-red-500" />
               </div>
             </div>
           </div>
-          <div className="absolute inset-0 bg-gradient-to-t from-olive-950 via-transparent to-transparent pointer-events-none" style={{ top: '60%' }} />
-        </div>
-      </section>
+        </section>
 
-      {/* Stats */}
-      <section className="border-y border-olive-800 bg-olive-900/40">
-        <div className="max-w-6xl mx-auto px-6 py-12 grid grid-cols-2 md:grid-cols-4 gap-8">
-          {stats.map(({ value, label }) => (
-            <div key={label} className="text-center">
-              <p className="text-3xl text-olive-300 mb-1" style={{ fontWeight: 700 }}>{value}</p>
-              <p className="text-olive-500 text-sm">{label}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Features */}
-      <section id="قابلیت‌ها" className="max-w-6xl mx-auto px-6 py-24">
-        <div className="text-center mb-14">
-          <h2 className="text-3xl text-olive-100 mb-4" style={{ fontWeight: 700 }}>همه چیز که نیاز دارید</h2>
-          <p className="text-olive-400 max-w-xl mx-auto">
-            ابزارهای حرفه‌ای برای برگزاری جلسات موفق، در یک پلتفرم یکپارچه
-          </p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {features.map(({ icon: Icon, title, desc }) => (
-            <div
-              key={title}
-              className="bg-olive-900 border border-olive-700 rounded-2xl p-6 hover:border-olive-600 hover:bg-olive-800/60 transition-all duration-200 group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-olive-800 border border-olive-700 flex items-center justify-center mb-4 group-hover:bg-olive-700 transition-colors">
-                <Icon className="w-5 h-5 text-olive-400" />
+        {/* Stats */}
+        <section className="border-y border-[#e5eaf2] bg-white/70">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-2 md:grid-cols-4 gap-6">
+            {stats.map((item) => (
+              <div key={item.label} className="text-center md:text-right md:border-r md:border-[#e5eaf2] md:pr-6 first:border-0">
+                <p className="meet-stat-number text-2xl sm:text-3xl font-bold">{item.value}</p>
+                <p className="text-xs text-[#8d98aa] mt-1">{item.label}</p>
               </div>
-              <h3 className="text-olive-100 mb-2">{title}</h3>
-              <p className="text-olive-500 text-sm leading-relaxed">{desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
 
-      {/*/!* Pricing *!/*/}
-      {/*<section id="قیمت‌گذاری" className="bg-olive-900/30 border-y border-olive-800">*/}
-      {/*  <div className="max-w-6xl mx-auto px-6 py-24">*/}
-      {/*    <div className="text-center mb-14">*/}
-      {/*      <h2 className="text-3xl text-olive-100 mb-4" style={{ fontWeight: 700 }}>پلن‌های قیمت‌گذاری</h2>*/}
-      {/*      <p className="text-olive-400">از رایگان شروع کنید، هر زمان که خواستید ارتقا دهید</p>*/}
-      {/*    </div>*/}
-      {/*    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">*/}
-      {/*      {plans.map((plan) => (*/}
-      {/*        <div*/}
-      {/*          key={plan.name}*/}
-      {/*          className={[*/}
-      {/*            'rounded-2xl p-6 flex flex-col border transition-all duration-200',*/}
-      {/*            plan.highlight*/}
-      {/*              ? 'bg-olive-500/10 border-olive-500/50 shadow-lg shadow-olive-500/10'*/}
-      {/*              : 'bg-olive-900 border-olive-700 hover:border-olive-600',*/}
-      {/*          ].join(' ')}*/}
-      {/*        >*/}
-      {/*          {plan.highlight && (*/}
-      {/*            <div className="text-xs text-olive-950 bg-olive-500 px-2 py-0.5 rounded-full self-start mb-3 font-medium">*/}
-      {/*              محبوب‌ترین*/}
-      {/*            </div>*/}
-      {/*          )}*/}
-      {/*          <h3 className="text-olive-100 mb-1">{plan.name}</h3>*/}
-      {/*          <div className="mb-5">*/}
-      {/*            <span className="text-2xl text-olive-300" style={{ fontWeight: 700 }}>{plan.price}</span>*/}
-      {/*            {plan.unit && <span className="text-olive-600 text-sm mr-1">{plan.unit}</span>}*/}
-      {/*          </div>*/}
-      {/*          <ul className="flex-1 flex flex-col gap-2.5 mb-6">*/}
-      {/*            {plan.features.map((f) => (*/}
-      {/*              <li key={f} className="flex items-center gap-2 text-olive-400 text-sm">*/}
-      {/*                <Check className="w-4 h-4 text-olive-500 shrink-0" />*/}
-      {/*                {f}*/}
-      {/*              </li>*/}
-      {/*            ))}*/}
-      {/*          </ul>*/}
-      {/*          <Link*/}
-      {/*            to="/register"*/}
-      {/*            className={[*/}
-      {/*              'text-center py-2.5 rounded-xl text-sm font-medium transition-all duration-200',*/}
-      {/*              plan.highlight*/}
-      {/*                ? 'bg-olive-500 text-olive-950 hover:bg-olive-400'*/}
-      {/*                : 'border border-olive-700 text-olive-300 hover:bg-olive-800',*/}
-      {/*            ].join(' ')}*/}
-      {/*          >*/}
-      {/*            {plan.cta}*/}
-      {/*          </Link>*/}
-      {/*        </div>*/}
-      {/*      ))}*/}
-      {/*    </div>*/}
-      {/*  </div>*/}
-      {/*</section>*/}
+        {/* Features */}
+        <section id="features" className="max-w-7xl mx-auto px-4 sm:px-6 py-20 sm:py-28">
+          <div className="max-w-2xl mb-12">
+            <div className="meet-kicker inline-flex rounded-full px-3 py-1.5 text-xs mb-4">برای تجربه بهتر جلسه</div>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">همه‌چیز سر جای خودش</h2>
+            <p className="text-[#68758a] mt-4 leading-7">
+              زبان بصری اَوسترو از اتاق جلسه می‌آید: سطوح عمیق و حرفه‌ای برای تمرکز،
+              با سطوح روشن برای مدیریت روزمره و تصمیم‌گیری سریع.
+            </p>
+          </div>
 
-      {/*/!* Testimonials *!/*/}
-      {/*<section className="max-w-6xl mx-auto px-6 py-24">*/}
-      {/*  <div className="text-center mb-14">*/}
-      {/*    <h2 className="text-3xl text-olive-100 mb-4" style={{ fontWeight: 700 }}>کاربران ما چه می‌گویند</h2>*/}
-      {/*  </div>*/}
-      {/*  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">*/}
-      {/*    {testimonials.map((t) => (*/}
-      {/*      <div key={t.name} className="bg-olive-900 border border-olive-700 rounded-2xl p-6">*/}
-      {/*        <div className="flex gap-1 mb-4">*/}
-      {/*          {Array.from({ length: 5 }).map((_, i) => (*/}
-      {/*            <Star key={i} className="w-4 h-4 text-olive-500 fill-olive-500" />*/}
-      {/*          ))}*/}
-      {/*        </div>*/}
-      {/*        <p className="text-olive-300 text-sm leading-relaxed mb-5">«{t.text}»</p>*/}
-      {/*        <div className="flex items-center gap-3">*/}
-      {/*          <div className="w-9 h-9 rounded-full bg-olive-800 border border-olive-700 flex items-center justify-center text-olive-400 text-sm font-medium">*/}
-      {/*            {t.name.charAt(0)}*/}
-      {/*          </div>*/}
-      {/*          <div>*/}
-      {/*            <p className="text-olive-100 text-sm">{t.name}</p>*/}
-      {/*            <p className="text-olive-600 text-xs">{t.role}</p>*/}
-      {/*          </div>*/}
-      {/*        </div>*/}
-      {/*      </div>*/}
-      {/*    ))}*/}
-      {/*  </div>*/}
-      {/*</section>*/}
-
-      {/* CTA */}
-      <section className="bg-olive-900/40 border-y border-olive-800">
-        <div className="max-w-2xl mx-auto px-6 py-20 text-center">
-          <h2 className="text-3xl text-olive-100 mb-4" style={{ fontWeight: 700 }}>همین الان شروع کنید</h2>
-          <p className="text-olive-400 mb-8">بدون نیاز به کارت اعتباری — رایگان شروع کنید</p>
-          <Link
-            to="/register"
-            className="inline-flex items-center gap-2 bg-olive-500 text-olive-950 hover:bg-olive-400 transition-all duration-200 px-8 py-3.5 rounded-xl font-medium text-lg active:scale-95"
-          >
-            ثبت‌نام رایگان
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-olive-800">
-        <div className="max-w-6xl mx-auto px-6 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
-            <div className="md:col-span-2">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 rounded-[8px] bg-olive-500 flex items-center justify-center">
-                  <img src="/avestro-logo.png" alt="اَوسترو" className="w-8 h-8 shrink-0" />
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {features.map(({ icon: Icon, title, desc, tone }) => (
+              <div key={title} className="meet-card meet-card-hover p-6">
+                <div className={`w-11 h-11 rounded-2xl flex items-center justify-center mb-5 ${tone === 'mint' ? 'bg-[#e8faf4] text-[#2eaf89]' : 'bg-[#edf2ff] text-[#4f7cff]'}`}>
+                  <Icon className="w-5 h-5" />
                 </div>
-                <span className="text-olive-100 font-medium">اَوسترو میت</span>
+                <h3 className="font-bold text-[15px]">{title}</h3>
+                <p className="text-sm text-[#68758a] leading-7 mt-2">{desc}</p>
               </div>
-              <p className="text-olive-500 text-sm leading-relaxed max-w-xs">
-                پلتفرم حرفه‌ای برگزاری جلسات و وبینارهای آنلاین فارسی‌زبان
-              </p>
-              {/*<div className="flex gap-3 mt-5">*/}
-              {/*  {[Twitter, Linkedin as InstagramIcon, Linkedin].map((Icon, i) => (*/}
-              {/*    <a*/}
-              {/*      key={i}*/}
-              {/*      href="#"*/}
-              {/*      className="w-9 h-9 rounded-xl bg-olive-900 border border-olive-700 flex items-center justify-center text-olive-500 hover:text-olive-300 hover:border-olive-600 transition-all"*/}
-              {/*    >*/}
-              {/*      <Icon className="w-4 h-4" />*/}
-              {/*    </a>*/}
-              {/*  ))}*/}
-              {/*</div>*/}
-            </div>
-            <div>
-              <p className="text-olive-300 text-sm font-medium mb-4">محصول</p>
-              <ul className="flex flex-col gap-2.5">
-                {['قابلیت‌ها', 'قیمت‌گذاری', 'امنیت', 'به‌روزرسانی‌ها'].map((item) => (
-                  <li key={item}>
-                    <a href="#" className="text-olive-500 hover:text-olive-300 transition-colors text-sm">
-                      {item}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <p className="text-olive-300 text-sm font-medium mb-4">شرکت</p>
-              <ul className="flex flex-col gap-2.5">
-                {['درباره ما', 'تماس', 'حریم خصوصی', 'شرایط استفاده'].map((item) => (
-                  <li key={item}>
-                    <a href="#" className="text-olive-500 hover:text-olive-300 transition-colors text-sm">
-                      {item}
-                    </a>
-                  </li>
-                ))}
-              </ul>
+            ))}
+          </div>
+        </section>
+
+        {/* Security / product philosophy */}
+        <section id="security" className="max-w-7xl mx-auto px-4 sm:px-6 pb-20">
+          <div className="meet-dark-panel rounded-[30px] p-7 sm:p-12 overflow-hidden relative">
+            <div className="absolute -left-20 -top-20 w-72 h-72 rounded-full bg-[#4f7cff]/10 blur-3xl" />
+            <div className="relative grid md:grid-cols-2 gap-10 items-center">
+              <div>
+                <div className="inline-flex items-center gap-2 text-xs text-[#54d9b0]"><Sparkles className="w-4 h-4" /> طراحی شده برای تمرکز</div>
+                <h2 className="text-3xl sm:text-4xl font-bold mt-4 leading-tight">رنگ‌های اتاق جلسه،<br />در کل محصول زنده می‌شوند.</h2>
+                <p className="text-white/55 leading-8 mt-5 max-w-xl">
+                  داشبورد و لندینگ روشن هستند، اما هویت اصلی اَوسترو از همان navy، blue و mint اتاق جلسه گرفته شده است.
+                  نتیجه یک محصول یکپارچه است، نه سه صفحه با سه شخصیت جدا.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl bg-white/[.05] border border-white/[.07] p-5"><p className="text-2xl font-bold">۱</p><p className="text-xs text-white/45 mt-2">زبان بصری</p></div>
+                <div className="rounded-2xl bg-[#4f7cff]/10 border border-[#6c93ff]/15 p-5"><p className="text-2xl font-bold text-[#9eb6ff]">۲</p><p className="text-xs text-white/45 mt-2">سطح روشن و تاریک</p></div>
+                <div className="rounded-2xl bg-[#54d9b0]/10 border border-[#54d9b0]/15 p-5"><p className="text-2xl font-bold text-[#7be7c7]">۳</p><p className="text-xs text-white/45 mt-2">رنگ برای معنا</p></div>
+                <div className="rounded-2xl bg-white/[.05] border border-white/[.07] p-5"><p className="text-2xl font-bold">∞</p><p className="text-xs text-white/45 mt-2">قابل توسعه</p></div>
+              </div>
             </div>
           </div>
-          <div className="pt-6 border-t border-olive-800 flex items-center justify-between flex-wrap gap-4">
-            <p className="text-olive-600 text-sm">© ۱۴۰۵ اَوسترو میت. تمام حقوق محفوظ است.</p>
-            <p className="text-olive-700 text-xs">ساخته شده با ❤️ برای ایران</p>
+        </section>
+
+        {/* Pricing */}
+        <section id="pricing" className="bg-white border-y border-[#e5eaf2]">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-20 sm:py-24">
+            <div className="text-center max-w-xl mx-auto mb-12">
+              <p className="text-xs text-[#4f7cff] font-medium mb-3">پلن‌ها</p>
+              <h2 className="text-3xl font-bold">شروع ساده، رشد بدون دردسر</h2>
+              <p className="text-[#68758a] text-sm mt-3">پلنی را انتخاب کنید که با اندازه جلسات شما هماهنگ است.</p>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {plans.map((plan) => (
+                <div key={plan.name} className={`rounded-[22px] p-6 border ${plan.featured ? 'border-[#6c93ff]/60 bg-[#edf2ff]/60 shadow-[0_18px_50px_rgba(79,124,255,.12)]' : 'border-[#e5eaf2] bg-[#f8faff]'}`}>
+                  {plan.featured && <span className="inline-flex rounded-full bg-[#4f7cff] text-white px-2.5 py-1 text-[10px] mb-4">پیشنهاد ویژه</span>}
+                  <h3 className="font-bold">{plan.name}</h3>
+                  <div className="mt-4 mb-6"><span className="text-2xl font-bold">{plan.price}</span>{plan.unit && <span className="text-xs text-[#8d98aa] mr-1">{plan.unit}</span>}</div>
+                  <ul className="space-y-3 min-h-[150px]">
+                    {plan.features.map((f) => <li key={f} className="flex items-center gap-2 text-xs text-[#68758a]"><Check className="w-4 h-4 text-[#4f7cff]" />{f}</li>)}
+                  </ul>
+                  <Link to="/register" className={`mt-6 block text-center rounded-xl py-2.5 text-sm font-medium ${plan.featured ? 'meet-primary-btn' : 'meet-soft-btn'}`}>{plan.featured ? 'شروع کنید' : 'انتخاب پلن'}</Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* CTA */}
+        <section className="max-w-4xl mx-auto px-4 sm:px-6 py-20 text-center">
+          <div className="meet-kicker inline-flex rounded-full px-3 py-1.5 text-xs mb-5">آماده شروع هستید؟</div>
+          <h2 className="text-3xl sm:text-4xl font-bold">اولین جلسه‌تان را بسازید.</h2>
+          <p className="text-[#68758a] mt-4 mb-8">سریع وارد شوید، جلسه را بسازید و لینک را برای شرکت‌کنندگان بفرستید.</p>
+          <Link to="/register" className="meet-primary-btn inline-flex items-center gap-2 rounded-xl px-7 py-3.5 font-medium">شروع رایگان <ArrowLeft className="w-5 h-5" /></Link>
+        </section>
+      </main>
+
+      <footer className="bg-[#0b1220] text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10">
+            <div className="lg:col-span-2">
+              <div className="flex items-center gap-3">
+                <img src="/avestro-logo.png" alt="" className="w-10 h-10" />
+                <div><p className="font-bold">اَوسترو میت</p><p className="text-[10px] text-white/35 mt-1">AVESTRO MEET</p></div>
+              </div>
+              <p className="text-sm text-white/45 leading-7 max-w-md mt-5">پلتفرم حرفه‌ای برگزاری جلسات، وبینار و کلاس آنلاین با تجربه‌ای فارسی و مدرن.</p>
+            </div>
+            <div><p className="text-sm font-medium text-white/80 mb-4">محصول</p><div className="space-y-3 text-xs text-white/45"><a href="#features" className="block hover:text-white">قابلیت‌ها</a><a href="#pricing" className="block hover:text-white">قیمت‌گذاری</a><a href="#security" className="block hover:text-white">امنیت</a></div></div>
+            <div><p className="text-sm font-medium text-white/80 mb-4">حساب</p><div className="space-y-3 text-xs text-white/45"><Link to="/login" className="block hover:text-white">ورود</Link><Link to="/register" className="block hover:text-white">ثبت‌نام</Link></div></div>
+          </div>
+          <div className="mt-10 pt-6 border-t border-white/[.08] flex flex-wrap justify-between gap-3 text-xs text-white/30">
+            <span>© ۱۴۰۵ اَوسترو میت. تمام حقوق محفوظ است.</span>
+            <span>ساخته شده برای تجربه‌ای ساده‌تر از جلسه آنلاین</span>
           </div>
         </div>
       </footer>

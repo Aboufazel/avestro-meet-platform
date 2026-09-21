@@ -28,6 +28,7 @@ export const useMeetingStore = create((set, get) => ({
 
     participants: new Map(),
     activeSpeakerId: null,
+    pinnedParticipantId: null,
 
     // state اولیه:
     isRecording: false,
@@ -77,7 +78,7 @@ export const useMeetingStore = create((set, get) => ({
     // UI
     // ─────────────────────────────────────────────────────────────
 
-    isPanelOpen: false,
+    isPanelOpen: true,
     activePanelTab: 'participants',
 
     // =============================================================
@@ -435,6 +436,41 @@ export const useMeetingStore = create((set, get) => ({
     // مهم‌ترین بخش Real-time
     // ─────────────────────────────────────────────────────────────
 
+    // ─────────────────────────────────────────────────────────────
+    // TRACK STREAMING STATUS
+    //
+    // این status مستقیماً از lib-jitsi-meet می‌آید.
+    // inactive می‌تواند وضعیت طبیعی Last-N/BWE باشد؛ فقط status را
+    // نگه می‌داریم تا restoring بتواند lifecycle اتصال ویدیو را sync کند.
+    // ─────────────────────────────────────────────────────────────
+
+    _updateTrackStreamingStatus: ({track, status}) =>
+        set((state) => {
+            if (!track?.participantId || !track?.type) {
+                return {}
+            }
+
+            const key =
+                `${track.participantId}-${track.type}`
+
+            const tracks = new Map(state.tracks)
+            const existing = tracks.get(key)
+
+            if (!existing) {
+                tracks.set(key, {
+                    ...track,
+                    streamingStatus: status || null,
+                })
+            } else {
+                tracks.set(key, {
+                    ...existing,
+                    streamingStatus: status || null,
+                })
+            }
+
+            return {tracks}
+        }),
+
     _updateTrackMute: (track) =>
         set((state) => {
             if (!track?.participantId || !track?.type) {
@@ -609,6 +645,9 @@ export const useMeetingStore = create((set, get) => ({
             return {isPanelOpen: true, activePanelTab: tab}
         }),
 
+    setPinnedParticipant: (participantId) => set({ pinnedParticipantId: participantId || null }),
+    togglePinnedParticipant: (participantId) => set((state) => ({ pinnedParticipantId: state.pinnedParticipantId === participantId ? null : participantId })),
+
     toggleMeetingMute: () =>
         set((state) => ({
             isMeetingMuted:
@@ -658,6 +697,7 @@ export const useMeetingStore = create((set, get) => ({
 
             participants: new Map(),
             activeSpeakerId: null,
+    pinnedParticipantId: null,
 
             tracks: new Map(),
 
@@ -674,7 +714,7 @@ export const useMeetingStore = create((set, get) => ({
             unreadCount: 0,
             isChatOpen: false,
 
-            isPanelOpen: false,
+            isPanelOpen: true,
             activePanelTab: 'participants',
         }),
 }))

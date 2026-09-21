@@ -1,112 +1,34 @@
-import {memo} from 'react'
-import {MessageSquare, Mic, MicOff, MonitorUp, PhoneOff, Settings, Users, Video, VideoOff,} from 'lucide-react'
-import {selectActivePanelTab, selectIsPanelOpen, selectUnreadCount} from '../store/meeting-selectors'
-import {useMeetingStore} from '../store/meeting-store'
+import { memo } from 'react'
+import { MessageSquare, Mic, MicOff, MonitorUp, PhoneOff, Settings, Users, Video, VideoOff, MoreHorizontal } from 'lucide-react'
+import { selectActivePanelTab, selectIsPanelOpen, selectUnreadCount } from '../store/meeting-selectors'
+import { useMeetingStore } from '../store/meeting-store'
 
-export const MeetingControls = memo(function MeetingControls({
-                                                                 isAudioMuted,
-                                                                 isVideoMuted,
-                                                                 isScreenSharing,
+export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isVideoMuted, isScreenSharing, onToggleAudio, onToggleVideo, onToggleScreenShare, onLeave }) {
+  const unreadCount = useMeetingStore(selectUnreadCount)
+  const activeTab = useMeetingStore(selectActivePanelTab)
+  const isPanelOpen = useMeetingStore(selectIsPanelOpen)
+  const openSettings = useMeetingStore((s) => s.openSettings)
+  const togglePanel = useMeetingStore((s) => s.togglePanel)
 
-                                                                 onToggleAudio,
-                                                                 onToggleVideo,
-                                                                 onToggleScreenShare,
-                                                                 onLeave,
-                                                             }) {
-    const unreadCount = useMeetingStore(selectUnreadCount)
-    const activeTab = useMeetingStore(selectActivePanelTab)
-    const isPanelOpen = useMeetingStore(selectIsPanelOpen)
-    const openSettings = useMeetingStore((s) => s.openSettings)
-    const togglePanel = useMeetingStore((s) => s.togglePanel)
-
-
-
-
-
-    return (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50">
-            <div
-                className="flex items-center gap-2 rounded-2xl border border-olive-700 bg-olive-900/90 backdrop-blur-md p-2 shadow-xl">
-
-                <ControlButton
-                    active={!isAudioMuted}
-                    off={isAudioMuted}
-                    onClick={onToggleAudio}
-                    icon={isAudioMuted ? <MicOff size={18}/> : <Mic size={18}/>}
-                />
-
-                <ControlButton
-                    active={!isVideoMuted}
-                    off={isVideoMuted}
-                    onClick={onToggleVideo}
-                    icon={isVideoMuted ? <VideoOff size={18}/> : <Video size={18}/>}
-                />
-
-                <ControlButton
-                    active={isScreenSharing}
-                    onClick={onToggleScreenShare}
-                    icon={<MonitorUp size={18}/>}
-                />
-
-                <ControlButton
-                    active={isPanelOpen && activeTab === 'participants'}
-                    onClick={() => togglePanel('participants')}
-                    icon={<Users size={18}/>}
-                />
-
-                <div className="relative">
-                    <ControlButton
-                        active={isPanelOpen && activeTab === 'chat'}
-                        onClick={() => togglePanel('chat')}
-                        icon={<MessageSquare size={18}/>}
-                    />
-
-                    {unreadCount > 0 && (
-                        <span
-                            className="absolute -top-1 -left-1 min-w-5 h-5 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center px-1">
-              {unreadCount}
-            </span>
-                    )}
-                </div>
-                <ControlButton onClick={openSettings} icon={<Settings size={18}/>}/>
-                <ControlButton
-                    danger
-                    onClick={onLeave}
-                    icon={<PhoneOff size={18}/>}
-                />
-            </div>
-        </div>
-    )
+  return <div className={`absolute ${isPanelOpen ? 'bottom-[calc(43vh+10px)] md:bottom-5' : 'bottom-3 sm:bottom-5'} left-1/2 -translate-x-1/2 z-30 w-[calc(100%-18px)] sm:w-auto transition-[bottom] duration-400 ease-out`}>
+    <div className="mx-auto flex items-center justify-center gap-1 sm:gap-1.5 rounded-[20px] sm:rounded-[24px] border room-border bg-[var(--room-surface)]/92 backdrop-blur-2xl p-1.5 shadow-[0_18px_60px_rgba(0,0,0,.42)] max-w-max room-rise">
+      <ControlButton onClick={openSettings} label="تنظیمات" icon={<Settings size={17} />} extra="hidden sm:flex" />
+      <ControlButton active={isPanelOpen && activeTab === 'chat'} onClick={() => togglePanel('chat')} label="گفتگو" icon={<MessageSquare size={17} />} badge={unreadCount} />
+      <ControlButton active={isPanelOpen && activeTab === 'participants'} onClick={() => togglePanel('participants')} label="شرکت‌کنندگان" icon={<Users size={17} />} />
+      <ControlButton active={isScreenSharing} onClick={onToggleScreenShare} label="اشتراک‌گذاری" icon={<MonitorUp size={17} />} extra="hidden sm:flex" />
+      <ControlButton active={!isVideoMuted} off={isVideoMuted} onClick={onToggleVideo} label="دوربین" icon={isVideoMuted ? <VideoOff size={17} /> : <Video size={17} />} />
+      <ControlButton active={!isAudioMuted} off={isAudioMuted} onClick={onToggleAudio} label="میکروفون" icon={isAudioMuted ? <MicOff size={17} /> : <Mic size={17} />} />
+      <ControlButton danger onClick={onLeave} label="خروج" icon={<PhoneOff size={17} />} />
+      <ControlButton onClick={() => togglePanel(activeTab || 'participants')} label="بیشتر" icon={<MoreHorizontal size={17} />} extra="hidden" />
+    </div>
+  </div>
 })
 
-function ControlButton({
-                           icon,
-                           active = false,
-                           danger = false,
-                           off = false,
-                           onClick,
-                       }) {
-    let classes =
-        'relative w-11 h-11 rounded-xl flex items-center justify-center transition-all'
-
-    if (danger) {
-        classes += ' bg-red-600 hover:bg-red-500 text-white'
-    } else if (off) {
-        classes += ' bg-red-500/15 text-red-400 hover:bg-red-500/25 ring-1 ring-red-500/40'
-    } else if (active) {
-        classes += ' bg-olive-600 text-white'
-    } else {
-        classes += ' bg-olive-800 text-olive-300 hover:bg-olive-700'
-    }
-
-    return (
-        <button type="button" onClick={onClick} className={classes}>
-            {icon}
-            {off && (
-                <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="w-9 h-9 rounded-lg ring-2 ring-red-500/60"/>
-        </span>
-            )}
-        </button>
-    )
+function ControlButton({ icon, active = false, danger = false, off = false, onClick, label, extra = '', badge = 0 }) {
+  let classes = `room-control relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl flex items-center justify-center ${extra}`
+  if (danger) classes += ' bg-[var(--room-danger)] hover:brightness-110 text-white shadow-[0_10px_24px_rgba(255,80,104,.28)]'
+  else if (off) classes += ' bg-[var(--room-danger)]/10 text-[var(--room-danger)] ring-1 ring-[var(--room-danger)]/30'
+  else if (active) classes += ' bg-[var(--room-mint-soft)] text-[var(--room-mint)] ring-1 ring-[var(--room-mint)]/25'
+  else classes += ' bg-white/[.045] text-white/55 hover:bg-white/[.085] hover:text-white'
+  return <button type="button" onClick={onClick} aria-label={label} title={label} className={classes}>{icon}{off && <span className="absolute inset-0 flex items-center justify-center pointer-events-none"><span className="w-8 h-8 rounded-xl ring-1 ring-[var(--room-danger)]/35" /></span>}{badge > 0 && <span className="absolute -top-1 -left-1 min-w-4 h-4 rounded-full bg-[var(--room-danger)] text-white text-[9px] flex items-center justify-center px-1">{badge}</span>}</button>
 }

@@ -326,6 +326,35 @@ export async function joinMeeting({roomName, displayName, email = ''}) {
 
     /**
      * ─────────────────────────────────────────────────────────────
+     * REMOTE TRACK STREAMING STATUS
+     *
+     * فقط status واقعی Jitsi را وارد store می‌کنیم.
+     * برای restoring، VideoTile می‌تواند همان JitsiTrack را دوباره
+     * به element متصل کند؛ هیچ conference reconnect انجام نمی‌شود.
+     */
+
+    _unsubscribers.push(
+        jitsiController.on(
+            JITSI_EVENTS.TRACK_STREAMING_STATUS_CHANGED,
+            ({track, status}) => {
+                if (generation !== _joinGeneration) return
+                if (!track || !status) return
+
+                useMeetingStore
+                    .getState()
+                    ._updateTrackStreamingStatus({track, status})
+
+                if (status === 'restoring') {
+                    useMeetingStore
+                        .getState()
+                        ._bumpRenegotiationTick()
+                }
+            }
+        )
+    )
+
+    /**
+     * ─────────────────────────────────────────────────────────────
      * TRACK MUTED
      *
      * این یکی از مهم‌ترین event های Real-time است.

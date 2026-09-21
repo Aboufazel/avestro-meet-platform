@@ -11,9 +11,9 @@ export default function App() {
         toastOptions={{
           duration: 3000,
           style: {
-            background: '#30382e',
-            color: '#e4e8e3',
-            border: '1px solid #485445',
+            background: '#101a2a',
+            color: '#f5f8ff',
+            border: '1px solid rgba(255,255,255,.10)',
             borderRadius: '10px',
             fontFamily: 'IRANSansX, sans-serif',
             fontSize: '14px',
@@ -21,14 +21,14 @@ export default function App() {
           },
           success: {
             iconTheme: {
-              primary: '#798c73',
-              secondary: '#111410',
+              primary: '#4d7dff',
+              secondary: '#080f1b',
             },
           },
           error: {
             iconTheme: {
-              primary: '#ef4444',
-              secondary: '#111410',
+              primary: '#ff5068',
+              secondary: '#080f1b',
             },
           },
         }}

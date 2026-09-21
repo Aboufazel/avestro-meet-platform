@@ -7,10 +7,10 @@ export const ParticipantList = memo(
     const { participants, count } = useParticipants()
 
     return (
-      <div className="flex flex-col h-full">
+      <div dir="rtl" className="flex flex-col h-full text-right">
         {/* Header */}
         <div className="px-4 py-3 border-b border-olive-700 shrink-0">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-row-reverse items-center justify-between">
             <h3 className="text-sm font-medium text-olive-100">
               شرکت‌کنندگان
             </h3>

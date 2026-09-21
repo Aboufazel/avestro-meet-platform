@@ -22,27 +22,286 @@
 @theme {
   --font-sans: 'IRANSansX', sans-serif;
 
-  --color-olive-50:  #f2f4f1;
-  --color-olive-100: #e4e8e3;
-  --color-olive-200: #c9d1c7;
-  --color-olive-300: #aebaab;
-  --color-olive-400: #94a38f;
-  --color-olive-500: #798c73;
-  --color-olive-600: #61705c;
-  --color-olive-700: #485445;
-  --color-olive-800: #30382e;
-  --color-olive-900: #181c17;
-  --color-olive-950: #111410;
+  /* Legacy olive utility aliases are intentionally mapped to the Room navy system.
+     Existing meeting components use these utility names; keeping the aliases avoids
+     changing meeting logic while preventing the old green/olive palette from leaking
+     into the Room UI. */
+  --color-olive-50:  #f5f8ff;
+  --color-olive-100: #e8eef8;
+  --color-olive-200: #c8d4e7;
+  --color-olive-300: #a8b7cc;
+  --color-olive-400: #899ab2;
+  --color-olive-500: #71839d;
+  --color-olive-600: #5b6d87;
+  --color-olive-700: #24344d;
+  --color-olive-800: #1b2940;
+  --color-olive-900: #111d30;
+  --color-olive-950: #080f1b;
 }
 
 @layer base {
   html, body {
     font-family: 'IRANSansX', sans-serif;
     direction: rtl;
-    background-color: #111410;
-    color: #e4e8e3;
+    background-color: var(--room-bg);
+    color: var(--room-text);
   }
   * {
     font-family: 'IRANSansX', sans-serif;
   }
+}
+
+
+/* =========================================================
+   Avestro Meet — Product surfaces
+   Room stays on the existing dark olive/navy system.
+   Landing + dashboard use this lighter premium product shell.
+   ========================================================= */
+
+:root {
+  --meet-ink: #101827;
+  --meet-ink-2: #182235;
+  --meet-muted: #68758a;
+  --meet-muted-2: #8d98aa;
+  --meet-bg: #f4f7fb;
+  --meet-surface: #ffffff;
+  --meet-surface-2: #f8faff;
+  --meet-border: #e5eaf2;
+  --meet-blue: #4f7cff;
+  --meet-blue-2: #6c93ff;
+  --meet-mint: #54d9b0;
+  --meet-mint-soft: #e8faf4;
+  --meet-blue-soft: #edf2ff;
+  --meet-danger: #ef6678;
+}
+
+/* Room — reference visual system */
+:root {
+  --room-bg: #080f1b;
+  --room-bg-soft: #0c1422;
+  --room-surface: #101a2a;
+  --room-surface-2: #131f31;
+  --room-surface-3: #172438;
+  --room-border: rgba(255,255,255,.075);
+  --room-border-strong: rgba(255,255,255,.12);
+  --room-text: #f5f8ff;
+  --room-text-soft: rgba(245,248,255,.66);
+  --room-text-muted: rgba(245,248,255,.38);
+  --room-blue: #4d7dff;
+  --room-blue-2: #6c96ff;
+  --room-mint: #45d8b0;
+  --room-mint-soft: rgba(69,216,176,.14);
+  --room-danger: #ff5068;
+  --room-warning: #f5b84b;
+  --room-shadow: 0 24px 70px rgba(0,0,0,.32);
+  --room-radius: 18px;
+}
+
+.room-shell {
+  background:
+    radial-gradient(circle at 55% 35%, rgba(77,125,255,.08), transparent 28%),
+    linear-gradient(145deg, var(--room-bg-soft), var(--room-bg));
+  color: var(--room-text);
+}
+.room-surface { background: linear-gradient(145deg, rgba(19,31,49,.96), rgba(10,17,29,.96)); }
+.room-border { border-color: var(--room-border); }
+.room-panel-shadow { box-shadow: var(--room-shadow); }
+
+.room-enter { animation: room-enter .55s cubic-bezier(.22,1,.36,1) both; }
+.room-rise { animation: room-rise .65s cubic-bezier(.22,1,.36,1) both; }
+.room-pop { animation: room-pop .4s cubic-bezier(.22,1,.36,1) both; }
+.room-glow { animation: room-glow 2.8s ease-in-out infinite; }
+
+@keyframes room-enter { from { opacity:0; transform: translateY(10px) scale(.992); } to { opacity:1; transform:none; } }
+@keyframes room-rise { from { opacity:0; transform: translateY(18px); } to { opacity:1; transform:none; } }
+@keyframes room-pop { from { opacity:0; transform:scale(.94); } to { opacity:1; transform:scale(1); } }
+@keyframes room-glow { 0%,100% { box-shadow: 0 0 0 0 rgba(69,216,176,0); } 50% { box-shadow: 0 0 0 8px rgba(69,216,176,.035); } }
+
+.room-control {
+  transition: transform .22s cubic-bezier(.22,1,.36,1), background .22s ease, border-color .22s ease, box-shadow .22s ease;
+}
+.room-control:hover { transform: translateY(-2px); }
+.room-control:active { transform: translateY(0) scale(.94); }
+
+.room-sheet {
+  animation: room-sheet-in .42s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes room-sheet-in { from { opacity:0; transform: translateY(24px) scale(.985); } to { opacity:1; transform:none; } }
+
+.room-backdrop { animation: room-backdrop .3s ease both; }
+@keyframes room-backdrop { from { opacity:0; } to { opacity:1; } }
+
+.room-panel-desktop { animation: room-panel-in .46s cubic-bezier(.22,1,.36,1) both; transform-origin: right center; }
+@keyframes room-panel-in { from { opacity:0; transform: translateX(24px) scale(.985); } to { opacity:1; transform:none; } }
+
+.room-tile { transition: transform .28s cubic-bezier(.22,1,.36,1), box-shadow .28s ease, border-color .28s ease; }
+.room-tile:hover { transform: translateY(-2px); box-shadow: 0 18px 50px rgba(0,0,0,.24); }
+.room-tile-pinned { box-shadow: 0 0 0 1px rgba(77,125,255,.5), 0 22px 65px rgba(0,0,0,.36); }
+
+.room-no-scrollbar::-webkit-scrollbar { display:none; }
+.room-no-scrollbar { scrollbar-width:none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .room-enter,.room-rise,.room-pop,.room-glow,.room-sheet,.room-backdrop,.room-panel-desktop { animation:none !important; }
+  .room-control,.room-tile { transition:none !important; }
+}
+
+.meet-light-page {
+  background:
+    radial-gradient(circle at 8% 0%, rgba(79,124,255,.10), transparent 28rem),
+    radial-gradient(circle at 92% 8%, rgba(84,217,176,.10), transparent 25rem),
+    var(--meet-bg);
+  color: var(--meet-ink);
+}
+
+.meet-glass {
+  background: rgba(255,255,255,.72);
+  border: 1px solid rgba(255,255,255,.82);
+  box-shadow: 0 18px 60px rgba(26, 43, 77, .08);
+  backdrop-filter: blur(18px);
+}
+
+.meet-dark-panel {
+  background:
+    radial-gradient(circle at 80% 0%, rgba(79,124,255,.16), transparent 30rem),
+    linear-gradient(145deg, #111a2a 0%, #0b1220 100%);
+  color: #fff;
+}
+
+.meet-sidebar {
+  background: linear-gradient(180deg, #111a2a 0%, #0b1220 100%);
+  color: #fff;
+  border-left: 1px solid rgba(255,255,255,.07);
+}
+
+.meet-nav-active {
+  background: linear-gradient(135deg, rgba(79,124,255,.20), rgba(84,217,176,.08));
+  border: 1px solid rgba(106,147,255,.22);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+}
+
+.meet-card {
+  background: var(--meet-surface);
+  border: 1px solid var(--meet-border);
+  border-radius: 22px;
+  box-shadow: 0 12px 38px rgba(20, 35, 65, .055);
+}
+
+.meet-card-hover {
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.meet-card-hover:hover {
+  transform: translateY(-2px);
+  border-color: rgba(79,124,255,.28);
+  box-shadow: 0 20px 50px rgba(20, 35, 65, .09);
+}
+
+.meet-primary-btn {
+  background: linear-gradient(135deg, var(--meet-blue), #6a8fff);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(79,124,255,.22);
+  transition: transform .2s ease, box-shadow .2s ease, filter .2s ease;
+}
+.meet-primary-btn:hover {
+  filter: brightness(1.03);
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px rgba(79,124,255,.28);
+}
+
+.meet-soft-btn {
+  background: #fff;
+  color: var(--meet-ink);
+  border: 1px solid var(--meet-border);
+  transition: all .2s ease;
+}
+.meet-soft-btn:hover {
+  border-color: rgba(79,124,255,.28);
+  background: var(--meet-blue-soft);
+}
+
+.meet-kicker {
+  color: var(--meet-blue);
+  background: var(--meet-blue-soft);
+  border: 1px solid rgba(79,124,255,.14);
+}
+
+.meet-stat-number {
+  color: var(--meet-ink);
+  letter-spacing: -.03em;
+}
+
+.meet-gradient-text {
+  background: linear-gradient(100deg, #243452 0%, #4f7cff 48%, #38b995 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meet-card-hover,
+  .meet-primary-btn {
+    transition: none;
+  }
+}
+
+/* Shared premium auth/product field polish */
+.meet-auth-input > div { width: 100%; }
+.meet-auth-input input::selection { background: rgba(79,124,255,.18); }
+
+/* Scrollbars for dark room surfaces */
+.room-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.room-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.room-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.10); border-radius: 999px; }
+
+/* =========================================================
+   Room panel splitter — pointer/touch friendly
+   ========================================================= */
+.room-panel-resizer {
+  background: linear-gradient(180deg, transparent, rgba(255,255,255,.035), transparent);
+}
+.room-panel-resizer-line {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  background: var(--room-border-strong);
+  opacity: .65;
+  transition: opacity .2s ease, background .2s ease;
+}
+.room-panel-resizer-grip {
+  position: relative;
+  z-index: 1;
+  width: 28px;
+  height: 18px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--room-text-muted);
+  background: color-mix(in srgb, var(--room-surface-3) 88%, transparent);
+  border: 1px solid var(--room-border);
+  box-shadow: 0 5px 18px rgba(0,0,0,.18);
+  transform: rotate(90deg);
+  transition: transform .22s cubic-bezier(.22,1,.36,1), color .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.room-panel-resizer:hover .room-panel-resizer-line,
+.room-panel-resizer.is-dragging .room-panel-resizer-line {
+  opacity: 1;
+  background: var(--room-blue);
+}
+.room-panel-resizer:hover .room-panel-resizer-grip,
+.room-panel-resizer:focus-visible .room-panel-resizer-grip,
+.room-panel-resizer.is-dragging .room-panel-resizer-grip {
+  color: var(--room-blue-2);
+  border-color: rgba(77,125,255,.42);
+  box-shadow: 0 0 0 4px rgba(77,125,255,.08), 0 7px 24px rgba(0,0,0,.22);
+  transform: rotate(90deg) scale(1.06);
+}
+.room-panel-resizer:focus-visible {
+  outline: none;
+}
+
+@media (max-width: 767px) {
+  .room-panel-resizer { display: none; }
 }

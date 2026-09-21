@@ -1,147 +1,144 @@
-import {Link} from 'react-router-dom'
-import {Plus, Calendar, Users, Video, ExternalLink, Clock, Loader2} from 'lucide-react'
-import {Button} from '../../components/ui/Button'
-import {Badge} from '../../components/ui/Badge'
-import {Card} from '../../components/ui/Card'
-import {useAuthStore} from '../../store/authStore'
-import {useRooms} from '../../hooks/useRooms'
+import { Link } from 'react-router-dom'
+import { Plus, Calendar, Users, Video, ExternalLink, Clock, Loader2, ArrowUpLeft, Activity, MoreHorizontal } from 'lucide-react'
+import { Button } from '../../components/ui/Button'
+import { Badge } from '../../components/ui/Badge'
+import { useAuthStore } from '../../store/authStore'
+import { useRooms } from '../../hooks/useRooms'
 
-const statusLabels = {
-    live: 'در جریان',
-    scheduled: 'زمان‌بندی‌شده',
-    ended: 'پایان یافته',
-}
+const statusLabels = { live: 'در جریان', scheduled: 'زمان‌بندی‌شده', ended: 'پایان یافته' }
 
-function StatCard({icon: Icon, value, label, sub}) {
-    return (
-        <Card>
-            <div className="flex items-start justify-between">
-                <div>
-                    <p className="text-olive-500 text-sm mb-1">{label}</p>
-                    <p className="text-3xl font-bold text-olive-100">{value}</p>
-                    {sub && <p className="text-olive-600 text-xs mt-1">{sub}</p>}
-                </div>
-                <div
-                    className="w-10 h-10 rounded-xl bg-olive-800 border border-olive-700 flex items-center justify-center shrink-0">
-                    <Icon className="w-5 h-5 text-olive-400"/>
-                </div>
-            </div>
-        </Card>
-    )
+function Stat({ icon: Icon, value, label, detail, accent }) {
+  return (
+    <div className="meet-card meet-card-hover p-5 sm:p-6 relative overflow-hidden">
+      <div className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl opacity-60 ${accent === 'mint' ? 'bg-[#54d9b0]/10' : 'bg-[#4f7cff]/10'}`} />
+      <div className="relative flex items-start justify-between">
+        <div>
+          <p className="text-xs text-[#8d98aa]">{label}</p>
+          <p className="meet-stat-number text-3xl font-bold mt-2">{value}</p>
+          <p className="text-[11px] text-[#8d98aa] mt-1">{detail}</p>
+        </div>
+        <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${accent === 'mint' ? 'bg-[#e8faf4] text-[#2eaf89]' : 'bg-[#edf2ff] text-[#4f7cff]'}`}>
+          <Icon className="w-5 h-5" />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function DashboardPage() {
-    const user = useAuthStore((s) => s.user)
-    const {data: rooms = [], isLoading} = useRooms()
+  const user = useAuthStore((s) => s.user)
+  const { data: rooms = [], isLoading } = useRooms()
+  const liveCount = rooms.filter((r) => r.status === 'live').length
+  const scheduledCount = rooms.filter((r) => r.status === 'scheduled').length
+  const totalParticipants = rooms.reduce((s, r) => s + (r.active_participants_count || 0), 0)
 
-    const liveCount = rooms.filter((r) => r.status === 'live').length
-    const scheduledCount = rooms.filter((r) => r.status === 'scheduled').length
-    const totalParticipants = rooms.reduce((s, r) => s + (r.active_participants_count || 0), 0)
-
-    return (
-        <div className="min-h-full bg-olive-950 p-4 sm:p-6">
-
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
-                <div>
-                    <h1 className="text-olive-100 font-bold text-lg sm:text-xl mb-1">
-                        سلام، {user?.display_name || user?.username || 'کاربر'}
-                    </h1>
-                    <p className="text-olive-500 text-sm">داشبورد مدیریت رویدادهای شما</p>
-                </div>
-                <Link to="/dashboard/create" className="self-start sm:self-auto">
-                    <Button size="md">
-                        <Plus className="w-4 h-4 ml-1"/>
-                        رویداد جدید
-                    </Button>
-                </Link>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
-                <StatCard icon={Video} value={liveCount} label="جلسه زنده" sub="در حال برگزاری"/>
-                <StatCard icon={Calendar} value={scheduledCount} label="زمان‌بندی شده" sub="رویداد آینده"/>
-                <StatCard icon={Users} value={totalParticipants} label="شرکت‌کننده" sub="در مجموع"/>
-            </div>
-
-            <Card padding="sm">
-                <div className="flex items-center justify-between px-2 py-3 border-b border-olive-700 mb-2">
-                    <h2 className="text-olive-100 text-sm font-medium">رویدادهای اخیر</h2>
-                    <span className="text-olive-600 text-xs">{rooms.length} رویداد</span>
-                </div>
-
-                {isLoading ? (
-                    <div className="flex items-center justify-center py-14">
-                        <Loader2 className="w-6 h-6 text-olive-500 animate-spin"/>
-                    </div>
-                ) : rooms.length === 0 ? (
-                    <div className="flex flex-col items-center py-14 text-center">
-                        <div
-                            className="w-14 h-14 rounded-2xl bg-olive-800 border border-olive-700 flex items-center justify-center mb-4">
-                            <Video className="w-7 h-7 text-olive-600"/>
-                        </div>
-                        <p className="text-olive-400 mb-1">هنوز رویدادی ندارید</p>
-                        <p className="text-olive-600 text-sm mb-5">اولین جلسه آنلاین خود را بسازید</p>
-                        <Link to="/dashboard/create">
-                            <Button size="sm">
-                                <Plus className="w-4 h-4 ml-1"/>
-                                رویداد جدید
-                            </Button>
-                        </Link>
-                    </div>
-                ) : (
-                    <div className="divide-y divide-olive-800/60">
-                        {rooms.map((room) => (
-                            <div
-                                key={room.id}
-                                className="flex flex-col sm:flex-row sm:items-center gap-3 px-2 py-4 hover:bg-olive-800/30 rounded-xl transition-all"
-                            >
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-olive-100 text-sm font-medium truncate mb-1.5">{room.title}</p>
-                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-olive-600 text-xs">
-                                        {room.scheduled_at && (
-                                            <>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3"/>
-                            {new Date(room.scheduled_at).toLocaleDateString('fa-IR')}
-                        </span>
-                                                <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3"/>
-                                                    {new Date(room.scheduled_at).toLocaleTimeString('fa-IR', {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit'
-                                                    })}
-                        </span>
-                                            </>
-                                        )}
-                                        <span className="flex items-center gap-1">
-                      <Users className="w-3 h-3"/>
-                                            {room.active_participants_count || 0}/{room.max_participants}
-                    </span>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-2 self-start sm:self-auto">
-                                    <Badge variant={room.status}>{statusLabels[room.status]}</Badge>
-                                    {room.status !== 'ended' && (
-                                        <>
-                                            <Link to={`/dashboard/edit/${encodeURIComponent(room.slug)}`}
-                                                  className="flex items-center gap-1 text-xs text-olive-400 hover:text-olive-200 border border-olive-700 hover:border-olive-500 px-2.5 py-1.5 rounded-lg transition-all whitespace-nowrap">
-                                              ویرایش
-                                            </Link>
-                                            <Link
-                                                to={`/join/${room.slug}`}
-                                                className="flex items-center gap-1 text-xs text-olive-400 hover:text-olive-200 border border-olive-700 hover:border-olive-500 px-2.5 py-1.5 rounded-lg transition-all whitespace-nowrap"
-                                            >
-                                                <ExternalLink className="w-3 h-3"/>
-                                                {room.status === 'live' ? 'ورود' : 'مشاهده'}
-                                            </Link>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </Card>
+  return (
+    <div className="meet-light-page min-h-full p-4 sm:p-6 lg:p-8">
+      <div className="max-w-[1500px] mx-auto">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5 mb-7">
+          <div>
+            <p className="text-xs text-[#4f7cff] font-medium mb-2">نمای کلی فضای کاری</p>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#101827]">
+              {user?.display_name || user?.username || 'کاربر'}، آماده‌ای؟
+            </h1>
+            <p className="text-sm text-[#68758a] mt-2">جلسات، زمان‌بندی و وضعیت اتاق‌ها را از یکجا مدیریت کنید.</p>
+          </div>
+          <Link to="/dashboard/create" className="self-start sm:self-auto">
+            <span className="meet-primary-btn inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-medium">
+              <Plus className="w-4 h-4" /> جلسه جدید
+            </span>
+          </Link>
         </div>
-    )
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <Stat icon={Video} value={liveCount} label="جلسه زنده" detail="در حال برگزاری" />
+          <Stat icon={Calendar} value={scheduledCount} label="جلسه زمان‌بندی‌شده" detail="رویدادهای آینده" accent="mint" />
+          <Stat icon={Users} value={totalParticipants} label="شرکت‌کننده فعال" detail="در جلسات فعلی" />
+        </div>
+
+        <div className="grid xl:grid-cols-[1fr_330px] gap-5">
+          <section className="meet-card overflow-hidden">
+            <div className="px-5 sm:px-6 py-5 border-b border-[#e5eaf2] flex items-center justify-between gap-4">
+              <div>
+                <h2 className="font-bold text-sm">جلسات اخیر</h2>
+                <p className="text-[11px] text-[#8d98aa] mt-1">{rooms.length} جلسه در فضای کاری</p>
+              </div>
+              <button className="w-9 h-9 rounded-xl border border-[#e5eaf2] flex items-center justify-center text-[#8d98aa] hover:bg-[#f4f7fb]"><MoreHorizontal className="w-4 h-4" /></button>
+            </div>
+
+            {isLoading ? (
+              <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 text-[#4f7cff] animate-spin" /></div>
+            ) : rooms.length === 0 ? (
+              <div className="py-20 px-6 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-[#edf2ff] text-[#4f7cff] mx-auto flex items-center justify-center"><Video className="w-6 h-6" /></div>
+                <p className="font-medium mt-4">هنوز جلسه‌ای ندارید</p>
+                <p className="text-xs text-[#8d98aa] mt-2 mb-5">اولین جلسه آنلاین خود را بسازید.</p>
+                <Link to="/dashboard/create" className="meet-primary-btn inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium"><Plus className="w-4 h-4" /> جلسه جدید</Link>
+              </div>
+            ) : (
+              <div>
+                {rooms.map((room) => (
+                  <div key={room.id} className="px-5 sm:px-6 py-4 border-b border-[#eef1f5] last:border-b-0 hover:bg-[#f8faff] transition-colors">
+                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${room.status === 'live' ? 'bg-[#54d9b0] shadow-[0_0_0_4px_rgba(84,217,176,.12)]' : room.status === 'scheduled' ? 'bg-[#4f7cff]' : 'bg-[#c4cbd6]'}`} />
+                          <p className="font-medium text-sm truncate">{room.title}</p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 text-[11px] text-[#8d98aa]">
+                          {room.scheduled_at && <span className="inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />{new Date(room.scheduled_at).toLocaleDateString('fa-IR')}</span>}
+                          {room.scheduled_at && <span className="inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />{new Date(room.scheduled_at).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })}</span>}
+                          <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />{room.active_participants_count || 0}/{room.max_participants}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 self-start lg:self-auto">
+                        <Badge variant={room.status}>{statusLabels[room.status]}</Badge>
+                        {room.status !== 'ended' && (
+                          <>
+                            <Link to={`/dashboard/edit/${encodeURIComponent(room.slug)}`} className="px-3 py-1.5 rounded-lg text-xs text-[#68758a] border border-[#e5eaf2] hover:border-[#b9c8ef] hover:bg-[#edf2ff]">ویرایش</Link>
+                            <Link to={`/join/${room.slug}`} className="meet-primary-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium">
+                              <ExternalLink className="w-3 h-3" />{room.status === 'live' ? 'ورود' : 'مشاهده'}
+                            </Link>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <aside className="space-y-5">
+            <div className="meet-card p-5">
+              <div className="flex items-center gap-2 mb-5">
+                <div className="w-9 h-9 rounded-xl bg-[#e8faf4] text-[#2eaf89] flex items-center justify-center"><Activity className="w-4 h-4" /></div>
+                <div><p className="font-bold text-sm">وضعیت سرویس</p><p className="text-[10px] text-[#8d98aa]">وضعیت فعلی فضای کاری</p></div>
+              </div>
+              <div className="flex items-center justify-between py-3 border-t border-[#eef1f5]">
+                <span className="text-xs text-[#68758a]">اتصال سرویس</span>
+                <span className="text-xs text-[#2eaf89] inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#54d9b0]" /> فعال</span>
+              </div>
+              <div className="flex items-center justify-between py-3 border-t border-[#eef1f5]">
+                <span className="text-xs text-[#68758a]">جلسات زنده</span>
+                <span className="text-xs font-medium">{liveCount}</span>
+              </div>
+            </div>
+
+            <div className="meet-dark-panel rounded-[22px] p-6 overflow-hidden relative">
+              <div className="absolute -left-12 -top-12 w-32 h-32 bg-[#4f7cff]/15 rounded-full blur-2xl" />
+              <div className="relative">
+                <p className="text-[10px] text-[#54d9b0]">اَوسترو میت</p>
+                <h3 className="text-lg font-bold mt-2">جلسه بعدی را<br />ساده‌تر شروع کن.</h3>
+                <p className="text-[11px] text-white/45 leading-6 mt-3">یک اتاق بساز، لینک را کپی کن و جلسه را شروع کن.</p>
+                <Link to="/dashboard/create" className="mt-5 inline-flex items-center gap-2 rounded-xl bg-white text-[#101827] px-4 py-2.5 text-xs font-medium hover:bg-white/90">
+                  ساخت جلسه <ArrowUpLeft className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  )
 }

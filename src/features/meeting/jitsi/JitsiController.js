@@ -124,6 +124,9 @@ export class JitsiController {
         // وضعیت reconnect برای پایداری روی نت ضعیف
         this._reconnectAttempts = 0
         this._reconnectTimer = null
+        this._connectionFallbackTimer = null
+        this._iceRestartTimer = null
+        this._iceRestartInFlight = false
         this._isReconnecting = false
 
 // آخرین اطلاعات join برای reconnect (بدون درخواست دوباره میکروفون/دوربین)
@@ -1462,7 +1465,11 @@ export class JitsiController {
                     }
 
                 const onEstablished =
-                    resolveOnce
+                    () => {
+                        clearTimeout(this._connectionFallbackTimer)
+                        this._connectionFallbackTimer = null
+                        resolveOnce()
+                    }
 
                 const onFailed =
                     (error) => {
@@ -1480,19 +1487,34 @@ export class JitsiController {
 
                 const onDisconnected =
                     () => {
-                        this._emit(
-                            JITSI_EVENTS.CONNECTION_INTERRUPTED
-                        )
-
-                        // قطع عمدی (کاربر خودش leave کرده) → هیچ تلاشی برای وصل شدن نکن
                         if (this._isLeaving || this._isDisposed) {
                             return
                         }
 
-                        // قطعی روی نت ضعیف موبایل → سعی کن دوباره وصل شی
-                        // به‌جای اینکه بلافاصله FAILED اعلام کنی و کاربر رو از جلسه بندازی بیرون
+                        // A temporary network loss can make the XMPP connection report
+                        // disconnected while the conference ICE path is still able to
+                        // recover. Do not tear down the conference immediately.
+                        // CONNECTION_DISCONNECTED belongs to the XMPP/server connection.
+                        // Do not emit the conference ICE interruption event here; the
+                        // conference-level CONNECTION_INTERRUPTED event is the authoritative
+                        // media/ICE signal and prevents duplicate reconnect UI/events.
                         this._setStatus(MEETING_STATUS.RECONNECTING)
-                        this._scheduleReconnect()
+
+                        clearTimeout(this._connectionFallbackTimer)
+                        this._connectionFallbackTimer = setTimeout(() => {
+                            if (this._isLeaving || this._isDisposed) {
+                                return
+                            }
+
+                            const conference = this._conference
+                            if (conference && typeof conference.isConnectionInterrupted === 'function') {
+                                if (!conference.isConnectionInterrupted()) {
+                                    return
+                                }
+                            }
+
+                            this._scheduleReconnect()
+                        }, 10000)
                     }
 
 
@@ -1673,7 +1695,12 @@ export class JitsiController {
 
     _cancelReconnect() {
         clearTimeout(this._reconnectTimer)
+        clearTimeout(this._connectionFallbackTimer)
+        clearTimeout(this._iceRestartTimer)
         this._reconnectTimer = null
+        this._connectionFallbackTimer = null
+        this._iceRestartTimer = null
+        this._iceRestartInFlight = false
         this._isReconnecting = false
         this._reconnectAttempts = 0
     }
@@ -1780,6 +1807,70 @@ export class JitsiController {
                         ]
                     )
                 }
+
+                // =================================================================
+                // Conference connection / ICE state
+                // =================================================================
+                // lib-jitsi-meet exposes these events at conference level.
+                // Keep the existing full reconnect as a fallback for a real
+                // XMPP connection disconnect, but do NOT recreate the conference
+                // or media tracks for a temporary ICE interruption.
+
+                bind(
+                    JitsiMeetJS.events.conference.CONNECTION_INTERRUPTED,
+                    () => {
+                        if (this._isLeaving || this._isDisposed) {
+                            return
+                        }
+
+                        this._setStatus(MEETING_STATUS.RECONNECTING)
+                        this._emit(JITSI_EVENTS.CONNECTION_INTERRUPTED)
+
+                        clearTimeout(this._iceRestartTimer)
+                        this._iceRestartTimer = setTimeout(async () => {
+                            if (this._isLeaving || this._isDisposed || this._iceRestartInFlight) {
+                                return
+                            }
+
+                            const currentConference = this._conference
+                            if (!currentConference || typeof currentConference.isIceRestartSupported !== 'function' || !currentConference.isIceRestartSupported()) {
+                                return
+                            }
+
+                            if (typeof currentConference.isConnectionInterrupted === 'function' && !currentConference.isConnectionInterrupted()) {
+                                return
+                            }
+
+                            this._iceRestartInFlight = true
+                            try {
+                                await currentConference.restartJvbIce()
+                            } catch (error) {
+                                console.warn('[JitsiController] JVB ICE restart failed:', error)
+                            } finally {
+                                this._iceRestartInFlight = false
+                            }
+                        }, 3000)
+                    }
+                )
+
+                bind(
+                    JitsiMeetJS.events.conference.CONNECTION_RESTORED,
+                    () => {
+                        clearTimeout(this._iceRestartTimer)
+                        clearTimeout(this._connectionFallbackTimer)
+                        this._iceRestartTimer = null
+                        this._connectionFallbackTimer = null
+                        this._iceRestartInFlight = false
+
+                        if (this._isLeaving || this._isDisposed) {
+                            return
+                        }
+
+                        this._reconnectAttempts = 0
+                        this._setStatus(MEETING_STATUS.CONNECTED)
+                        this._emit(JITSI_EVENTS.CONNECTION_RESTORED)
+                    }
+                )
 
                 // =================================================================
                 // Conference joined
@@ -1980,6 +2071,86 @@ export class JitsiController {
                     (participantId, stats) => {
                         const downloadPacketLoss = stats?.packetLoss?.download ?? null
                         this._emitQualityThrottled(participantId, stats?.connectionQuality ?? null, downloadPacketLoss)
+                    }
+                )
+
+                // =================================================================
+                // Remote track streaming status
+                // =================================================================
+                // Jitsi reports active/inactive/interrupted/restoring for remote
+                // video streams. This is more precise than treating every black
+                // video as a conference reconnect problem.
+
+                bind(
+                    JitsiMeetJS.events.conference.TRACK_ADDED,
+                    (track) => {
+                        if (!track || track.isLocal()) {
+                            return
+                        }
+
+                        const streamingEvent =
+                            JitsiMeetJS.events.track?.TRACK_STREAMING_STATUS_CHANGED
+
+                        if (!streamingEvent || typeof track.on !== 'function') {
+                            return
+                        }
+
+                        const handler = (sourceName, status) => {
+                            this._emit(JITSI_EVENTS.TRACK_STREAMING_STATUS_CHANGED, {
+                                track: mapTrack(track),
+                                sourceName: sourceName || null,
+                                status: status || null,
+                            })
+                        }
+
+                        track.on(streamingEvent, handler)
+
+                        // Emit the current state immediately as well. A remote track can
+                        // already be active by the time our listener is attached, so waiting
+                        // only for the next status transition can leave the app without the
+                        // real current streaming state.
+                        if (typeof track.getTrackStreamingStatus === 'function') {
+                            try {
+                                const currentStatus = track.getTrackStreamingStatus()
+
+                                if (currentStatus) {
+                                    this._emit(JITSI_EVENTS.TRACK_STREAMING_STATUS_CHANGED, {
+                                        track: mapTrack(track),
+                                        sourceName: null,
+                                        status: currentStatus,
+                                    })
+                                }
+                            } catch (error) {
+                                console.warn(
+                                    '[JitsiController] Could not read remote track streaming status:',
+                                    error
+                                )
+                            }
+                        }
+
+                        this._trackStreamingListeners = this._trackStreamingListeners || new Map()
+                        this._trackStreamingListeners.set(track, {
+                            event: streamingEvent,
+                            handler,
+                        })
+                    }
+                )
+
+                bind(
+                    JitsiMeetJS.events.conference.TRACK_REMOVED,
+                    (track) => {
+                        const entry = this._trackStreamingListeners?.get(track)
+                        if (!entry || !track || typeof track.off !== 'function') {
+                            this._trackStreamingListeners?.delete(track)
+                            return
+                        }
+
+                        try {
+                            track.off(entry.event, entry.handler)
+                        } catch {
+                        }
+
+                        this._trackStreamingListeners.delete(track)
                     }
                 )
 
