@@ -10,7 +10,7 @@ export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isV
   const openSettings = useMeetingStore((s) => s.openSettings)
   const togglePanel = useMeetingStore((s) => s.togglePanel)
 
-  return <div className={`absolute ${isPanelOpen ? 'bottom-[calc(43vh+10px)] md:bottom-5' : 'bottom-3 sm:bottom-5'} left-1/2 -translate-x-1/2 z-30 w-[calc(100%-18px)] sm:w-auto transition-[bottom] duration-400 ease-out`}>
+  return <div className={`fixed md:absolute ${isPanelOpen ? 'md:bottom-5' : 'md:bottom-5'} bottom-[calc(env(safe-area-inset-bottom)+14px)] left-1/2 -translate-x-1/2 z-[60] w-max max-w-[calc(100%-20px)] transition-all duration-400 ease-out`}>
     <div className="mx-auto flex items-center justify-center gap-1 sm:gap-1.5 rounded-[20px] sm:rounded-[24px] border room-border bg-[var(--room-surface)]/92 backdrop-blur-2xl p-1.5 shadow-[0_18px_60px_rgba(0,0,0,.42)] max-w-max room-rise">
       <ControlButton onClick={openSettings} label="تنظیمات" icon={<Settings size={17} />} extra="hidden sm:flex" />
       <ControlButton active={isPanelOpen && activeTab === 'chat'} onClick={() => togglePanel('chat')} label="گفتگو" icon={<MessageSquare size={17} />} badge={unreadCount} />

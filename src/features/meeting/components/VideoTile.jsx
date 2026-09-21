@@ -435,14 +435,24 @@ export const VideoTile = memo(
                     </div>
                 )}
 
-                {/* Tile actions */}
-                <div className="absolute top-2 left-2 z-30 flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity sm:opacity-0">
+                {/* Tile actions — desktop hover toolbar */}
+                <div className="hidden md:flex absolute top-2 left-2 z-30 items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                     <button type="button" onClick={() => togglePinnedParticipant(participant.id)} className={`room-control w-8 h-8 rounded-lg flex items-center justify-center backdrop-blur-md border border-white/10 ${isPinned ? 'bg-[var(--room-blue)] text-white' : 'bg-black/35 text-white/70 hover:text-white'}`} title={isPinned ? 'برداشتن پین' : 'پین کردن'} aria-label={isPinned ? 'برداشتن پین' : 'پین کردن'}>
                         {isPinned ? <PinOff size={14} /> : <Pin size={14} />}
                     </button>
                     <button type="button" onClick={() => setZoom((z) => Math.min(160, z + 10))} className="room-control w-8 h-8 rounded-lg flex items-center justify-center bg-black/35 backdrop-blur-md border border-white/10 text-white/70 hover:text-white" title="بزرگنمایی" aria-label="بزرگنمایی"><ZoomIn size={14} /></button>
                     <button type="button" onClick={() => setZoom((z) => Math.max(100, z - 10))} className="room-control w-8 h-8 rounded-lg flex items-center justify-center bg-black/35 backdrop-blur-md border border-white/10 text-white/70 hover:text-white" title="کوچک‌نمایی" aria-label="کوچک‌نمایی"><ZoomOut size={14} /></button>
-                    {zoom !== 100 && <span className="px-2 h-8 rounded-lg bg-black/45 backdrop-blur-md border border-white/10 text-[10px] text-white/75 flex items-center">{zoom}%</span>}
+                    {zoom !== 100 && <button type="button" onClick={() => setZoom(100)} className="px-2 h-8 rounded-lg bg-black/45 backdrop-blur-md border border-white/10 text-[10px] text-white/75 flex items-center" title="بازنشانی بزرگنمایی" aria-label="بازنشانی بزرگنمایی">{zoom}%</button>}
+                </div>
+
+                {/* Tile actions — mobile are always visible; no hover dependency on touch screens. */}
+                <div className="md:hidden absolute bottom-12 left-2 z-30 flex items-center gap-1.5 rounded-2xl p-1.5 bg-black/45 backdrop-blur-xl border border-white/10 shadow-[0_10px_30px_rgba(0,0,0,.28)]">
+                    <button type="button" onClick={() => togglePinnedParticipant(participant.id)} className={`room-control w-9 h-9 rounded-xl flex items-center justify-center border ${isPinned ? 'bg-[var(--room-blue)] text-white border-[var(--room-blue)]/50 shadow-[0_0_18px_rgba(77,125,255,.28)]' : 'bg-white/[.07] text-white/80 border-white/10'}`} title={isPinned ? 'برداشتن پین' : 'پین کردن'} aria-label={isPinned ? 'برداشتن پین' : 'پین کردن'}>
+                        {isPinned ? <PinOff size={15} /> : <Pin size={15} />}
+                    </button>
+                    <button type="button" onClick={() => setZoom((z) => Math.min(160, z + 10))} className="room-control w-9 h-9 rounded-xl flex items-center justify-center bg-white/[.07] text-white/80 border border-white/10" title="بزرگنمایی" aria-label="بزرگنمایی"><ZoomIn size={15} /></button>
+                    <button type="button" onClick={() => setZoom((z) => Math.max(100, z - 10))} className="room-control w-9 h-9 rounded-xl flex items-center justify-center bg-white/[.07] text-white/80 border border-white/10" title="کوچک‌نمایی" aria-label="کوچک‌نمایی"><ZoomOut size={15} /></button>
+                    {zoom !== 100 && <button type="button" onClick={() => setZoom(100)} className="min-w-9 h-9 px-2 rounded-xl bg-white/[.07] text-[10px] text-white/80 border border-white/10" title="بازنشانی بزرگنمایی" aria-label="بازنشانی بزرگنمایی">{zoom}%</button>}
                 </div>
 
                 {/* --------------------------------------------------------- */}
@@ -458,22 +468,18 @@ export const VideoTile = memo(
                     </span>
 
                     <div className="flex items-center gap-1.5">
-                        <div className="flex flex-row items-center justify-center w-8 h-8">
-                            <ConnectionIcon
-                                className={`
-                                    w-6 h-6
-                                    ${connectionColor}
-                                `}
-                            />
+                        <div className={`room-status-signal ${connectionLevel}`} title={connectionLevel === 'strong' ? 'اتصال خوب' : connectionLevel === 'medium' ? 'اتصال متوسط' : 'اتصال ضعیف'} aria-label={connectionLevel === 'strong' ? 'اتصال خوب' : connectionLevel === 'medium' ? 'اتصال متوسط' : 'اتصال ضعیف'}>
+                            <ConnectionIcon className={`w-[17px] h-[17px] ${connectionColor}`} />
+                            <span className="room-signal-dot" />
                         </div>
 
                         {isAudioMuted ? (
-                            <div className="w-6 h-6 rounded-full bg-red-500/90 flex items-center justify-center">
-                                <MicOff className="w-3 h-3 text-white" />
+                            <div className="room-mic-status muted" title="میکروفون بسته است" aria-label="میکروفون بسته است">
+                                <MicOff className="w-3.5 h-3.5 text-white" />
                             </div>
                         ) : (
-                            <div className="w-6 h-6 rounded-full bg-[var(--room-mint)]/30 flex items-center justify-center">
-                                <Mic className="w-3 h-3 text-white" />
+                            <div className="room-mic-status live" title="میکروفون باز است" aria-label="میکروفون باز است">
+                                <Mic className="w-3.5 h-3.5 text-white" />
                             </div>
                         )}
                     </div>

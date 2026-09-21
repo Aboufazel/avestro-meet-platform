@@ -173,6 +173,12 @@ export class JitsiController {
 
         this._audioTrackCreating = false
         this._videoTrackCreating = false
+
+        // Local audio outbound recovery only.
+        // This is intentionally isolated from reconnect / ICE / video logic.
+        this._localAudioRecoveryInFlight = false
+        this._localAudioRecoveryLastAt = 0
+        this._localAudioRecoveryCooldownMs = 2500
         this._screenShareTransitioning = false
 
         // =====================================================================
@@ -460,6 +466,16 @@ export class JitsiController {
 
         try {
             if (audioTrack.isMuted()) {
+                // Before unmuting, verify that the underlying local source is
+                // still alive. A stale/ended JitsiLocalTrack can otherwise make
+                // the UI look unmuted while no microphone data is actually sent.
+                if (this._isLocalAudioTrackBroken(audioTrack)) {
+                    return this._recoverLocalAudioTrack(
+                        audioTrack,
+                        'toggle-audio-health-check'
+                    )
+                }
+
                 await audioTrack.unmute()
             } else {
                 await audioTrack.mute()
@@ -2599,6 +2615,260 @@ export class JitsiController {
 
         track.__jitsiControllerMuteHandler =
             onMuteChanged
+
+        // ---------------------------------------------------------------------
+        // Local audio health events
+        // ---------------------------------------------------------------------
+        //
+        // Jitsi explicitly exposes these events for local tracks. We only
+        // attach the recovery handlers to audio tracks; video/reconnect paths
+        // are deliberately untouched.
+        if (track.getType() === 'audio') {
+            const onNoDataFromSource = () => {
+                if (
+                    !track.isMuted() &&
+                    this._localTracks.includes(track)
+                ) {
+                    void this._recoverLocalAudioTrack(
+                        track,
+                        'no-data-from-source'
+                    )
+                }
+            }
+
+            const onLocalTrackStopped = () => {
+                if (
+                    !this._isLeaving &&
+                    this._localTracks.includes(track)
+                ) {
+                    void this._recoverLocalAudioTrack(
+                        track,
+                        'local-track-stopped'
+                    )
+                }
+            }
+
+            track.addEventListener(
+                JitsiMeetJS.events.track
+                    .NO_DATA_FROM_SOURCE,
+                onNoDataFromSource
+            )
+
+            track.addEventListener(
+                JitsiMeetJS.events.track
+                    .LOCAL_TRACK_STOPPED,
+                onLocalTrackStopped
+            )
+
+            track.__jitsiControllerNoDataFromSourceHandler =
+                onNoDataFromSource
+
+            track.__jitsiControllerLocalTrackStoppedHandler =
+                onLocalTrackStopped
+        }
+    }
+
+    /**
+     * Conservative local-audio health check.
+     *
+     * Do not use isReceivingData() as a standalone failure signal because
+     * Jitsi documents that it can be false while a track is muted/disposed.
+     */
+    _isLocalAudioTrackBroken(track) {
+        if (!track || track.getType?.() !== 'audio') {
+            return true
+        }
+
+        try {
+            if (track.isEnded?.()) {
+                return true
+            }
+
+            if (track.disposed) {
+                return true
+            }
+
+            if (
+                !track.isMuted() &&
+                typeof track.isReceivingData === 'function' &&
+                !track.isReceivingData()
+            ) {
+                return true
+            }
+        } catch {
+            return true
+        }
+
+        return false
+    }
+
+    /**
+     * Replace a broken local microphone without reconnecting the conference.
+     * The replacement uses the same microphone device when Jitsi exposes it.
+     */
+    async _recoverLocalAudioTrack(
+        oldTrack,
+        reason
+    ) {
+        if (
+            !oldTrack ||
+            oldTrack.getType?.() !== 'audio' ||
+            !this._conference ||
+            this._isLeaving ||
+            oldTrack.isMuted?.()
+        ) {
+            return false
+        }
+
+        if (this._localAudioRecoveryInFlight) {
+            return false
+        }
+
+        const now = Date.now()
+
+        if (
+            now - this._localAudioRecoveryLastAt <
+            this._localAudioRecoveryCooldownMs
+        ) {
+            return false
+        }
+
+        if (
+            !this._localTracks.includes(oldTrack)
+        ) {
+            return false
+        }
+
+        this._localAudioRecoveryInFlight = true
+        this._localAudioRecoveryLastAt = now
+
+        const JitsiMeetJS =
+            ensureJitsiInitialized()
+
+        let newTrack = null
+
+        try {
+            const deviceId =
+                oldTrack.getDeviceId?.()
+
+            const options = {
+                devices: ['audio'],
+            }
+
+            if (deviceId) {
+                options.micDeviceId = deviceId
+            }
+
+            console.warn(
+                '[JitsiController] Recovering local audio track:',
+                reason
+            )
+
+            const tracks =
+                await JitsiMeetJS.createLocalTracks(
+                    options
+                )
+
+            newTrack = tracks?.[0]
+
+            if (!newTrack) {
+                throw new Error(
+                    'Could not create replacement audio track'
+                )
+            }
+
+            this._bindLocalTrackEvents(
+                newTrack
+            )
+
+            await this._conference.replaceTrack(
+                oldTrack,
+                newTrack
+            )
+
+            this._replaceLocalTrack(
+                oldTrack,
+                newTrack
+            )
+
+            // The old track is no longer needed after replaceTrack succeeds.
+            this._unbindLocalAudioRecoveryEvents(
+                oldTrack
+            )
+
+            await this._safeDisposeTrack(
+                oldTrack
+            )
+
+            this._emit(
+                JITSI_EVENTS.TRACK_REMOVED,
+                mapTrack(oldTrack)
+            )
+
+            this._emit(
+                JITSI_EVENTS.TRACK_ADDED,
+                mapTrack(newTrack)
+            )
+
+            return true
+        } catch (error) {
+            if (newTrack) {
+                this._unbindLocalAudioRecoveryEvents(
+                    newTrack
+                )
+
+                await this._safeDisposeTrack(
+                    newTrack
+                )
+            }
+
+            console.warn(
+                '[JitsiController] Local audio recovery failed:',
+                error
+            )
+
+            return false
+        } finally {
+            this._localAudioRecoveryInFlight = false
+        }
+    }
+
+    _unbindLocalAudioRecoveryEvents(
+        track
+    ) {
+        if (!track) {
+            return
+        }
+
+        try {
+            const JitsiMeetJS =
+                ensureJitsiInitialized()
+
+            const noDataHandler =
+                track.__jitsiControllerNoDataFromSourceHandler
+
+            if (noDataHandler) {
+                track.removeEventListener(
+                    JitsiMeetJS.events.track
+                        .NO_DATA_FROM_SOURCE,
+                    noDataHandler
+                )
+                delete track.__jitsiControllerNoDataFromSourceHandler
+            }
+
+            const stoppedHandler =
+                track.__jitsiControllerLocalTrackStoppedHandler
+
+            if (stoppedHandler) {
+                track.removeEventListener(
+                    JitsiMeetJS.events.track
+                        .LOCAL_TRACK_STOPPED,
+                    stoppedHandler
+                )
+                delete track.__jitsiControllerLocalTrackStoppedHandler
+            }
+        } catch {
+        }
     }
 
     /**
@@ -2776,6 +3046,16 @@ export class JitsiController {
 
                 delete track.__jitsiControllerScreenStoppedHandler
             }
+
+            // -----------------------------------------------------------------
+            // Remove local-audio recovery listeners before disposing.
+            // This prevents our own recovery from reacting to intentional
+            // disposal of the old microphone track.
+            // -----------------------------------------------------------------
+
+            this._unbindLocalAudioRecoveryEvents(
+                track
+            )
 
             // -----------------------------------------------------------------
             // Dispose Jitsi track

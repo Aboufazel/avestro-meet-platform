@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Plus, Calendar, Users, Video, ExternalLink, Clock, Loader2, ArrowUpLeft, Activity, MoreHorizontal } from 'lucide-react'
+import { Plus, Calendar, Users, Video, ExternalLink, Clock, Loader2, ArrowUpLeft, Activity, MoreHorizontal, ArrowLeft, Sparkles, Radio } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { useAuthStore } from '../../store/authStore'
@@ -35,7 +35,7 @@ export default function DashboardPage() {
   return (
     <div className="meet-light-page min-h-full p-4 sm:p-6 lg:p-8">
       <div className="max-w-[1500px] mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5 mb-7">
+        <div className="dashboard-hero rounded-[24px] p-5 sm:p-6 lg:p-7 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5 mb-5 sm:mb-7">
           <div>
             <p className="text-xs text-[#4f7cff] font-medium mb-2">نمای کلی فضای کاری</p>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#101827]">
@@ -50,15 +50,27 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-5 sm:mb-6">
           <Stat icon={Video} value={liveCount} label="جلسه زنده" detail="در حال برگزاری" />
           <Stat icon={Calendar} value={scheduledCount} label="جلسه زمان‌بندی‌شده" detail="رویدادهای آینده" accent="mint" />
-          <Stat icon={Users} value={totalParticipants} label="شرکت‌کننده فعال" detail="در جلسات فعلی" />
+          <div className="col-span-2 lg:col-span-1"><Stat icon={Users} value={totalParticipants} label="شرکت‌کننده فعال" detail="در جلسات فعلی" /></div>
         </div>
 
-        <div className="grid xl:grid-cols-[1fr_330px] gap-5">
+        <div className="grid xl:grid-cols-[minmax(0,1fr)_340px] gap-4 sm:gap-5">
+          <div className="grid grid-cols-2 gap-3 xl:hidden mb-0">
+            <Link to="/dashboard/create" className="dashboard-quick meet-card meet-card-hover p-4 flex items-center gap-3 group">
+              <span className="w-10 h-10 rounded-xl bg-[#edf2ff] text-[#4f7cff] flex items-center justify-center shrink-0"><Plus className="w-5 h-5" /></span>
+              <span className="min-w-0"><span className="block text-xs font-bold">جلسه جدید</span><span className="block text-[10px] text-[#8d98aa] mt-1">ساخت اتاق</span></span>
+              <ArrowLeft className="w-3.5 h-3.5 mr-auto text-[#b0bac8] group-hover:text-[#4f7cff]" />
+            </Link>
+            <div className="dashboard-quick meet-card meet-card-hover p-4 flex items-center gap-3">
+              <span className="w-10 h-10 rounded-xl bg-[#e8faf4] text-[#2eaf89] flex items-center justify-center shrink-0"><Radio className="w-5 h-5" /></span>
+              <span className="min-w-0"><span className="block text-xs font-bold">وضعیت زنده</span><span className="block text-[10px] text-[#8d98aa] mt-1">{liveCount} جلسه فعال</span></span>
+            </div>
+          </div>
+
           <section className="meet-card overflow-hidden">
-            <div className="px-5 sm:px-6 py-5 border-b border-[#e5eaf2] flex items-center justify-between gap-4">
+            <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-[#e5eaf2] flex items-center justify-between gap-4">
               <div>
                 <h2 className="font-bold text-sm">جلسات اخیر</h2>
                 <p className="text-[11px] text-[#8d98aa] mt-1">{rooms.length} جلسه در فضای کاری</p>
@@ -78,8 +90,8 @@ export default function DashboardPage() {
             ) : (
               <div>
                 {rooms.map((room) => (
-                  <div key={room.id} className="px-5 sm:px-6 py-4 border-b border-[#eef1f5] last:border-b-0 hover:bg-[#f8faff] transition-colors">
-                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                  <div key={room.id} className="px-4 sm:px-6 py-4 border-b border-[#eef1f5] last:border-b-0 hover:bg-[#f8faff] transition-colors">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className={`w-2 h-2 rounded-full ${room.status === 'live' ? 'bg-[#54d9b0] shadow-[0_0_0_4px_rgba(84,217,176,.12)]' : room.status === 'scheduled' ? 'bg-[#4f7cff]' : 'bg-[#c4cbd6]'}`} />
@@ -91,12 +103,12 @@ export default function DashboardPage() {
                           <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />{room.active_participants_count || 0}/{room.max_participants}</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 self-start lg:self-auto">
+                      <div className="flex items-center gap-2 self-stretch sm:self-auto">
                         <Badge variant={room.status}>{statusLabels[room.status]}</Badge>
                         {room.status !== 'ended' && (
                           <>
-                            <Link to={`/dashboard/edit/${encodeURIComponent(room.slug)}`} className="px-3 py-1.5 rounded-lg text-xs text-[#68758a] border border-[#e5eaf2] hover:border-[#b9c8ef] hover:bg-[#edf2ff]">ویرایش</Link>
-                            <Link to={`/join/${room.slug}`} className="meet-primary-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium">
+                            <Link to={`/dashboard/edit/${encodeURIComponent(room.slug)}`} className="flex-1 sm:flex-none text-center px-3 py-2 rounded-lg text-xs text-[#68758a] border border-[#e5eaf2] hover:border-[#b9c8ef] hover:bg-[#edf2ff]">ویرایش</Link>
+                            <Link to={`/join/${room.slug}`} className="flex-1 sm:flex-none justify-center meet-primary-btn inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium">
                               <ExternalLink className="w-3 h-3" />{room.status === 'live' ? 'ورود' : 'مشاهده'}
                             </Link>
                           </>
