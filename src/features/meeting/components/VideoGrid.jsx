@@ -58,11 +58,12 @@ export const VideoGrid = memo(function VideoGrid() {
   }
 
   return (
-    <div className="h-full min-h-0 p-2 sm:p-3">
-      {/* Mobile: one featured speaker on top + a breathing 2-column gallery below. */}
-      <div className="md:hidden h-full min-h-0 flex flex-col gap-2.5 overflow-y-auto room-no-scrollbar pb-20">
+    <div className="h-full min-h-0 p-2 sm:p-3 pb-[calc(92px+env(safe-area-inset-bottom))] lg:pb-[calc(104px+env(safe-area-inset-bottom))]">
+      {/* All breakpoints: one clear featured speaker on top + a 3-column gallery below.
+          Narrow phones collapse to 2 columns so tiles stay readable. */}
+      <div className="h-full min-h-0 flex flex-col gap-2.5 overflow-y-auto room-no-scrollbar">
         {mobileFeatured && (
-          <div className="shrink-0 h-[46vh] min-h-[250px] max-h-[430px]">
+          <div className="shrink-0 h-[38vh] min-h-[240px] sm:h-[40vh] sm:min-h-[270px] lg:h-[42vh] lg:min-h-[300px] max-h-[500px]">
             <VideoTile
               participantId={mobileFeatured.id}
               isLarge
@@ -70,29 +71,14 @@ export const VideoGrid = memo(function VideoGrid() {
             />
           </div>
         )}
+
         {mobileRest.length > 0 && (
-          <div className="grid grid-cols-2 gap-2.5 shrink-0">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 shrink-0 auto-rows-[150px] sm:auto-rows-[175px] lg:auto-rows-[190px] xl:auto-rows-[205px]">
             {mobileRest.map((p) => (
-              <div key={p.id} className="min-w-0 aspect-[4/3]">
+              <div key={p.id} className="min-w-0 h-full">
                 <VideoTile participantId={p.id} />
               </div>
             ))}
-          </div>
-        )}
-      </div>
-
-      {/* Desktop/tablet: keep the existing featured + participant strip behavior. */}
-      <div className="hidden md:flex h-full flex-col gap-2.5 min-h-0">
-        <div className={`grid ${featured.length <= 1 ? 'grid-cols-1' : featured.length === 2 ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-3'} gap-2.5 flex-1 min-h-0`}>
-          {featured.length > 0 ? featured.map((p) => (
-            <VideoTile key={p.id} participantId={p.id} isLarge isPinned={pinnedParticipantId === p.id} />
-          )) : participants.map((p) => (
-            <VideoTile key={p.id} participantId={p.id} />
-          ))}
-        </div>
-        {rest.length > 0 && (
-          <div className="flex gap-2.5 overflow-x-auto h-[92px] sm:h-[118px] shrink-0 room-no-scrollbar pb-0.5">
-            {rest.map((p) => <div key={p.id} className="w-[150px] sm:w-[190px] shrink-0"><VideoTile participantId={p.id} /></div>)}
           </div>
         )}
       </div>

@@ -368,6 +368,92 @@
   .room-status-signal, .room-mic-status { width: 32px; height: 30px; border-radius: 11px; }
 }
 
+
+/* Active-speaker audio visualization + polished weak-network signal. */
+.room-speaking-wave {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 26px;
+  height: 22px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: rgba(69,216,176,.12);
+  border: 1px solid rgba(69,216,176,.2);
+  box-shadow: 0 0 18px rgba(69,216,176,.08);
+}
+.room-speaking-wave i {
+  display: block;
+  width: 2px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--room-mint);
+  transform-origin: center;
+  animation: room-speaking-wave 760ms ease-in-out infinite;
+}
+.room-speaking-wave i:nth-child(2) { animation-delay: -580ms; }
+.room-speaking-wave i:nth-child(3) { animation-delay: -420ms; }
+.room-speaking-wave i:nth-child(4) { animation-delay: -250ms; }
+.room-speaking-wave i:nth-child(5) { animation-delay: -90ms; }
+@keyframes room-speaking-wave {
+  0%, 100% { transform: scaleY(.55); opacity: .5; }
+  50% { transform: scaleY(2.2); opacity: 1; }
+}
+
+/* Active speaker / connection feedback */
+.room-tile-pinned::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(102,231,208,.16), 0 0 32px rgba(77,125,255,.12);
+}
+@media (max-width: 767px) {
+  .room-panel-desktop { height: 72vh !important; min-height: 460px !important; }
+  .room-weak-network { max-width: min(220px, calc(100% - 20px)); padding: 7px 9px; }
+}
+
+.room-weak-network {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(260px, calc(100% - 16px));
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(10,17,29,.72);
+  border: 1px solid rgba(255,80,104,.24);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 12px 35px rgba(0,0,0,.24);
+}
+.room-weak-wave {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: 30px;
+  height: 24px;
+}
+.room-weak-wave i {
+  width: 3px;
+  border-radius: 999px;
+  background: var(--room-danger);
+  animation: room-weak-wave 900ms ease-in-out infinite;
+}
+.room-weak-wave i:nth-child(1) { height: 7px; animation-delay: -700ms; }
+.room-weak-wave i:nth-child(2) { height: 14px; animation-delay: -520ms; }
+.room-weak-wave i:nth-child(3) { height: 20px; animation-delay: -340ms; }
+.room-weak-wave i:nth-child(4) { height: 12px; animation-delay: -180ms; }
+.room-weak-wave i:nth-child(5) { height: 6px; animation-delay: -40ms; }
+@keyframes room-weak-wave {
+  0%, 100% { transform: scaleY(.55); opacity: .55; }
+  50% { transform: scaleY(1.18); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .room-speaking-wave i, .room-weak-wave i { animation: none !important; }
+}
+
 /* Landing + dashboard responsive polish */
 .meet-mobile-rise { animation: meet-mobile-rise .55s cubic-bezier(.22,1,.36,1) both; }
 .meet-mobile-rise:nth-child(2) { animation-delay: .06s; }

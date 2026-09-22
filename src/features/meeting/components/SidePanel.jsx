@@ -103,7 +103,7 @@ export const SidePanel = memo(function SidePanel() {
 
       <aside
         dir="rtl"
-        className="room-sheet room-panel-desktop fixed bottom-0 left-0 right-0 z-50 h-[43vh] min-h-[300px] max-h-[520px] rounded-t-[26px] border-t room-border room-surface room-panel-shadow md:static md:h-full md:max-h-none md:min-h-0 md:w-[360px] md:rounded-[20px] md:border md:shrink-0 overflow-hidden flex flex-col"
+        className="room-sheet room-panel-desktop fixed bottom-0 left-0 right-0 z-50 h-[72vh] min-h-[460px] max-h-[780px] rounded-t-[26px] border-t room-border room-surface room-panel-shadow md:static md:h-full md:max-h-none md:min-h-0 md:w-[360px] md:rounded-[20px] md:border md:shrink-0 overflow-hidden flex flex-col"
       >
         <div className="md:hidden flex justify-center pt-2.5 pb-1">
           <div className="w-11 h-1 rounded-full bg-white/20" />
@@ -119,7 +119,7 @@ export const SidePanel = memo(function SidePanel() {
           </button>
         </div>
 
-        <div className="md:hidden flex-1 min-h-0">
+        <div className="md:hidden flex-1 min-h-0 pb-[calc(78px+env(safe-area-inset-bottom))] overflow-hidden">
           {activeTab === 'participants' ? <ParticipantList /> : <ChatPanel />}
         </div>
 

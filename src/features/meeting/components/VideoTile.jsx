@@ -16,6 +16,7 @@ import {
     PinOff,
     ZoomIn,
     ZoomOut,
+    MoreHorizontal,
 } from 'lucide-react'
 
 import {useParticipant} from '../hooks/useParticipants'
@@ -95,6 +96,7 @@ export const VideoTile = memo(
         // ---------------------------------------------------------------------
         const [isVisible, setIsVisible] = useState(isLarge)
         const [zoom, setZoom] = useState(100)
+        const [mobileActionsOpen, setMobileActionsOpen] = useState(false)
         const togglePinnedParticipant = useMeetingStore((s) => s.togglePinnedParticipant)
 
         // isFrozen حذف شد — heuristic فریم‌شمار بیش‌ازحد حساس بود و با
@@ -330,7 +332,7 @@ export const VideoTile = memo(
             <div
                 ref={containerRef}
                 className={`
-                    group relative room-tile bg-[var(--room-bg)] rounded-[18px] overflow-hidden flex items-center justify-center border border-white/[.06]
+                    group relative room-tile bg-[var(--room-bg)] rounded-[18px] overflow-visible flex items-center justify-center border border-white/[.06]
 
                     ${
                         participant.isActiveSpeaker || isPinned
@@ -354,15 +356,17 @@ export const VideoTile = memo(
                 {/* بقیه او را بد ببینند.                                        */}
                 {/* --------------------------------------------------------- */}
 
-                {participant.isLocal &&
-                    connectionLevel === 'weak' && (
-                        <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-center gap-1.5 bg-red-500/90 py-1.5 px-2">
-                            <SignalLow className="w-3.5 h-3.5 text-white shrink-0" />
-                            <span className="text-white text-xs font-medium">
-                                اینترنت شما ضعیف است
-                            </span>
+                {participant.isLocal && connectionLevel === 'weak' && (
+                    <div className="absolute top-2 right-2 z-20 room-weak-network" role="status" aria-live="polite">
+                        <div className="room-weak-wave" aria-hidden="true">
+                            <i /><i /><i /><i /><i />
                         </div>
-                    )}
+                        <div className="min-w-0">
+                            <span className="block text-[10px] font-semibold text-white leading-none">اینترنت ضعیف است</span>
+                            <span className="block text-[9px] text-white/50 mt-1 leading-none">کیفیت اتصال در حال نوسان است</span>
+                        </div>
+                    </div>
+                )}
 
                 {/* --------------------------------------------------------- */}
                 {/* Temporary connection interruption                         */}
@@ -445,27 +449,51 @@ export const VideoTile = memo(
                     {zoom !== 100 && <button type="button" onClick={() => setZoom(100)} className="px-2 h-8 rounded-lg bg-black/45 backdrop-blur-md border border-white/10 text-[10px] text-white/75 flex items-center" title="بازنشانی بزرگنمایی" aria-label="بازنشانی بزرگنمایی">{zoom}%</button>}
                 </div>
 
-                {/* Tile actions — mobile are always visible; no hover dependency on touch screens. */}
-                <div className="md:hidden absolute bottom-12 left-2 z-30 flex items-center gap-1.5 rounded-2xl p-1.5 bg-black/45 backdrop-blur-xl border border-white/10 shadow-[0_10px_30px_rgba(0,0,0,.28)]">
-                    <button type="button" onClick={() => togglePinnedParticipant(participant.id)} className={`room-control w-9 h-9 rounded-xl flex items-center justify-center border ${isPinned ? 'bg-[var(--room-blue)] text-white border-[var(--room-blue)]/50 shadow-[0_0_18px_rgba(77,125,255,.28)]' : 'bg-white/[.07] text-white/80 border-white/10'}`} title={isPinned ? 'برداشتن پین' : 'پین کردن'} aria-label={isPinned ? 'برداشتن پین' : 'پین کردن'}>
-                        {isPinned ? <PinOff size={15} /> : <Pin size={15} />}
-                    </button>
-                    <button type="button" onClick={() => setZoom((z) => Math.min(160, z + 10))} className="room-control w-9 h-9 rounded-xl flex items-center justify-center bg-white/[.07] text-white/80 border border-white/10" title="بزرگنمایی" aria-label="بزرگنمایی"><ZoomIn size={15} /></button>
-                    <button type="button" onClick={() => setZoom((z) => Math.max(100, z - 10))} className="room-control w-9 h-9 rounded-xl flex items-center justify-center bg-white/[.07] text-white/80 border border-white/10" title="کوچک‌نمایی" aria-label="کوچک‌نمایی"><ZoomOut size={15} /></button>
-                    {zoom !== 100 && <button type="button" onClick={() => setZoom(100)} className="min-w-9 h-9 px-2 rounded-xl bg-white/[.07] text-[10px] text-white/80 border border-white/10" title="بازنشانی بزرگنمایی" aria-label="بازنشانی بزرگنمایی">{zoom}%</button>}
-                </div>
+                {/* Mobile: keep the video clean. One compact action trigger opens a bottom sheet outside the tile. */}
+                <button
+                    type="button"
+                    onClick={() => setMobileActionsOpen(true)}
+                    className="md:hidden absolute -top-3 left-2 z-40 w-9 h-9 rounded-xl flex items-center justify-center bg-black/35 backdrop-blur-md border border-white/10 text-white/80 shadow-lg"
+                    title="گزینه‌های تصویر"
+                    aria-label="گزینه‌های تصویر"
+                >
+                    <MoreHorizontal size={18} />
+                </button>
+
+                {mobileActionsOpen && (
+                    <div className="md:hidden fixed inset-x-3 bottom-[calc(84px+env(safe-area-inset-bottom))] z-[90] rounded-[22px] border room-border bg-[var(--room-surface)]/98 backdrop-blur-2xl p-2 shadow-[0_24px_70px_rgba(0,0,0,.5)] room-sheet">
+                        <div className="px-2 pt-1 pb-2 flex items-center justify-between">
+                            <span className="text-xs text-white/55 truncate">گزینه‌های {participant.displayName}</span>
+                            <button type="button" onClick={() => setMobileActionsOpen(false)} className="text-xs text-white/40 px-2 py-1">بستن</button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                            <button type="button" onClick={() => { togglePinnedParticipant(participant.id); setMobileActionsOpen(false) }} className={`h-12 rounded-2xl flex flex-col items-center justify-center gap-1 border ${isPinned ? 'bg-[var(--room-blue)] text-white border-[var(--room-blue)]/50' : 'bg-white/[.05] text-white/75 border-white/10'}`}>
+                                {isPinned ? <PinOff size={17} /> : <Pin size={17} />}<span className="text-[10px]">{isPinned ? 'برداشتن پین' : 'پین کردن'}</span>
+                            </button>
+                            <button type="button" onClick={() => { setZoom((z) => Math.min(160, z + 10)); setMobileActionsOpen(false) }} className="h-12 rounded-2xl flex flex-col items-center justify-center gap-1 bg-white/[.05] text-white/75 border border-white/10"><ZoomIn size={17} /><span className="text-[10px]">بزرگ‌تر</span></button>
+                            <button type="button" onClick={() => { setZoom((z) => Math.max(100, z - 10)); setMobileActionsOpen(false) }} className="h-12 rounded-2xl flex flex-col items-center justify-center gap-1 bg-white/[.05] text-white/75 border border-white/10"><ZoomOut size={17} /><span className="text-[10px]">کوچک‌تر</span></button>
+                        </div>
+                    </div>
+                )}
 
                 {/* --------------------------------------------------------- */}
                 {/* Bottom bar                                                  */}
                 {/* --------------------------------------------------------- */}
 
                 <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-3 py-2 bg-gradient-to-t from-black/70 to-transparent">
-                    <span className="text-white text-xs font-medium truncate max-w-[70%]">
+                    <div className="min-w-0 flex items-center gap-2">
+                        {participant.isActiveSpeaker && !isAudioMuted && (
+                            <span className="room-speaking-wave" aria-label="در حال صحبت">
+                                <i /><i /><i /><i /><i />
+                            </span>
+                        )}
+                        <span className="text-white text-xs font-medium truncate max-w-[70%]">
                         {participant.displayName}
 
                         {participant.isLocal &&
                             ' (شما)'}
-                    </span>
+                        </span>
+                    </div>
 
                     <div className="flex items-center gap-1.5">
                         <div className={`room-status-signal ${connectionLevel}`} title={connectionLevel === 'strong' ? 'اتصال خوب' : connectionLevel === 'medium' ? 'اتصال متوسط' : 'اتصال ضعیف'} aria-label={connectionLevel === 'strong' ? 'اتصال خوب' : connectionLevel === 'medium' ? 'اتصال متوسط' : 'اتصال ضعیف'}>

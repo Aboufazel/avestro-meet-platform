@@ -10,12 +10,12 @@ export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isV
   const openSettings = useMeetingStore((s) => s.openSettings)
   const togglePanel = useMeetingStore((s) => s.togglePanel)
 
-  return <div className={`fixed md:absolute ${isPanelOpen ? 'md:bottom-5' : 'md:bottom-5'} bottom-[calc(env(safe-area-inset-bottom)+14px)] left-1/2 -translate-x-1/2 z-[60] w-max max-w-[calc(100%-20px)] transition-all duration-400 ease-out`}>
+  return <div className={`fixed lg:absolute ${isPanelOpen ? 'md:bottom-5' : 'md:bottom-5'} bottom-[calc(env(safe-area-inset-bottom)+14px)] left-1/2 -translate-x-1/2 z-[60] w-max max-w-[calc(100%-20px)] transition-all duration-400 ease-out`}>
     <div className="mx-auto flex items-center justify-center gap-1 sm:gap-1.5 rounded-[20px] sm:rounded-[24px] border room-border bg-[var(--room-surface)]/92 backdrop-blur-2xl p-1.5 shadow-[0_18px_60px_rgba(0,0,0,.42)] max-w-max room-rise">
-      <ControlButton onClick={openSettings} label="تنظیمات" icon={<Settings size={17} />} extra="hidden sm:flex" />
+      <ControlButton onClick={openSettings} label="تنظیمات" icon={<Settings size={17} />} extra="" />
       <ControlButton active={isPanelOpen && activeTab === 'chat'} onClick={() => togglePanel('chat')} label="گفتگو" icon={<MessageSquare size={17} />} badge={unreadCount} />
       <ControlButton active={isPanelOpen && activeTab === 'participants'} onClick={() => togglePanel('participants')} label="شرکت‌کنندگان" icon={<Users size={17} />} />
-      <ControlButton active={isScreenSharing} onClick={onToggleScreenShare} label="اشتراک‌گذاری" icon={<MonitorUp size={17} />} extra="hidden sm:flex" />
+      <ControlButton active={isScreenSharing} onClick={onToggleScreenShare} label="اشتراک‌گذاری" icon={<MonitorUp size={17} />} extra="" />
       <ControlButton active={!isVideoMuted} off={isVideoMuted} onClick={onToggleVideo} label="دوربین" icon={isVideoMuted ? <VideoOff size={17} /> : <Video size={17} />} />
       <ControlButton active={!isAudioMuted} off={isAudioMuted} onClick={onToggleAudio} label="میکروفون" icon={isAudioMuted ? <MicOff size={17} /> : <Mic size={17} />} />
       <ControlButton danger onClick={onLeave} label="خروج" icon={<PhoneOff size={17} />} />
