@@ -487,7 +487,7 @@ export const VideoTile = memo(
                                 <i /><i /><i /><i /><i />
                             </span>
                         )}
-                        <span className="text-white text-xs font-medium truncate max-w-[70%]">
+                        <span className="text-white text-xs font-medium">
                         {participant.displayName}
 
                         {participant.isLocal &&
