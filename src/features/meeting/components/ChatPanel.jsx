@@ -13,7 +13,13 @@ import { selectLocalParticipantId, selectReplyingTo } from '../store/meeting-sel
 import { useParticipants } from '../hooks/useParticipants'
 
 export const ChatPanel = memo(function ChatPanel() {
-    const { messages, send, bottomRef } = useChat()
+    const {
+        messages,
+        send,
+        bottomRef,
+        markAsRead,
+        setChatAtBottom,
+    } = useChat()
     const replyingTo = useMeetingStore(selectReplyingTo)
     const localParticipantId = useMeetingStore(selectLocalParticipantId)
     const setReplyingTo = useMeetingStore((s) => s.setReplyingTo)
@@ -44,19 +50,30 @@ export const ChatPanel = memo(function ChatPanel() {
         const handleScroll = () => {
             const distanceFromBottom =
                 element.scrollHeight - element.scrollTop - element.clientHeight
+            const atBottom = distanceFromBottom < 40
             setShowNewMessageButton(distanceFromBottom > 180)
+            setChatAtBottom(atBottom)
+            if (atBottom) markAsRead()
         }
 
         handleScroll()
         element.addEventListener('scroll', handleScroll, { passive: true })
         return () => element.removeEventListener('scroll', handleScroll)
-    }, [])
+    }, [markAsRead, setChatAtBottom])
 
     useEffect(() => {
-        if (!showNewMessageButton) {
+        if (!messages.length) return
+        const element = scrollRef.current
+        if (!element) return
+
+        const distanceFromBottom =
+            element.scrollHeight - element.scrollTop - element.clientHeight
+
+        if (distanceFromBottom < 40) {
             bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+            markAsRead()
         }
-    }, [messages.length, showNewMessageButton, bottomRef])
+    }, [messages.length, bottomRef, markAsRead])
 
     const handleSubmit = (e) => {
         e.preventDefault()
@@ -71,6 +88,8 @@ export const ChatPanel = memo(function ChatPanel() {
     const scrollToBottom = () => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
         setShowNewMessageButton(false)
+        setChatAtBottom(true)
+        markAsRead()
     }
 
     return (
@@ -242,6 +261,7 @@ const EmptyChat = memo(function EmptyChat({ hasSearch }) {
 
 const MessageItem = memo(function MessageItem({ message, grouped, onReply }) {
     const time = formatMessageTime(message.timestamp)
+    const [showReplyPreview, setShowReplyPreview] = useState(false)
 
     return (
         <div className={`group flex flex-col ${message.isLocal ? 'items-end' : 'items-start'} ${grouped ? 'mt-1' : 'mt-3'}`}>
@@ -265,16 +285,28 @@ const MessageItem = memo(function MessageItem({ message, grouped, onReply }) {
                     }`}
                 >
                     {message.replyTo && (
-                        <div className={`mb-2 px-2.5 py-1.5 rounded-lg border-r-2 text-[11px] ${message.isLocal
-                            ? 'bg-olive-800/70 border-olive-300/60 text-olive-200'
-                            : 'bg-olive-950/70 border-olive-500 text-olive-400'
-                        }`}>
-                            <span className="font-medium block truncate">
-                                {message.replyTo.displayName}
-                            </span>
-                            <span className="opacity-70 truncate block mt-0.5">
-                                {message.replyTo.text}
-                            </span>
+                        <div className="mb-1.5">
+                            <button
+                                type="button"
+                                onClick={() => setShowReplyPreview((value) => !value)}
+                                className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg bg-black/15 border border-white/10 text-[10px] text-white/65 hover:text-white hover:bg-black/20 transition-colors"
+                                aria-expanded={showReplyPreview}
+                                title="نمایش پیام مورد پاسخ"
+                            >
+                                <Reply size={12} />
+                                <span>پاسخ</span>
+                            </button>
+
+                            {showReplyPreview && (
+                                <div className="mt-1.5 max-w-[240px] rounded-lg border border-white/10 bg-black/15 px-2.5 py-1.5 text-[10px] text-white/55 leading-5">
+                                    <span className="font-medium text-white/70">
+                                        {message.replyTo.displayName}
+                                    </span>
+                                    <span className="block truncate">
+                                        {message.replyTo.text}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                     )}
                     <span className="whitespace-pre-wrap break-words">{message.text}</span>
@@ -283,11 +315,12 @@ const MessageItem = memo(function MessageItem({ message, grouped, onReply }) {
                 <button
                     type="button"
                     onClick={onReply}
-                    className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-olive-600 bg-olive-900/70 border border-olive-800 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-olive-200 hover:bg-olive-800 transition-all"
+                    className="shrink-0 min-w-8 h-8 px-2 rounded-xl flex items-center justify-center gap-1.5 text-olive-300 bg-olive-900/85 border border-olive-700/80 shadow-sm hover:text-white hover:bg-olive-800 hover:border-olive-600 active:scale-95 transition-all"
                     title="پاسخ"
                     aria-label="پاسخ به پیام"
                 >
                     <Reply size={13} />
+                    <span className="text-[10px] font-medium">پاسخ</span>
                 </button>
             </div>
         </div>

@@ -17,6 +17,8 @@ import {
     ZoomIn,
     ZoomOut,
     MoreHorizontal,
+    Maximize2,
+    Minimize2,
 } from 'lucide-react'
 
 import {useParticipant} from '../hooks/useParticipants'
@@ -35,6 +37,7 @@ export const VideoTile = memo(
         participantId,
         isLarge = false,
         isPinned = false,
+        isFocused = false,
     }) {
         const participant =
             useParticipant(
@@ -97,7 +100,9 @@ export const VideoTile = memo(
         const [isVisible, setIsVisible] = useState(isLarge)
         const [zoom, setZoom] = useState(100)
         const [mobileActionsOpen, setMobileActionsOpen] = useState(false)
+        const [desktopActionsOpen, setDesktopActionsOpen] = useState(false)
         const togglePinnedParticipant = useMeetingStore((s) => s.togglePinnedParticipant)
+        const toggleFocusedParticipant = useMeetingStore((s) => s.toggleFocusedParticipant)
 
         // isFrozen حذف شد — heuristic فریم‌شمار بیش‌ازحد حساس بود و با
         // کوچیک‌ترین لگ چند فریمی (طبیعی روی نت موبایل) قفل می‌شد روی
@@ -351,10 +356,13 @@ export const VideoTile = memo(
                     group relative room-tile bg-[var(--room-bg)] rounded-[18px] overflow-visible flex items-center justify-center border border-white/[.06]
 
                     ${
-                        participant.isActiveSpeaker || isPinned
+                        isPinned
                             ? 'ring-2 ring-[var(--room-blue)] room-tile-pinned'
-                            : ''
+                            : participant.isActiveSpeaker && !participant.isAudioMuted
+                                ? 'ring-1 ring-[var(--room-mint)]/70 room-tile-speaking'
+                                : ''
                     }
+                    ${isFocused ? 'room-tile-focused' : ''}
 
                     ${
                         isLarge
@@ -460,39 +468,66 @@ export const VideoTile = memo(
                     </div>
                 )}
 
-                {/* Tile actions — desktop hover toolbar */}
-                <div className="hidden md:flex absolute top-2 left-2 z-30 items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                    <button type="button" onClick={() => togglePinnedParticipant(participant.id)} className={`room-control w-8 h-8 rounded-lg flex items-center justify-center backdrop-blur-md border border-white/10 ${isPinned ? 'bg-[var(--room-blue)] text-white' : 'bg-black/35 text-white/70 hover:text-white'}`} title={isPinned ? 'برداشتن پین' : 'پین کردن'} aria-label={isPinned ? 'برداشتن پین' : 'پین کردن'}>
-                        {isPinned ? <PinOff size={14} /> : <Pin size={14} />}
+                {/* Desktop: one unobtrusive action trigger. The menu never covers the video controls permanently. */}
+                <div className="hidden md:block absolute top-2 left-2 z-40 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                    <button
+                        type="button"
+                        onClick={() => setDesktopActionsOpen((value) => !value)}
+                        className="room-control w-9 h-9 rounded-xl flex items-center justify-center bg-black/45 backdrop-blur-md border border-white/10 text-white/80 hover:text-white shadow-lg"
+                        title="گزینه‌های تصویر"
+                        aria-label="گزینه‌های تصویر"
+                    >
+                        <MoreHorizontal size={17} />
                     </button>
-                    <button type="button" onClick={() => setZoom((z) => Math.min(160, z + 10))} className="room-control w-8 h-8 rounded-lg flex items-center justify-center bg-black/35 backdrop-blur-md border border-white/10 text-white/70 hover:text-white" title="بزرگنمایی" aria-label="بزرگنمایی"><ZoomIn size={14} /></button>
-                    <button type="button" onClick={() => setZoom((z) => Math.max(100, z - 10))} className="room-control w-8 h-8 rounded-lg flex items-center justify-center bg-black/35 backdrop-blur-md border border-white/10 text-white/70 hover:text-white" title="کوچک‌نمایی" aria-label="کوچک‌نمایی"><ZoomOut size={14} /></button>
-                    {zoom !== 100 && <button type="button" onClick={() => setZoom(100)} className="px-2 h-8 rounded-lg bg-black/45 backdrop-blur-md border border-white/10 text-[10px] text-white/75 flex items-center" title="بازنشانی بزرگنمایی" aria-label="بازنشانی بزرگنمایی">{zoom}%</button>}
+
+                    {desktopActionsOpen && (
+                        <div className="absolute left-0 top-10 w-44 rounded-2xl border room-border bg-[var(--room-surface)]/98 backdrop-blur-2xl p-1.5 shadow-[0_20px_60px_rgba(0,0,0,.45)] room-sheet">
+                            <button type="button" onClick={() => { togglePinnedParticipant(participant.id); setDesktopActionsOpen(false) }} className="w-full h-10 px-3 rounded-xl flex items-center gap-2 text-xs text-white/80 hover:bg-white/[.06]">
+                                {isPinned ? <PinOff size={15} /> : <Pin size={15} />}
+                                <span>{isPinned ? 'برداشتن پین' : 'پین کردن'}</span>
+                            </button>
+                            <button type="button" onClick={() => { toggleFocusedParticipant(participant.id); setDesktopActionsOpen(false) }} className="w-full h-10 px-3 rounded-xl flex items-center gap-2 text-xs text-white/80 hover:bg-white/[.06]">
+                                {isFocused ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                                <span>{isFocused ? 'خروج از Focus' : 'ورود به Focus'}</span>
+                            </button>
+                            <button type="button" onClick={() => setZoom((z) => Math.min(160, z + 10))} className="w-full h-10 px-3 rounded-xl flex items-center gap-2 text-xs text-white/80 hover:bg-white/[.06]">
+                                <ZoomIn size={15} /><span>نمایش بزرگ‌تر</span>
+                            </button>
+                            {zoom !== 100 && (
+                                <button type="button" onClick={() => setZoom(100)} className="w-full h-9 px-3 rounded-xl flex items-center gap-2 text-[11px] text-white/50 hover:bg-white/[.06]">
+                                    <ZoomOut size={14} /><span>بازنشانی اندازه ({zoom}%)</span>
+                                </button>
+                            )}
+                        </div>
+                    )}
                 </div>
 
-                {/* Mobile: keep the video clean. One compact action trigger opens a bottom sheet outside the tile. */}
+                {/* Mobile: compact action trigger lives inside the tile footer, not above the frame. */}
                 <button
                     type="button"
                     onClick={() => setMobileActionsOpen(true)}
-                    className="md:hidden absolute -top-3 left-2 z-40 w-9 h-9 rounded-xl flex items-center justify-center bg-black/35 backdrop-blur-md border border-white/10 text-white/80 shadow-lg"
+                    className="md:hidden absolute bottom-2 left-2 z-40 w-8 h-8 rounded-lg flex items-center justify-center bg-black/55 backdrop-blur-md border border-white/10 text-white/80 shadow-lg active:scale-95 transition-transform"
                     title="گزینه‌های تصویر"
                     aria-label="گزینه‌های تصویر"
                 >
-                    <MoreHorizontal size={18} />
+                    <MoreHorizontal size={16} />
                 </button>
 
                 {mobileActionsOpen && (
-                    <div className="md:hidden fixed inset-x-3 bottom-[calc(84px+env(safe-area-inset-bottom))] z-[90] rounded-[22px] border room-border bg-[var(--room-surface)]/98 backdrop-blur-2xl p-2 shadow-[0_24px_70px_rgba(0,0,0,.5)] room-sheet">
+                    <div className="md:hidden fixed inset-x-3 bottom-[calc(78px+env(safe-area-inset-bottom))] z-[90] rounded-[22px] border room-border bg-[var(--room-surface)]/98 backdrop-blur-2xl p-2 shadow-[0_24px_70px_rgba(0,0,0,.5)] room-sheet">
                         <div className="px-2 pt-1 pb-2 flex items-center justify-between">
                             <span className="text-xs text-white/55 truncate">گزینه‌های {participant.displayName}</span>
                             <button type="button" onClick={() => setMobileActionsOpen(false)} className="text-xs text-white/40 px-2 py-1">بستن</button>
                         </div>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-2 gap-2">
                             <button type="button" onClick={() => { togglePinnedParticipant(participant.id); setMobileActionsOpen(false) }} className={`h-12 rounded-2xl flex flex-col items-center justify-center gap-1 border ${isPinned ? 'bg-[var(--room-blue)] text-white border-[var(--room-blue)]/50' : 'bg-white/[.05] text-white/75 border-white/10'}`}>
                                 {isPinned ? <PinOff size={17} /> : <Pin size={17} />}<span className="text-[10px]">{isPinned ? 'برداشتن پین' : 'پین کردن'}</span>
                             </button>
+                            <button type="button" onClick={() => { toggleFocusedParticipant(participant.id); setMobileActionsOpen(false) }} className={`h-12 rounded-2xl flex flex-col items-center justify-center gap-1 border ${isFocused ? 'bg-[var(--room-blue)] text-white border-[var(--room-blue)]/50' : 'bg-white/[.05] text-white/75 border-white/10'}`}>
+                                {isFocused ? <Minimize2 size={17} /> : <Maximize2 size={17} />}<span className="text-[10px]">{isFocused ? 'خروج از Focus' : 'Focus'}</span>
+                            </button>
                             <button type="button" onClick={() => { setZoom((z) => Math.min(160, z + 10)); setMobileActionsOpen(false) }} className="h-12 rounded-2xl flex flex-col items-center justify-center gap-1 bg-white/[.05] text-white/75 border border-white/10"><ZoomIn size={17} /><span className="text-[10px]">بزرگ‌تر</span></button>
-                            <button type="button" onClick={() => { setZoom((z) => Math.max(100, z - 10)); setMobileActionsOpen(false) }} className="h-12 rounded-2xl flex flex-col items-center justify-center gap-1 bg-white/[.05] text-white/75 border border-white/10"><ZoomOut size={17} /><span className="text-[10px]">کوچک‌تر</span></button>
+                            <button type="button" onClick={() => { setZoom(100); setMobileActionsOpen(false) }} className="h-12 rounded-2xl flex flex-col items-center justify-center gap-1 bg-white/[.05] text-white/75 border border-white/10"><ZoomOut size={17} /><span className="text-[10px]">بازنشانی</span></button>
                         </div>
                     </div>
                 )}

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { useJitsi } from '../../features/meeting/hooks/useJitsi'
 import { VideoGrid } from '../../features/meeting/components/VideoGrid'
@@ -20,6 +21,14 @@ export default function RoomPage() {
   const voiceRecordingSeconds = useMeetingStore(selectVoiceRecordingSeconds)
   const isRecording = useMeetingStore(selectIsRecording)
   const recordingSeconds = useMeetingStore(selectRecordingSeconds)
+  const setPanelOpen = useMeetingStore((s) => s.setPanelOpen)
+
+  useEffect(() => {
+    // Desktop keeps the established side panel experience. Mobile starts
+    // clean with the participant/chat sheet closed until the user opens it.
+    const media = window.matchMedia('(min-width: 768px)')
+    setPanelOpen(media.matches)
+  }, [setPanelOpen])
 
   const { error, isConnecting, isReconnecting, isAudioMuted, isVideoMuted, isScreenSharing, isConnected, leave, toggleAudio, toggleVideo, toggleScreenShare } = useJitsi(roomName)
 

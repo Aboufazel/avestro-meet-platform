@@ -5,26 +5,22 @@ import {
   selectMessages,
   selectUnreadCount,
   selectIsChatOpen,
+  selectIsChatAtBottom,
 } from '../store/meeting-selectors'
 
-/**
- * مدیریت چت جلسه
- */
 export function useChat() {
   const messages = useMeetingStore(selectMessages)
   const unreadCount = useMeetingStore(selectUnreadCount)
   const isChatOpen = useMeetingStore(selectIsChatOpen)
+  const isAtBottom = useMeetingStore(selectIsChatAtBottom)
   const bottomRef = useRef(null)
-
-  // const send = useCallback((text) => {
-  //   if (!text?.trim()) return
-  //   sendMessage(text)
-  // }, [])
+  const markAsRead = useMeetingStore((s) => s.markMessagesAsRead)
+  const setChatAtBottom = useMeetingStore((s) => s.setChatAtBottom)
 
   const send = useCallback((text, replyTo) => {
     if (!text?.trim()) return
     sendMessage(text, replyTo)
-}, [])
+  }, [])
 
   const openChat = useCallback(() => {
     useMeetingStore.getState().openChat()
@@ -37,5 +33,8 @@ export function useChat() {
     send,
     openChat,
     bottomRef,
+    markAsRead,
+    setChatAtBottom,
+    isAtBottom,
   }
 }

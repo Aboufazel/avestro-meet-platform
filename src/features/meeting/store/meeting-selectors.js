@@ -22,6 +22,7 @@ export const selectActiveSpeakerId =
     (s) => s.activeSpeakerId
 
 export const selectPinnedParticipantId = (s) => s.pinnedParticipantId
+export const selectFocusedParticipantId = (s) => s.focusedParticipantId
 
 export const selectParticipantList = (s) =>
     Array.from(s.participants.values())
@@ -104,6 +105,9 @@ export const selectUnreadCount =
 
 export const selectIsChatOpen =
     (s) => s.isChatOpen
+
+export const selectLastReadMessageId = (s) => s.lastReadMessageId
+export const selectIsChatAtBottom = (s) => s.isChatAtBottom
 
 // ─────────────────────────────────────────────────────────────
 // UI

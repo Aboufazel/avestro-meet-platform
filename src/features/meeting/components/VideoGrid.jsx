@@ -1,96 +1,89 @@
-import { memo, useMemo, useEffect } from 'react'
+import { memo, useEffect, useMemo } from 'react'
 import { useParticipants } from '../hooks/useParticipants'
 import { useMeetingStore } from '../store/meeting-store'
-import { selectActiveSpeakerId, selectPinnedParticipantId } from '../store/meeting-selectors'
 import { VideoTile } from './VideoTile'
 import { jitsiController } from '../jitsi/JitsiController'
-
-function useFeaturedParticipants(participants, activeSpeakerId, pinnedId) {
-  return useMemo(() => {
-    if (pinnedId) {
-      const pinned = participants.filter((p) => p.id === pinnedId)
-      if (pinned.length) return { featured: pinned, rest: participants.filter((p) => p.id !== pinnedId) }
-    }
-    const screenSharers = participants.filter((p) => p.isScreenSharing)
-    if (screenSharers.length) return { featured: screenSharers, rest: participants.filter((p) => !p.isScreenSharing) }
-    const featuredIds = new Set()
-    if (activeSpeakerId) featuredIds.add(activeSpeakerId)
-    participants.forEach((p) => { if (!p.isAudioMuted) featuredIds.add(p.id) })
-    return { featured: participants.filter((p) => featuredIds.has(p.id)), rest: participants.filter((p) => !featuredIds.has(p.id)) }
-  }, [participants, activeSpeakerId, pinnedId])
-}
+import { SpeakerStage } from './SpeakerStage'
+import { CameraParticipants } from './CameraParticipants'
 
 export const VideoGrid = memo(function VideoGrid() {
   const { participants, count } = useParticipants()
-  const activeSpeakerId = useMeetingStore(selectActiveSpeakerId)
-  const pinnedParticipantId = useMeetingStore(selectPinnedParticipantId)
-  const { featured, rest } = useFeaturedParticipants(participants, activeSpeakerId, pinnedParticipantId)
 
-  // Mobile deliberately has one clear "main speaker" and a 2-column gallery.
-  // This prevents the horizontal participant strip from making the room feel cramped.
-  const mobileFeatured = useMemo(() => {
-    if (!participants.length) return null
-    if (pinnedParticipantId) {
-      const pinned = participants.find((p) => p.id === pinnedParticipantId)
-      if (pinned) return pinned
+  // Keep layout state local to this component so the Room can boot even if
+  // optional layout helper files are missing from an older src copy.
+  const activeSpeakerId = useMeetingStore((s) => s.activeSpeakerId ?? null)
+  const pinnedParticipantId = useMeetingStore((s) => s.pinnedParticipantId ?? null)
+  const focusedParticipantId = useMeetingStore((s) => s.focusedParticipantId ?? null)
+
+  const layout = useMemo(() => {
+    const pinnedParticipant =
+      pinnedParticipantId
+        ? participants.find((p) => p.id === pinnedParticipantId) || null
+        : null
+
+    const focusedParticipant =
+      focusedParticipantId
+        ? participants.find((p) => p.id === focusedParticipantId) || null
+        : null
+
+    // Pin > explicit Focus > Screen Share.
+    const priorityParticipant =
+      pinnedParticipant ||
+      focusedParticipant ||
+      participants.find((p) => p.isScreenSharing) ||
+      null
+
+    const priorityId = priorityParticipant?.id || null
+    const speakers = []
+    const cameraParticipants = []
+    const avatarParticipants = []
+
+    for (const participant of participants) {
+      if (participant.id === priorityId) continue
+
+      const micOn = !participant.isAudioMuted
+      const hasVideo =
+        participant.hasVideo !== undefined
+          ? participant.hasVideo
+          : !participant.isVideoMuted
+
+      if (micOn) {
+        speakers.push(participant)
+      } else if (hasVideo || participant.isScreenSharing) {
+        cameraParticipants.push(participant)
+      } else {
+        avatarParticipants.push(participant)
+      }
     }
-    const screenSharer = participants.find((p) => p.isScreenSharing)
-    if (screenSharer) return screenSharer
-    const speaker = participants.find((p) => p.id === activeSpeakerId)
-    if (speaker) return speaker
-    return participants.find((p) => p.isLocal) || participants[0]
-  }, [participants, pinnedParticipantId, activeSpeakerId])
 
-  const mobileRest = useMemo(
-    () => participants.filter((p) => p.id !== mobileFeatured?.id),
-    [participants, mobileFeatured]
-  )
+    return {
+      priorityParticipant,
+      speakers,
+      cameraParticipants,
+      avatarParticipants,
+    }
+  }, [participants, pinnedParticipantId, focusedParticipantId])
 
-  // ---------------------------------------------------------------------------
-  // Receive-quality priority
-  //
-  // The UI may show several featured tiles, but we must NOT mark every
-  // unmuted participant as a high-priority receive source. Doing that makes
-  // the bridge constantly reshuffle high-resolution layers when audio activity
-  // changes, which is especially visible on unstable connections.
-  //
-  // Only one source is promoted for receive quality:
-  //   1) pinned participant
-  //   2) screen sharer
-  //   3) active speaker
-  //
-  // The change is deliberately debounced so short speaker/connection
-  // fluctuations do not immediately trigger another receive-quality update.
-  // This affects receiver quality preference only; the visual layout remains
-  // unchanged.
-  // ---------------------------------------------------------------------------
   const qualityPreferredParticipantId = useMemo(() => {
+    // Receive Quality stays independent from visual grouping:
+    // Pinned > Screen Share > Active Speaker.
     if (pinnedParticipantId) {
       const pinned = participants.find(
-        (participant) =>
-          participant.id === pinnedParticipantId &&
-          !participant.isLocal
+        (p) => p.id === pinnedParticipantId && !p.isLocal
       )
-
       if (pinned) return pinned.id
     }
 
     const screenSharer = participants.find(
-      (participant) =>
-        participant.isScreenSharing &&
-        !participant.isLocal
+      (p) => p.isScreenSharing && !p.isLocal
     )
-
     if (screenSharer) return screenSharer.id
 
     if (activeSpeakerId) {
-      const activeSpeaker = participants.find(
-        (participant) =>
-          participant.id === activeSpeakerId &&
-          !participant.isLocal
+      const active = participants.find(
+        (p) => p.id === activeSpeakerId && !p.isLocal
       )
-
-      if (activeSpeaker) return activeSpeaker.id
+      if (active) return active.id
     }
 
     return null
@@ -105,42 +98,85 @@ export const VideoGrid = memo(function VideoGrid() {
       )
     }, 900)
 
-    return () => {
-      window.clearTimeout(timer)
-    }
+    return () => window.clearTimeout(timer)
   }, [qualityPreferredParticipantId])
 
-  if (count === 0) return <div className="h-full flex items-center justify-center text-white/35 text-sm">در حال انتظار برای اتصال...</div>
-
-  if (count === 1) {
-    return <div className="h-full min-h-0 p-2 sm:p-3"><VideoTile participantId={participants[0].id} isLarge /></div>
+  if (count === 0) {
+    return (
+      <div className="h-full flex items-center justify-center text-white/35 text-sm">
+        در حال انتظار برای اتصال...
+      </div>
+    )
   }
 
-  return (
-    <div className="h-full min-h-0 p-2 sm:p-3 pb-[calc(92px+env(safe-area-inset-bottom))] lg:pb-[calc(104px+env(safe-area-inset-bottom))]">
-      {/* All breakpoints: one clear featured speaker on top + a 3-column gallery below.
-          Narrow phones collapse to 2 columns so tiles stay readable. */}
-      <div className="h-full min-h-0 flex flex-col gap-2.5 overflow-y-auto room-no-scrollbar">
-        {mobileFeatured && (
-          <div className="shrink-0 h-[38vh] min-h-[240px] sm:h-[40vh] sm:min-h-[270px] lg:h-[42vh] lg:min-h-[300px] max-h-[500px]">
-            <VideoTile
-              participantId={mobileFeatured.id}
-              isLarge
-              isPinned={pinnedParticipantId === mobileFeatured.id}
-            />
-          </div>
-        )}
+  const { priorityParticipant, speakers, cameraParticipants, avatarParticipants } = layout
+  const hasFocus = Boolean(priorityParticipant)
+  const focusIsPinned = priorityParticipant?.id === pinnedParticipantId
+  const focusIsExplicit = priorityParticipant?.id === focusedParticipantId
 
-        {mobileRest.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 shrink-0 auto-rows-[150px] sm:auto-rows-[175px] lg:auto-rows-[190px] xl:auto-rows-[205px]">
-            {mobileRest.map((p) => (
-              <div key={p.id} className="min-w-0 h-full">
-                <VideoTile participantId={p.id} />
-              </div>
-            ))}
+  return (
+    <div className="meeting-layout h-full min-h-0 p-2 sm:p-3 pb-[calc(98px+env(safe-area-inset-bottom))] lg:pb-[calc(106px+env(safe-area-inset-bottom))]">
+      {hasFocus && (
+        <div className="meeting-focus-wrapper">
+          <section className="meeting-focus-view" aria-label="نمای اصلی">
+            <VideoTile
+              participantId={priorityParticipant.id}
+              isLarge
+              isPinned={focusIsPinned}
+              isFocused={focusIsExplicit}
+            />
+          </section>
+          <div className="meeting-focus-meta">
+            {focusIsPinned && <span>📌 پین شده</span>}
+            {focusIsExplicit && <span>نمای Focus</span>}
+            {!focusIsPinned &&
+              !focusIsExplicit &&
+              priorityParticipant.isScreenSharing && <span>اشتراک صفحه</span>}
+          </div>
+        </div>
+      )}
+
+      {speakers.length > 0 && (
+        <SpeakerStage participants={speakers} />
+      )}
+
+      {cameraParticipants.length > 0 && (
+        <CameraParticipants participants={cameraParticipants} />
+      )}
+
+      {avatarParticipants.length > 0 && (
+        <section
+          className="meeting-avatar-section"
+          aria-label="شرکت‌کنندگان بدون دوربین و میکروفون"
+        >
+          <div className="meeting-section-label">بدون تصویر و صدا</div>
+          <div className="meeting-avatar-row">
+            {avatarParticipants.map((participant) => {
+              const initial =
+                participant.displayName?.trim()?.[0]?.toUpperCase() || '?'
+              return (
+                <div
+                  key={participant.id}
+                  className="meeting-avatar-item"
+                  title={participant.displayName}
+                >
+                  <div className="meeting-avatar-circle">{initial}</div>
+                  <span>{participant.displayName || 'شرکت‌کننده'}</span>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
+      {!hasFocus &&
+        !speakers.length &&
+        !cameraParticipants.length &&
+        !avatarParticipants.length && (
+          <div className="flex-1 flex items-center justify-center text-white/40 text-sm">
+            شرکت‌کننده‌ای برای نمایش وجود ندارد.
           </div>
         )}
-      </div>
     </div>
   )
 })
