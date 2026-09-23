@@ -734,168 +734,101 @@
 
 
 /* =========================================================
-   Stable three-slot media grids
-   - 1 media participant = 1 real tile + 2 visual placeholders
-   - 2 media participants = 2 real tiles + 1 visual placeholder
-   - 3 media participants = 3 real tiles
-   - The real video is never cropped; VideoTile owns object-contain.
+   Stable participant slots
+   Keep a predictable visual grid even when only one or two
+   participants have video/mic enabled. Empty slots are visual
+   placeholders only and never mount a VideoTile/Jitsi track.
    ========================================================= */
-.meeting-empty-video-slot {
-  width: 100%;
+.meeting-empty-tile {
   min-width: 0;
   min-height: 0;
-  aspect-ratio: 16 / 9;
   border-radius: 18px;
-  border: 1px dashed rgba(255,255,255,.10);
-  background:
-    radial-gradient(circle at 50% 40%, rgba(79,124,255,.055), transparent 58%),
-    rgba(255,255,255,.018);
+  border: 1px dashed rgba(148, 163, 184, .18);
+  background: linear-gradient(145deg, rgba(255,255,255,.025), rgba(255,255,255,.012));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
 }
-.meeting-empty-video-slot-inner {
+.meeting-empty-tile-inner {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  color: rgba(255,255,255,.20);
+  justify-content: center;
+  gap: 7px;
+  color: rgba(255,255,255,.18);
   font-size: 10px;
+  user-select: none;
 }
-.meeting-empty-video-slot-icon {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: rgba(255,255,255,.14);
-  box-shadow: 0 0 0 5px rgba(255,255,255,.025);
+.meeting-empty-tile-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.09);
+  background: rgba(255,255,255,.025);
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  font-weight: 300;
 }
 
-.meeting-speaker-stage.is-single {
-  flex: 0 0 auto;
-  max-height: 44%;
-  min-height: 0;
-  display: block;
-}
-.meeting-speaker-stage.is-single .meeting-speaker-grid {
-  flex: none;
-  min-height: 0;
-  max-height: none;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: auto;
-}
+/* One-to-three participants keep the same three-slot composition. */
 .meeting-speaker-grid.count-1,
 .meeting-speaker-grid.count-2,
-.meeting-speaker-grid.count-3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: auto;
-}
+.meeting-speaker-grid.count-3,
 .meeting-camera-grid.count-1,
 .meeting-camera-grid.count-2,
 .meeting-camera-grid.count-3 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: auto;
 }
-.meeting-speaker-tile,
-.meeting-camera-tile,
-.meeting-empty-video-slot {
-  aspect-ratio: 16 / 9;
+
+.meeting-speaker-grid.count-4 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-.meeting-speaker-tile > div,
-.meeting-camera-tile > div {
-  aspect-ratio: 16 / 9;
+.meeting-speaker-grid.count-5,
+.meeting-speaker-grid.count-6 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.meeting-camera-grid.count-4 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.meeting-camera-grid.count-5,
+.meeting-camera-grid.count-6 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* Do not let the old single-item flex sizing override the stable slots. */
+.meeting-speaker-stage.is-single {
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: none;
+}
+.meeting-speaker-stage.is-single .meeting-speaker-grid {
+  flex: 0 0 auto;
+  min-height: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: minmax(150px, 1fr);
+  max-height: none;
 }
 
 @media (max-width: 767px) {
-  .meeting-speaker-stage.is-single {
-    flex-basis: auto;
-    max-height: none;
-    min-height: 0;
-  }
-  .meeting-speaker-stage.is-single .meeting-speaker-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-auto-rows: auto;
-  }
   .meeting-speaker-grid.count-1,
   .meeting-speaker-grid.count-2,
   .meeting-speaker-grid.count-3,
   .meeting-camera-grid.count-1,
   .meeting-camera-grid.count-2,
   .meeting-camera-grid.count-3 {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .meeting-empty-video-slot-inner span:last-child { display: none; }
-}
-
-/* =========================================================
-   Final stable media-grid rules
-   - First three participants establish three visible slots.
-   - From participant 4 onward, fake slots disappear.
-   - Never more than 3 media tiles per desktop row.
-   - Mobile keeps the same 3-slot presentation for the first 3 people,
-     then switches to 2 columns for larger groups to keep tiles usable.
-   ========================================================= */
-.meeting-speaker-grid,
-.meeting-camera-grid {
-  width: 100%;
-  display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: auto;
-  align-items: stretch;
-  overflow: visible;
-  max-height: none;
-}
-
-.meeting-speaker-grid[data-layout='multi-row'],
-.meeting-camera-grid[data-layout='multi-row'] {
-  grid-auto-rows: minmax(140px, 1fr);
-}
-
-.meeting-speaker-tile,
-.meeting-camera-tile,
-.meeting-empty-video-slot {
-  width: 100%;
-  min-width: 0;
-  aspect-ratio: 16 / 9;
-}
-
-.meeting-speaker-tile > div,
-.meeting-camera-tile > div {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  aspect-ratio: 16 / 9;
-}
-
-/* Never let a single participant become a giant full-width tile. */
-.meeting-speaker-stage.is-single {
-  flex: 0 0 auto;
-  max-height: none;
-  min-height: 0;
-}
-
-.meeting-speaker-stage.is-single .meeting-speaker-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: auto;
-}
-
-/* 4+ participants: three columns, then additional rows. */
-.meeting-speaker-grid[data-layout='multi-row'],
-.meeting-camera-grid[data-layout='multi-row'] {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-@media (max-width: 767px) {
-  /* Keep the requested three-slot layout for 1–3 participants. */
-  .meeting-speaker-grid[data-layout='stable-three'],
-  .meeting-camera-grid[data-layout='stable-three'] {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  /* For 4+ participants, two columns on mobile keeps each video readable. */
-  .meeting-speaker-grid[data-layout='multi-row'],
-  .meeting-camera-grid[data-layout='multi-row'] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-auto-rows: minmax(135px, 1fr);
+  }
+
+  .meeting-speaker-stage.is-single {
+    flex: 0 0 auto;
+    min-height: 0;
+  }
+  .meeting-speaker-stage.is-single .meeting-speaker-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: minmax(130px, 1fr);
   }
 }

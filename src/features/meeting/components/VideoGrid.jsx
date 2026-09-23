@@ -3,8 +3,6 @@ import { useParticipants } from '../hooks/useParticipants'
 import { useMeetingStore } from '../store/meeting-store'
 import { VideoTile } from './VideoTile'
 import { jitsiController } from '../jitsi/JitsiController'
-import { SpeakerStage } from './SpeakerStage'
-import { CameraParticipants } from './CameraParticipants'
 
 export const VideoGrid = memo(function VideoGrid() {
   const { participants, count } = useParticipants()
@@ -109,6 +107,14 @@ export const VideoGrid = memo(function VideoGrid() {
     )
   }
 
+  if (count === 1 && !layout.priorityParticipant) {
+    return (
+      <div className="h-full min-h-0 p-2 sm:p-3 pb-[calc(96px+env(safe-area-inset-bottom))]">
+        <VideoTile participantId={participants[0].id} isLarge />
+      </div>
+    )
+  }
+
   const { priorityParticipant, speakers, cameraParticipants, avatarParticipants } = layout
   const hasFocus = Boolean(priorityParticipant)
   const focusIsPinned = priorityParticipant?.id === pinnedParticipantId
@@ -137,11 +143,67 @@ export const VideoGrid = memo(function VideoGrid() {
       )}
 
       {speakers.length > 0 && (
-        <SpeakerStage participants={speakers} />
+        <section
+          className={`meeting-speaker-stage ${
+            speakers.length === 1 ? 'is-single' : ''
+          } ${
+            !hasFocus && !cameraParticipants.length && !avatarParticipants.length
+              ? 'is-only-group'
+              : ''
+          }`}
+          aria-label="افراد دارای میکروفون روشن"
+        >
+          <div className="meeting-stage-header">
+            <span className="meeting-stage-dot" />
+            <span>{speakers.length} نفر با میکروفون روشن</span>
+          </div>
+          <div
+            className={`meeting-speaker-grid count-${Math.min(speakers.length, 7)}`}
+          >
+            {speakers.map((participant) => (
+              <div key={participant.id} className="meeting-speaker-tile">
+                <VideoTile participantId={participant.id} />
+              </div>
+            ))}
+            {Array.from({ length: speakers.length <= 3 ? 3 - speakers.length : speakers.length <= 6 ? 6 - speakers.length : 0 }).map((_, index) => (
+              <div
+                key={`speaker-placeholder-${index}`}
+                className="meeting-empty-tile meeting-speaker-tile"
+                aria-hidden="true"
+              >
+                <div className="meeting-empty-tile-inner">
+                  <span className="meeting-empty-tile-icon">+</span>
+                  <span>جای خالی</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {cameraParticipants.length > 0 && (
-        <CameraParticipants participants={cameraParticipants} />
+        <section className="meeting-camera-section" aria-label="دوربین‌های روشن">
+          <div className="meeting-section-label">دوربین</div>
+          <div className={`meeting-camera-grid count-${Math.min(cameraParticipants.length, 6)}`}>
+            {cameraParticipants.map((participant) => (
+              <div key={participant.id} className="meeting-camera-tile">
+                <VideoTile participantId={participant.id} />
+              </div>
+            ))}
+            {Array.from({ length: cameraParticipants.length <= 3 ? 3 - cameraParticipants.length : cameraParticipants.length <= 6 ? 6 - cameraParticipants.length : 0 }).map((_, index) => (
+              <div
+                key={`camera-placeholder-${index}`}
+                className="meeting-empty-tile meeting-camera-tile"
+                aria-hidden="true"
+              >
+                <div className="meeting-empty-tile-inner">
+                  <span className="meeting-empty-tile-icon">+</span>
+                  <span>جای خالی</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {avatarParticipants.length > 0 && (

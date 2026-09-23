@@ -81,8 +81,7 @@ export const useMeetingStore = create((set, get) => ({
     // UI
     // ─────────────────────────────────────────────────────────────
 
-    // The room panel is opened by RoomPage only on desktop. Mobile starts closed.
-    isPanelOpen: false,
+    isPanelOpen: true,
     activePanelTab: 'participants',
 
     // =============================================================
@@ -651,11 +650,10 @@ export const useMeetingStore = create((set, get) => ({
     //         }
     //
     //         return {
+    //             isPanelOpen: true,
     //             activePanelTab: tab,
     //         }
     //     }),
-
-    setPanelOpen: (open) => set({ isPanelOpen: Boolean(open), isChatOpen: false }),
 
     togglePanel: (tab) =>
         set((state) => {
@@ -749,7 +747,7 @@ export const useMeetingStore = create((set, get) => ({
 
             participants: new Map(),
             activeSpeakerId: null,
-            pinnedParticipantId: null,
+    pinnedParticipantId: null,
             focusedParticipantId: null,
 
             tracks: new Map(),
@@ -769,7 +767,7 @@ export const useMeetingStore = create((set, get) => ({
             isChatOpen: false,
             isChatAtBottom: true,
 
-            isPanelOpen: false,
+            isPanelOpen: true,
             activePanelTab: 'participants',
         }),
 }))
