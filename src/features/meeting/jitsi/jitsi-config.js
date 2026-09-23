@@ -61,6 +61,13 @@ export const CONFERENCE_CONFIG = {
   // کیفیت ویدیو
   maxFullResolutionParticipants: isMobileDevice() ? 1 : 2,
   resolution: isMobileDevice() ? 480 : 720,
+
+  // اجازه می‌دهیم QualityController داخلی خود Jitsi بر اساس
+  // آمار واقعی WebRTC/BWE کیفیت ارسال و دریافت را تنظیم کند.
+  // این مسیر از تغییرات دستی و لحظه‌ای کیفیت پایدارتر است.
+  videoQuality: {
+    enableAdaptiveMode: true,
+  },
   constraints: {
     video: isMobileDevice()
       ? { height: { ideal: 480, max: 480, min: 180 } }

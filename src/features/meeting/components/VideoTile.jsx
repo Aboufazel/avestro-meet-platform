@@ -328,6 +328,22 @@ export const VideoTile = memo(
         const isScreenShare =
             !!desktopTrack
 
+        // دوربین کاربر باید مثل آینه نمایش داده شود؛ اشتراک صفحه هرگز mirror نمی‌شود.
+        // این مقدار مستقل از کلاس CSS نگه داشته می‌شود تا بعد از attach شدن track توسط Jitsi
+        // نیز حالت mirror حتماً روی خود عنصر video اعمال شود.
+        const shouldMirrorVideo =
+            Boolean(participant?.isLocal && !isScreenShare)
+
+        useEffect(() => {
+            const element = videoRef.current
+            if (!element) return
+
+            element.style.transform = shouldMirrorVideo
+                ? `scaleX(-1) scale(${zoom / 100})`
+                : `scale(${zoom / 100})`
+            element.style.transformOrigin = 'center center'
+        }, [shouldMirrorVideo, zoom, activeTrack?.jitsiTrack])
+
         return (
             <div
                 ref={containerRef}
@@ -402,8 +418,13 @@ export const VideoTile = memo(
                         muted={
                             participant.isLocal
                         }
-                        className={`w-full h-full object-contain bg-black !rounded-[18px] transition-transform duration-300 ease-out ${participant.isLocal && !isScreenShare ? 'scale-x-[-1]' : ''}`}
-                        style={{ transform: `${participant.isLocal && !isScreenShare ? 'scaleX(-1) ' : ''}scale(${zoom / 100})` }}
+                        className="w-full h-full object-contain bg-black !rounded-[18px] transition-transform duration-300 ease-out"
+                        style={{
+                            transform: shouldMirrorVideo
+                                ? `scaleX(-1) scale(${zoom / 100})`
+                                : `scale(${zoom / 100})`,
+                            transformOrigin: 'center center',
+                        }}
                     />
                 ) : (
                     <VideoPlaceholder

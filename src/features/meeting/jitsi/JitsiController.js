@@ -2,7 +2,6 @@ import {JITSI_EVENTS, MEETING_STATUS} from './jitsi-events.js'
 import {
     CONNECTION_CONFIG,
     CONFERENCE_CONFIG,
-    RECEIVER_QUALITY,
     RECONNECT_CONFIG,
 } from './jitsi-config.js'
 import {
@@ -137,6 +136,10 @@ export class JitsiController {
         // =====================================================================
 
         this._qualityCache = new Map()
+
+        // Last receive-quality priority sent to Jitsi. Avoid repeating the
+        // same bridge update when the React participant store refreshes.
+        this._preferredParticipantsKey = null
 
         // =====================================================================
         // Screen sharing
@@ -905,9 +908,27 @@ export class JitsiController {
         if (!this._conference) return false
 
         try {
-            if (typeof this._conference.selectParticipants === 'function') {
-                this._conference.selectParticipants(participantIds)
+            if (typeof this._conference.selectParticipants !== 'function') {
+                return false
             }
+
+            const normalizedIds = [...new Set(
+                (Array.isArray(participantIds) ? participantIds : [])
+                    .filter(Boolean)
+                    .map(String)
+            )]
+
+            const key = normalizedIds.join('|')
+
+            // React state can refresh frequently while stats are changing.
+            // Do not send the same receive-priority command repeatedly.
+            if (key === this._preferredParticipantsKey) {
+                return true
+            }
+
+            this._preferredParticipantsKey = key
+            this._conference.selectParticipants(normalizedIds)
+
             return true
         } catch (error) {
             console.warn('[JitsiController] selectParticipants failed:', error)
@@ -1423,6 +1444,7 @@ export class JitsiController {
             this._listeners.clear()
 
             this._qualityCache.clear()
+            this._preferredParticipantsKey = null
 
             this._connection = null
             this._conference = null
@@ -2506,25 +2528,6 @@ export class JitsiController {
         }
     }
 
-    _adaptReceiverQuality(quality) {
-        if (!this._conference || typeof this._conference.setReceiverVideoConstraint !== 'function') {
-            return
-        }
-
-        const POOR_THRESHOLD = 30
-
-        try {
-            if (quality != null && quality < POOR_THRESHOLD) {
-                // شبکه ضعیف: فقط کیفیت خیلی پایین بگیر تا استریم قطع نشود
-                this._conference.setReceiverVideoConstraint(180)
-            } else {
-                this._conference.setReceiverVideoConstraint(RECEIVER_QUALITY.LARGE)
-            }
-        } catch (error) {
-            console.warn('[JitsiController] Adaptive receiver quality failed:', error)
-        }
-    }
-
     /**
      * Bind local track events.
      */
@@ -3309,6 +3312,7 @@ export class JitsiController {
         this._disconnectWatchdogs.clear()
 
         this._qualityCache.clear()
+        this._preferredParticipantsKey = null
 
         this._screenShare = {
             active: false,

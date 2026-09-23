@@ -46,10 +46,69 @@ export const VideoGrid = memo(function VideoGrid() {
     [participants, mobileFeatured]
   )
 
+  // ---------------------------------------------------------------------------
+  // Receive-quality priority
+  //
+  // The UI may show several featured tiles, but we must NOT mark every
+  // unmuted participant as a high-priority receive source. Doing that makes
+  // the bridge constantly reshuffle high-resolution layers when audio activity
+  // changes, which is especially visible on unstable connections.
+  //
+  // Only one source is promoted for receive quality:
+  //   1) pinned participant
+  //   2) screen sharer
+  //   3) active speaker
+  //
+  // The change is deliberately debounced so short speaker/connection
+  // fluctuations do not immediately trigger another receive-quality update.
+  // This affects receiver quality preference only; the visual layout remains
+  // unchanged.
+  // ---------------------------------------------------------------------------
+  const qualityPreferredParticipantId = useMemo(() => {
+    if (pinnedParticipantId) {
+      const pinned = participants.find(
+        (participant) =>
+          participant.id === pinnedParticipantId &&
+          !participant.isLocal
+      )
+
+      if (pinned) return pinned.id
+    }
+
+    const screenSharer = participants.find(
+      (participant) =>
+        participant.isScreenSharing &&
+        !participant.isLocal
+    )
+
+    if (screenSharer) return screenSharer.id
+
+    if (activeSpeakerId) {
+      const activeSpeaker = participants.find(
+        (participant) =>
+          participant.id === activeSpeakerId &&
+          !participant.isLocal
+      )
+
+      if (activeSpeaker) return activeSpeaker.id
+    }
+
+    return null
+  }, [participants, pinnedParticipantId, activeSpeakerId])
+
   useEffect(() => {
-    const featuredIds = featured.map((p) => p.id).filter((id) => id && !participants.find((p) => p.id === id)?.isLocal)
-    jitsiController.setPreferredParticipants(featuredIds)
-  }, [featured, participants])
+    const timer = window.setTimeout(() => {
+      jitsiController.setPreferredParticipants(
+        qualityPreferredParticipantId
+          ? [qualityPreferredParticipantId]
+          : []
+      )
+    }, 900)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [qualityPreferredParticipantId])
 
   if (count === 0) return <div className="h-full flex items-center justify-center text-white/35 text-sm">در حال انتظار برای اتصال...</div>
 

@@ -340,14 +340,21 @@ export async function joinMeeting({roomName, displayName, email = ''}) {
                 if (generation !== _joinGeneration) return
                 if (!track || !status) return
 
-                useMeetingStore
-                    .getState()
-                    ._updateTrackStreamingStatus({track, status})
+                const store = useMeetingStore.getState()
+                const trackKey = `${track.participantId}-${track.type}`
+                const previousTrack = store.tracks?.get(trackKey)
 
-                if (status === 'restoring') {
-                    useMeetingStore
-                        .getState()
-                        ._bumpRenegotiationTick()
+                store._updateTrackStreamingStatus({track, status})
+
+                // Jitsi can emit repeated `restoring` notifications while a
+                // weak connection is recovering. Re-attaching the same video
+                // element for every notification causes visible image jumps.
+                // Reattach only when the track actually ENTERS restoring.
+                if (
+                    status === 'restoring' &&
+                    previousTrack?.streamingStatus !== 'restoring'
+                ) {
+                    store._bumpRenegotiationTick()
                 }
             }
         )
