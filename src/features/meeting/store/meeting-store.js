@@ -14,6 +14,8 @@ export const useMeetingStore = create((set, get) => ({
     status: MEETING_STATUS.IDLE,
     error: null,
     renegotiationTick: 0,
+    // tick جداگانه برای هر participant تا با تغییر track یک نفر، ویدیوی همه re-attach نشود
+    renegotiationTicks: {},
 
     // ─────────────────────────────────────────────────────────────
     // ROOM
@@ -207,6 +209,21 @@ export const useMeetingStore = create((set, get) => ({
                 state.participants.get(participantId)
 
             if (!participant) {
+                return {}
+            }
+
+            // اگر هیچ مقداری واقعاً عوض نشده، state را عوض نکن؛ وگرنه کل
+            // Map کپی می‌شود و همه‌ی subscriber ها دوباره رندر می‌شوند.
+            let changed = false
+
+            for (const key of Object.keys(updates)) {
+                if (participant[key] !== updates[key]) {
+                    changed = true
+                    break
+                }
+            }
+
+            if (!changed) {
                 return {}
             }
 
@@ -575,7 +592,16 @@ export const useMeetingStore = create((set, get) => ({
 
 
 // اکشن جدید:
-    _bumpRenegotiationTick: () => set((state) => ({renegotiationTick: state.renegotiationTick + 1})),
+    _bumpRenegotiationTick: (participantId) =>
+        set((state) => ({
+            renegotiationTick: state.renegotiationTick + 1,
+            renegotiationTicks: participantId
+                ? {
+                    ...state.renegotiationTicks,
+                    [participantId]: (state.renegotiationTicks[participantId] || 0) + 1,
+                }
+                : state.renegotiationTicks,
+        })),
     _setScreenSharing: (enabled, track = null) =>
         set((state) => {
             const participants =
@@ -751,6 +777,8 @@ export const useMeetingStore = create((set, get) => ({
             focusedParticipantId: null,
 
             tracks: new Map(),
+            renegotiationTick: 0,
+            renegotiationTicks: {},
 
             isAudioMuted: true,
             isVideoMuted: true,

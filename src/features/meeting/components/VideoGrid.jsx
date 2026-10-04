@@ -1,8 +1,9 @@
-import { memo, useEffect, useMemo } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { useParticipants } from '../hooks/useParticipants'
 import { useMeetingStore } from '../store/meeting-store'
 import { VideoTile } from './VideoTile'
 import { jitsiController } from '../jitsi/JitsiController'
+import { PERF } from '../jitsi/jitsi-config'
 
 export const VideoGrid = memo(function VideoGrid() {
   const { participants, count } = useParticipants()
@@ -62,42 +63,84 @@ export const VideoGrid = memo(function VideoGrid() {
     }
   }, [participants, pinnedParticipantId, focusedParticipantId])
 
-  const qualityPreferredParticipantId = useMemo(() => {
-    // Receive Quality stays independent from visual grouping:
-    // Pinned > Screen Share > Active Speaker.
-    if (pinnedParticipantId) {
-      const pinned = participants.find(
-        (p) => p.id === pinnedParticipantId && !p.isLocal
-      )
-      if (pinned) return pinned.id
+  // ---------------------------------------------------------------------------
+  // بودجه‌ی ویدیو (Video budget)
+  //
+  // قبلاً برای «همه»ی شرکت‌کننده‌ها یک <video> زنده رندر و decode می‌شد.
+  // روی دستگاه قدیمی با چند نفر، decode همزمان باعث اسلوموشن و داغ شدن می‌شد.
+  // حالا فقط به PERF.maxRemoteVideos نفر (به ترتیب اولویت) ویدیو می‌رسد و
+  // همین لیست به bridge هم اعلام می‌شود تا ویدیوی بقیه اصلاً ارسال نشود.
+  //
+  // اولویت: Pin > Focus > Screen Share > Active Speaker > بقیه.
+  // ---------------------------------------------------------------------------
+  const { allowedVideoIds, onStageIds } = useMemo(() => {
+    const remote = participants.filter((p) => !p.isLocal)
+
+    const hasLiveVideo = (p) =>
+      p.isScreenSharing ||
+      (p.hasVideo !== undefined ? p.hasVideo : !p.isVideoMuted)
+
+    const priorityRemote =
+      layout.priorityParticipant && !layout.priorityParticipant.isLocal
+        ? layout.priorityParticipant
+        : null
+
+    const activeSpeaker = activeSpeakerId
+      ? remote.find((p) => p.id === activeSpeakerId) || null
+      : null
+
+    const ordered = []
+    const push = (p) => {
+      if (p && hasLiveVideo(p) && !ordered.includes(p.id)) ordered.push(p.id)
     }
 
-    const screenSharer = participants.find(
-      (p) => p.isScreenSharing && !p.isLocal
-    )
-    if (screenSharer) return screenSharer.id
+    push(priorityRemote)
+    push(activeSpeaker)
+    remote.forEach(push)
 
-    if (activeSpeakerId) {
-      const active = participants.find(
-        (p) => p.id === activeSpeakerId && !p.isLocal
-      )
-      if (active) return active.id
-    }
+    const allowed = new Set(ordered.slice(0, PERF.maxRemoteVideos))
 
-    return null
-  }, [participants, pinnedParticipantId, activeSpeakerId])
+    // «بزرگ» = pin/focus/screen-share؛ اگر نبود، گوینده‌ی فعال؛
+    // اگر فقط یک نفر ویدیو دارد همان بزرگ نمایش داده می‌شود.
+    let stage = []
+    if (priorityRemote) stage = [priorityRemote.id]
+    else if (activeSpeaker && allowed.has(activeSpeaker.id)) stage = [activeSpeaker.id]
+    else if (ordered.length === 1) stage = [ordered[0]]
+
+    return { allowedVideoIds: allowed, onStageIds: stage }
+  }, [participants, layout.priorityParticipant, activeSpeakerId])
+
+  // وقتی صفحه مخفی است (تب پس‌زمینه / قفل صفحه) هیچ ویدیویی لازم نیست.
+  // یک ساعت جلسه با گوشی در جیب = یک ساعت decode بی‌فایده.
+  const [pageHidden, setPageHidden] = useState(
+    typeof document !== 'undefined' ? document.hidden : false
+  )
+  const isRecording = useMeetingStore((s) => s.isRecording)
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      jitsiController.setPreferredParticipants(
-        qualityPreferredParticipantId
-          ? [qualityPreferredParticipantId]
-          : []
-      )
-    }, 900)
+    const onVisibility = () => setPageHidden(document.hidden)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [])
+
+  const paused = pageHidden && !isRecording
+
+  useEffect(() => {
+    // قطع ویدیو با ۳ ثانیه تأخیر (تا جابه‌جایی کوتاه بین تب‌ها لگ نزند)،
+    // اما برگشت و تغییر گوینده سریع اعمال شود.
+    const timer = window.setTimeout(
+      () => {
+        jitsiController.setReceiverPriority({
+          onStageIds,
+          visibleIds: [...allowedVideoIds],
+          paused,
+        })
+      },
+      paused ? 3000 : 400
+    )
 
     return () => window.clearTimeout(timer)
-  }, [qualityPreferredParticipantId])
+  }, [onStageIds, allowedVideoIds, paused])
 
   if (count === 0) {
     return (
@@ -110,7 +153,7 @@ export const VideoGrid = memo(function VideoGrid() {
   if (count === 1 && !layout.priorityParticipant) {
     return (
       <div className="h-full min-h-0 p-2 sm:p-3 pb-[calc(96px+env(safe-area-inset-bottom))]">
-        <VideoTile participantId={participants[0].id} isLarge />
+        <VideoTile participantId={participants[0].id} isLarge videoEnabled={participants[0].isLocal || allowedVideoIds.has(participants[0].id)} />
       </div>
     )
   }
@@ -128,6 +171,7 @@ export const VideoGrid = memo(function VideoGrid() {
           <section className="meeting-focus-view" aria-label="نمای اصلی">
             <VideoTile
               participantId={priorityParticipant.id}
+              videoEnabled={priorityParticipant.isLocal || allowedVideoIds.has(priorityParticipant.id)}
               isLarge
               isPinned={focusIsPinned}
               isFocused={focusIsExplicit}
@@ -163,7 +207,7 @@ export const VideoGrid = memo(function VideoGrid() {
           >
             {speakers.map((participant) => (
               <div key={participant.id} className="meeting-speaker-tile">
-                <VideoTile participantId={participant.id} />
+                <VideoTile participantId={participant.id} videoEnabled={participant.isLocal || allowedVideoIds.has(participant.id)} />
               </div>
             ))}
             {Array.from({ length: speakers.length <= 3 ? 3 - speakers.length : speakers.length <= 6 ? 6 - speakers.length : 0 }).map((_, index) => (
@@ -188,7 +232,7 @@ export const VideoGrid = memo(function VideoGrid() {
           <div className={`meeting-camera-grid count-${Math.min(cameraParticipants.length, 6)}`}>
             {cameraParticipants.map((participant) => (
               <div key={participant.id} className="meeting-camera-tile">
-                <VideoTile participantId={participant.id} />
+                <VideoTile participantId={participant.id} videoEnabled={participant.isLocal || allowedVideoIds.has(participant.id)} />
               </div>
             ))}
             {Array.from({ length: cameraParticipants.length <= 3 ? 3 - cameraParticipants.length : cameraParticipants.length <= 6 ? 6 - cameraParticipants.length : 0 }).map((_, index) => (

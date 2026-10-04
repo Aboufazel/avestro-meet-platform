@@ -60,11 +60,22 @@ export function useParticipant(participantId) {
   const participant = useMeetingStore(
     (state) => state.participants.get(participantId)
   )
-  const activeSpeakerId = useMeetingStore(selectActiveSpeakerId)
-  const localId = useMeetingStore(selectLocalParticipantId)
+  // قبلاً کل activeSpeakerId/localId subscribe می‌شد؛ یعنی با هر تغییر گوینده‌ی
+  // فعال، «همه‌ی» تایل‌ها دوباره رندر می‌شدند. حالا فقط یک boolean.
+  const isActiveSpeaker = useMeetingStore(
+    (state) => state.activeSpeakerId === participantId
+  )
+  const isLocalId = useMeetingStore(
+    (state) => state.localParticipantId === participantId
+  )
 
   return useMemo(() => {
     if (!participant) return null
-    return decorateParticipant(participant, activeSpeakerId, localId)
-  }, [participant, activeSpeakerId, localId])
+    return {
+      ...participant,
+      isActiveSpeaker,
+      isLocal: isLocalId || participant.isLocal === true,
+      hasVideo: !participant.isVideoMuted,
+    }
+  }, [participant, isActiveSpeaker, isLocalId])
 }

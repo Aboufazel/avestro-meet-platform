@@ -97,7 +97,7 @@ export const SidePanel = memo(function SidePanel() {
   return (
     <>
       <div
-        className="fixed inset-0 z-40 bg-black/55 backdrop-blur-[3px] md:hidden room-backdrop"
+        className="fixed inset-0 z-40 bg-black/65 md:hidden room-backdrop"
         onClick={closePanel}
       />
 

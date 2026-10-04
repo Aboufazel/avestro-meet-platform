@@ -22,7 +22,7 @@ export const RoomHeader = memo(function RoomHeader({ slug, isConnected, onCopyLi
   const handleCopy = () => { onCopyLink?.(); setCopied(true); setTimeout(() => setCopied(false), 1500) }
 
   return (
-    <header className="h-[62px] bg-[var(--room-surface)]/95 backdrop-blur-xl border-b border-[var(--room-border)] flex items-center justify-between px-3 sm:px-5 shrink-0 relative z-50">
+    <header className="h-[62px] bg-[var(--room-surface)] border-b border-[var(--room-border)] flex items-center justify-between px-3 sm:px-5 shrink-0 relative z-50">
       <div className="flex items-center gap-2.5 min-w-0">
         <img src="/avestro-logo.png" alt="اَوسترو" className="w-8 h-8 shrink-0 rounded-lg" />
         <div className="hidden sm:block min-w-0"><p className="text-white text-xs font-medium">اَوسترو میت</p><p className="text-[9px] text-white/25 mt-0.5 tracking-wide">AVESTRO MEET</p></div>

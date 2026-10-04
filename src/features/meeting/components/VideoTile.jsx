@@ -29,7 +29,6 @@ import {useMeetingStore} from '../store/meeting-store'
 
 import {
     selectIsMeetingMuted,
-    selectRenegotiationTick,
 } from '../store/meeting-selectors'
 
 export const VideoTile = memo(
@@ -38,15 +37,20 @@ export const VideoTile = memo(
         isLarge = false,
         isPinned = false,
         isFocused = false,
+        // false = بیرون از بودجه‌ی ویدیو: آواتار نشان بده و decode نکن
+        videoEnabled = true,
     }) {
         const participant =
             useParticipant(
                 participantId
             )
 
+        // tick مخصوص همین participant؛ قبلاً یک tick سراسری بود و با هر
+        // تغییر track یک نفر، ویدیوی «همه»ی تایل‌ها (روی iOS/Safari) دوباره
+        // detach/attach می‌شد.
         const renegotiationTick =
             useMeetingStore(
-                selectRenegotiationTick
+                (s) => s.renegotiationTicks?.[participantId] ?? 0
             )
 
         const {
@@ -206,7 +210,8 @@ export const VideoTile = memo(
             if (
                 !videoRef.current ||
                 !activeTrack?.jitsiTrack ||
-                !isVisible
+                !isVisible ||
+                !videoEnabled
             ) {
                 return
             }
@@ -239,6 +244,7 @@ export const VideoTile = memo(
                 ? renegotiationTick
                 : null,
             isVisible,
+            videoEnabled,
 
             ...(isSafariOrIOS
                 ? [renegotiationTick]
@@ -325,7 +331,8 @@ export const VideoTile = memo(
         const isVideoOff =
             !activeTrack ||
             activeTrack.isMuted ||
-            !isVisible
+            !isVisible ||
+            (!videoEnabled && !participant.isLocal)
 
         const isAudioMuted =
             participant.isAudioMuted
@@ -403,7 +410,7 @@ export const VideoTile = memo(
 
                 {participant.isConnectionInterrupted &&
                     !isVideoOff && (
-                        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/55 backdrop-blur-md">
+                        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/70">
                             <div className="flex flex-col items-center gap-2">
                                 <span className="w-3 h-3 rounded-full bg-yellow-400 animate-pulse" />
 
@@ -473,7 +480,7 @@ export const VideoTile = memo(
                     <button
                         type="button"
                         onClick={() => setDesktopActionsOpen((value) => !value)}
-                        className="room-control w-9 h-9 rounded-xl flex items-center justify-center bg-black/45 backdrop-blur-md border border-white/10 text-white/80 hover:text-white shadow-lg"
+                        className="room-control w-9 h-9 rounded-xl flex items-center justify-center bg-black/65 border border-white/10 text-white/80 hover:text-white"
                         title="گزینه‌های تصویر"
                         aria-label="گزینه‌های تصویر"
                     >
@@ -481,7 +488,7 @@ export const VideoTile = memo(
                     </button>
 
                     {desktopActionsOpen && (
-                        <div className="absolute left-0 top-10 w-44 rounded-2xl border room-border bg-[var(--room-surface)]/98 backdrop-blur-2xl p-1.5 shadow-[0_20px_60px_rgba(0,0,0,.45)] room-sheet">
+                        <div className="absolute left-0 top-10 w-44 rounded-2xl border room-border bg-[var(--room-surface)] p-1.5 shadow-[0_20px_60px_rgba(0,0,0,.45)] room-sheet">
                             <button type="button" onClick={() => { togglePinnedParticipant(participant.id); setDesktopActionsOpen(false) }} className="w-full h-10 px-3 rounded-xl flex items-center gap-2 text-xs text-white/80 hover:bg-white/[.06]">
                                 {isPinned ? <PinOff size={15} /> : <Pin size={15} />}
                                 <span>{isPinned ? 'برداشتن پین' : 'پین کردن'}</span>
@@ -506,7 +513,7 @@ export const VideoTile = memo(
                 <button
                     type="button"
                     onClick={() => setMobileActionsOpen(true)}
-                    className="md:hidden absolute bottom-2 left-2 z-40 w-8 h-8 rounded-lg flex items-center justify-center bg-black/55 backdrop-blur-md border border-white/10 text-white/80 shadow-lg active:scale-95 transition-transform"
+                    className="md:hidden absolute bottom-2 left-2 z-40 w-8 h-8 rounded-lg flex items-center justify-center bg-black/65 border border-white/10 text-white/80 active:scale-95 transition-transform"
                     title="گزینه‌های تصویر"
                     aria-label="گزینه‌های تصویر"
                 >
@@ -514,7 +521,7 @@ export const VideoTile = memo(
                 </button>
 
                 {mobileActionsOpen && (
-                    <div className="md:hidden fixed inset-x-3 bottom-[calc(78px+env(safe-area-inset-bottom))] z-[90] rounded-[22px] border room-border bg-[var(--room-surface)]/98 backdrop-blur-2xl p-2 shadow-[0_24px_70px_rgba(0,0,0,.5)] room-sheet">
+                    <div className="md:hidden fixed inset-x-3 bottom-[calc(78px+env(safe-area-inset-bottom))] z-[90] rounded-[22px] border room-border bg-[var(--room-surface)] p-2 shadow-[0_24px_70px_rgba(0,0,0,.5)] room-sheet">
                         <div className="px-2 pt-1 pb-2 flex items-center justify-between">
                             <span className="text-xs text-white/55 truncate">گزینه‌های {participant.displayName}</span>
                             <button type="button" onClick={() => setMobileActionsOpen(false)} className="text-xs text-white/40 px-2 py-1">بستن</button>

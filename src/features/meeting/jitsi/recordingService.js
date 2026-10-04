@@ -30,8 +30,9 @@ function resolveQualityPreset(quality) {
     return RECORDING_QUALITY_PRESETS[quality] ?? RECORDING_QUALITY_PRESETS.medium
 }
 
-// انتخاب بهترین کدک قابل پشتیبانی. av1 در بیت‌ریت پایین از vp9 بهتره،
-// ولی پشتیبانی محدودتر و سنگین‌تری داره؛ vp9 گزینه‌ی پیش‌فرض امن‌تره.
+// انتخاب کدک قابل پشتیبانی. ترتیب بر اساس «کم‌ترین بار CPU» است:
+// vp8 سبک‌ترین انکودر نرم‌افزاری است. av1 (که قبلاً اول لیست بود) روی
+// دستگاه‌های قدیمی سنگین‌ترین انتخاب ممکن است و ضبط را کند/داغ می‌کند.
 function pickMimeType(candidates) {
     return candidates.find((c) => MediaRecorder.isTypeSupported(c)) ?? 'video/webm'
 }
@@ -43,7 +44,7 @@ export function isRecordingSupported() {
 /**
  * @param {'low'|'medium'|'high'} quality پیش‌فرض: 'medium'
  */
-export async function startLocalRecording(quality = 'medium') {
+export async function startLocalRecording(quality = 'medium', onEnded = null) {
     if (!isRecordingSupported()) {
         throw new Error('مرورگر شما از ضبط لوکال پشتیبانی نمی‌کند.')
     }
@@ -90,7 +91,7 @@ export async function startLocalRecording(quality = 'medium') {
     _recordedChunks = []
 
     const mimeType = pickMimeType([
-        'video/webm;codecs=av01,opus',
+        'video/webm;codecs=vp8,opus',
         'video/webm;codecs=vp9,opus',
         'video/webm',
     ])
@@ -108,7 +109,9 @@ export async function startLocalRecording(quality = 'medium') {
     return new Promise((resolve, reject) => {
         // اگه کاربر از دیالوگ مرورگر "Stop sharing" رو بزنه
         _displayStream.getVideoTracks()[0].addEventListener('ended', () => {
-            stopLocalRecording()
+            // وقتی کاربر از دیالوگ مرورگر «Stop sharing» را می‌زند باید state و
+            // تایمر اپ هم بسته شود؛ قبلاً فقط recorder متوقف می‌شد.
+            stopLocalRecording().then((blob) => onEnded?.(blob))
         })
 
         _mediaRecorder.onerror = (e) => reject(e.error)
@@ -153,7 +156,7 @@ let _voiceAudioContext = null
 /**
  * @param {'low'|'medium'|'high'} quality پیش‌فرض: 'medium'
  */
-export async function startVoiceRecording(quality = 'medium') {
+export async function startVoiceRecording(quality = 'medium', onEnded = null) {
     const preset = resolveQualityPreset(quality)
 
     // میکروفون خودمون (مونو، چون فقط صدای گفتاره نه موسیقی)
@@ -162,8 +165,15 @@ export async function startVoiceRecording(quality = 'medium') {
     })
 
     // صدای خروجی تب (صدای بقیه‌ی شرکت‌کننده‌ها) — بدون نیاز به گرفتن تصویر واقعی صفحه
+    // مرورگرها audio-only capture از تب را نمی‌دهند، پس ویدیو باید درخواست شود
+    // ولی استفاده نمی‌شود. قبلاً video:true بود و کل صفحه با فریم‌ریت کامل برای
+    // ساعت‌ها capture می‌شد (CPU/GPU بیهوده). حالا کوچک‌ترین/کندترین حالت.
     _voiceDisplayStream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,   // مرورگرها اجازه‌ی audio-only capture از تب رو نمیدن، پس ویدیو باید درخواست بشه ولی استفاده نمیشه
+        video: {
+            frameRate: { ideal: 1, max: 1 },
+            width: { max: 640 },
+            height: { max: 360 },
+        },
         audio: true,
     })
 
@@ -199,7 +209,7 @@ export async function startVoiceRecording(quality = 'medium') {
 
     return new Promise((resolve, reject) => {
         _voiceDisplayStream.getVideoTracks()[0]?.addEventListener('ended', () => {
-            stopVoiceRecording()
+            stopVoiceRecording().then((blob) => onEnded?.(blob))
         })
 
         _voiceMediaRecorder.onerror = (e) => reject(e.error)

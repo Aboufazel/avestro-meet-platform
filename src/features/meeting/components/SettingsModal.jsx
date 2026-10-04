@@ -54,7 +54,7 @@ export const SettingsModal = memo(function SettingsModal() {
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--room-bg)]/70 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--room-bg)]/85 p-4">
       <div className="w-full max-w-2xl bg-[var(--room-surface)] border border-white/[.08] rounded-[26px] overflow-hidden flex flex-col md:flex-row max-h-[85vh]">
 
         {/* Sidebar tabs */}

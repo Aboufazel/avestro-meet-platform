@@ -51,7 +51,7 @@ export default function RoomPage() {
             <main className="relative flex-1 min-w-0 min-h-0 room-surface rounded-[20px] border room-border overflow-hidden room-panel-shadow">
               <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_42%,rgba(77,125,255,.08),transparent_34%)]" />
               <VideoGrid />
-              {isReconnecting && <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 room-pop"><div className="flex items-center gap-2 rounded-full bg-[var(--room-surface)]/95 backdrop-blur-xl border room-border px-4 py-2 text-xs shadow-xl"><span className="w-2 h-2 rounded-full bg-[var(--room-warning)] animate-pulse" /><span>اتصال ضعیف است؛ در حال برقراری مجدد...</span></div></div>}
+              {isReconnecting && <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 room-pop"><div className="flex items-center gap-2 rounded-full bg-[var(--room-surface)] border room-border px-4 py-2 text-xs shadow-xl"><span className="w-2 h-2 rounded-full bg-[var(--room-warning)] animate-pulse" /><span>اتصال ضعیف است؛ در حال برقراری مجدد...</span></div></div>}
               <MeetingControls isAudioMuted={isAudioMuted} isVideoMuted={isVideoMuted} isScreenSharing={isScreenSharing} onToggleAudio={toggleAudio} onToggleVideo={toggleVideo} onToggleScreenShare={toggleScreenShare} onLeave={leave} />
             </main>
           </div>

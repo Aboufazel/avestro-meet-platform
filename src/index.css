@@ -135,7 +135,9 @@
 @keyframes room-panel-in { from { opacity:0; transform: translateX(24px) scale(.985); } to { opacity:1; transform:none; } }
 
 .room-tile { transition: transform .28s cubic-bezier(.22,1,.36,1), box-shadow .28s ease, border-color .28s ease; }
-.room-tile:hover { transform: translateY(-2px); box-shadow: 0 18px 50px rgba(0,0,0,.24); }
+@media (hover: hover) and (pointer: fine) {
+  .room-tile:hover { transform: translateY(-2px); box-shadow: 0 18px 50px rgba(0,0,0,.24); }
+}
 .room-tile-pinned { box-shadow: 0 0 0 1px rgba(77,125,255,.5), 0 22px 65px rgba(0,0,0,.36); }
 
 .room-no-scrollbar::-webkit-scrollbar { display:none; }
@@ -330,7 +332,7 @@
   border-radius: 10px;
   background: rgba(255,255,255,.055);
   border: 1px solid rgba(255,255,255,.08);
-  backdrop-filter: blur(10px);
+  /* backdrop-filter حذف شد: blur روی ویدیوی زنده هر فریم دوباره محاسبه می‌شود */
 }
 .room-status-signal .room-signal-dot {
   position: absolute;
@@ -351,7 +353,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 10px;
-  backdrop-filter: blur(10px);
+  /* backdrop-filter حذف شد */
   transition: all .2s ease;
 }
 .room-mic-status.live {
@@ -422,9 +424,9 @@
   max-width: min(260px, calc(100% - 16px));
   padding: 8px 10px;
   border-radius: 14px;
-  background: rgba(10,17,29,.72);
+  background: rgba(10,17,29,.88);
   border: 1px solid rgba(255,80,104,.24);
-  backdrop-filter: blur(14px);
+  /* backdrop-filter حذف شد */
   box-shadow: 0 12px 35px rgba(0,0,0,.24);
 }
 .room-weak-wave {
@@ -518,8 +520,8 @@
 }
 .meeting-focus-meta span {
   border: 1px solid rgba(255,255,255,.10);
-  background: rgba(7,13,23,.72);
-  backdrop-filter: blur(12px);
+  background: rgba(7,13,23,.88);
+  /* backdrop-filter حذف شد */
   color: rgba(255,255,255,.72);
   padding: 5px 8px;
   border-radius: 10px;
@@ -839,4 +841,11 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-auto-rows: minmax(130px, 1fr);
   }
+}
+
+/* Touch/mobile: انیمیشن‌های بی‌پایان تزئینی خاموش (هر فریمشان روی GPU ضعیف هزینه دارد) */
+@media (pointer: coarse) {
+  .meeting-stage-dot,
+  .room-weak-wave i,
+  .room-glow { animation: none !important; }
 }

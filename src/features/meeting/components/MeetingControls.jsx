@@ -11,7 +11,7 @@ export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isV
   const togglePanel = useMeetingStore((s) => s.togglePanel)
 
   return <div className={`fixed lg:absolute ${isPanelOpen ? 'md:bottom-5' : 'md:bottom-5'} bottom-[calc(env(safe-area-inset-bottom)+14px)] left-1/2 -translate-x-1/2 z-[60] w-max max-w-[calc(100%-20px)] transition-all duration-400 ease-out`}>
-    <div className="mx-auto flex items-center justify-center gap-1 sm:gap-1.5 rounded-[20px] sm:rounded-[24px] border room-border bg-[var(--room-surface)]/92 backdrop-blur-2xl p-1.5 shadow-[0_18px_60px_rgba(0,0,0,.42)] max-w-max room-rise">
+    <div className="mx-auto flex items-center justify-center gap-1 sm:gap-1.5 rounded-[20px] sm:rounded-[24px] border room-border bg-[var(--room-surface)] p-1.5 shadow-[0_18px_60px_rgba(0,0,0,.42)] max-w-max room-rise">
       <ControlButton onClick={openSettings} label="تنظیمات" icon={<Settings size={17} />} extra="" />
       <ControlButton active={isPanelOpen && activeTab === 'chat'} onClick={() => togglePanel('chat')} label="گفتگو" icon={<MessageSquare size={17} />} badge={unreadCount} />
       <ControlButton active={isPanelOpen && activeTab === 'participants'} onClick={() => togglePanel('participants')} label="شرکت‌کنندگان" icon={<Users size={17} />} />

@@ -20,7 +20,13 @@ let _voiceRecordingInterval = null
 
 export async function startVoiceRec() {
     try {
-        await startVoiceRecording()
+        await startVoiceRecording('medium', async (blob) => {
+            clearInterval(_voiceRecordingInterval)
+            useMeetingStore.getState()._setVoiceRecording(false)
+            if (blob) {
+                downloadRecording(blob, `صدای-جلسه-${new Date().toISOString().slice(0, 19)}.webm`)
+            }
+        })
         useMeetingStore.getState()._setVoiceRecording(true)
         _voiceRecordingInterval = setInterval(() => {
             useMeetingStore.getState()._incrementVoiceRecordingSeconds()
@@ -53,7 +59,13 @@ let _recordingInterval = null
 
 export async function startRecording() {
     try {
-        await startLocalRecording()
+        await startLocalRecording('medium', async (blob) => {
+            clearInterval(_recordingInterval)
+            useMeetingStore.getState()._setRecording(false)
+            if (blob) {
+                downloadRecording(blob, `جلسه-${new Date().toISOString().slice(0, 19)}.webm`)
+            }
+        })
         useMeetingStore.getState()._setRecording(true)
         _recordingInterval = setInterval(() => {
             useMeetingStore.getState()._incrementRecordingSeconds()
@@ -296,7 +308,7 @@ export async function joinMeeting({roomName, displayName, email = ''}) {
 
                 useMeetingStore
                     .getState()
-                    ._bumpRenegotiationTick()
+                    ._bumpRenegotiationTick(track.participantId)
             }
         )
     )
@@ -319,7 +331,7 @@ export async function joinMeeting({roomName, displayName, email = ''}) {
 
                 useMeetingStore
                     .getState()
-                    ._bumpRenegotiationTick()
+                    ._bumpRenegotiationTick(track.participantId)
             }
         )
     )
@@ -354,7 +366,7 @@ export async function joinMeeting({roomName, displayName, email = ''}) {
                     status === 'restoring' &&
                     previousTrack?.streamingStatus !== 'restoring'
                 ) {
-                    store._bumpRenegotiationTick()
+                    store._bumpRenegotiationTick(track.participantId)
                 }
             }
         )
@@ -491,6 +503,10 @@ export async function leaveMeeting() {
     const roomName = _currentRoomName
     const externalId = _currentExternalId
 
+    // ضبط جلسه/صدا بعد از خروج هم ادامه پیدا می‌کرد (getDisplayMedia + میکروفون
+    // + AudioContext + setInterval) و تا بستن تب CPU مصرف می‌کرد.
+    await _stopRecordersOnLeave()
+
     try {
         await jitsiController.leave()
     } finally {
@@ -500,6 +516,25 @@ export async function leaveMeeting() {
         _currentRoomName = null
         _currentExternalId = null
     }
+}
+
+async function _stopRecordersOnLeave() {
+    const state = useMeetingStore.getState()
+
+    try {
+        if (state.isRecording) await stopRecording()
+    } catch (error) {
+        console.warn('[meeting-actions] stopRecording on leave failed:', error)
+    }
+
+    try {
+        if (state.isVoiceRecording) await stopVoiceRec()
+    } catch (error) {
+        console.warn('[meeting-actions] stopVoiceRec on leave failed:', error)
+    }
+
+    clearInterval(_recordingInterval)
+    clearInterval(_voiceRecordingInterval)
 }
 
 function _authHeaders() {

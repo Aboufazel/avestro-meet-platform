@@ -126,6 +126,8 @@ export const selectSelectedAudioOutputId =
     (s) => s.selectedAudioOutputId
 
 export const selectRenegotiationTick = (s) => s.renegotiationTick
+export const selectRenegotiationTickFor = (participantId) => (s) =>
+    s.renegotiationTicks?.[participantId] ?? 0
 
 export const selectIsRecording = (s) => s.isRecording
 export const selectRecordingSeconds = (s) => s.recordingSeconds
