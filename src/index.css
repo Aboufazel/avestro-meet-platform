@@ -493,6 +493,14 @@
   min-height: 220px;
   max-height: 42%;
 }
+.meeting-focus-wrapper.is-screenshare {
+  flex: 1 1 clamp(420px, 68vh, 900px);
+  min-height: 420px;
+  max-height: 82%;
+}
+.meeting-focus-wrapper.is-screenshare .meeting-focus-view video {
+  object-fit: contain;
+}
 .meeting-focus-view {
   width: 100%;
   height: 100%;
@@ -520,7 +528,6 @@
 .meeting-speaker-stage {
   flex: 0 0 auto;
   min-height: 0;
-  max-height: 44%;
   overflow: hidden;
 }
 .meeting-stage-header,
@@ -545,7 +552,6 @@
   gap: 8px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-auto-rows: minmax(110px, 1fr);
-  max-height: calc(44vh - 28px);
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -641,11 +647,14 @@
     min-height: 200px;
     max-height: 34%;
   }
-  .meeting-speaker-stage { max-height: 42%; }
+  .meeting-focus-wrapper.is-screenshare {
+    flex: 1 1 clamp(320px, 60vh, 700px);
+    min-height: 320px;
+    max-height: 74%;
+  }
   .meeting-speaker-grid {
     gap: 7px;
     grid-auto-rows: 120px;
-    max-height: 34vh;
   }
   .meeting-camera-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -696,7 +705,7 @@
 .meeting-speaker-grid.count-5,
 .meeting-speaker-grid.count-6,
 .meeting-speaker-grid.count-7 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.meeting-speaker-grid.count-7 { max-height: 320px; overflow-y: auto; }
+.meeting-speaker-grid.count-7 { overflow-y: auto; }
 
 @media (max-width: 767px) {
   .meeting-speaker-stage.is-single {
@@ -714,7 +723,6 @@
   .meeting-speaker-grid.count-5,
   .meeting-speaker-grid.count-6,
   .meeting-speaker-grid.count-7 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .meeting-speaker-grid.count-7 { max-height: 34vh; }
 }
 
 /* Reply is an intentional action, not a hover-only affordance. */

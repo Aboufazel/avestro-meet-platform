@@ -119,11 +119,12 @@ export const VideoGrid = memo(function VideoGrid() {
   const hasFocus = Boolean(priorityParticipant)
   const focusIsPinned = priorityParticipant?.id === pinnedParticipantId
   const focusIsExplicit = priorityParticipant?.id === focusedParticipantId
+  const focusIsScreenShare = Boolean(priorityParticipant?.isScreenSharing)
 
   return (
     <div className="meeting-layout h-full min-h-0 p-2 sm:p-3 pb-[calc(98px+env(safe-area-inset-bottom))] lg:pb-[calc(106px+env(safe-area-inset-bottom))]">
       {hasFocus && (
-        <div className="meeting-focus-wrapper">
+        <div className={`meeting-focus-wrapper ${focusIsScreenShare ? 'is-screenshare' : ''}`}>
           <section className="meeting-focus-view" aria-label="نمای اصلی">
             <VideoTile
               participantId={priorityParticipant.id}

@@ -6,23 +6,65 @@ let _displayStream = null
 let _micStream = null
 let _audioContext = null
 
+// پریست‌های کیفیت ضبط ویدیو. برای ضبط صفحه (متن/اسلاید/UI) نیازی به
+// فریم‌ریت و بیت‌ریت بالا نیست؛ همین باعث کاهش چشمگیر حجم فایل می‌شه.
+export const RECORDING_QUALITY_PRESETS = {
+    low: {
+        frameRate: 8,
+        videoBitsPerSecond: 250_000,
+        audioBitsPerSecond: 32_000,
+    },
+    medium: {
+        frameRate: 12,
+        videoBitsPerSecond: 500_000,
+        audioBitsPerSecond: 48_000,
+    },
+    high: {
+        frameRate: 20,
+        videoBitsPerSecond: 1_200_000,
+        audioBitsPerSecond: 96_000,
+    },
+}
+
+function resolveQualityPreset(quality) {
+    return RECORDING_QUALITY_PRESETS[quality] ?? RECORDING_QUALITY_PRESETS.medium
+}
+
+// انتخاب بهترین کدک قابل پشتیبانی. av1 در بیت‌ریت پایین از vp9 بهتره،
+// ولی پشتیبانی محدودتر و سنگین‌تری داره؛ vp9 گزینه‌ی پیش‌فرض امن‌تره.
+function pickMimeType(candidates) {
+    return candidates.find((c) => MediaRecorder.isTypeSupported(c)) ?? 'video/webm'
+}
+
 export function isRecordingSupported() {
     return typeof navigator.mediaDevices?.getDisplayMedia === 'function'
 }
 
-export async function startLocalRecording() {
+/**
+ * @param {'low'|'medium'|'high'} quality پیش‌فرض: 'medium'
+ */
+export async function startLocalRecording(quality = 'medium') {
     if (!isRecordingSupported()) {
         throw new Error('مرورگر شما از ضبط لوکال پشتیبانی نمی‌کند.')
     }
 
+    const preset = resolveQualityPreset(quality)
+
     // ۱. گرفتن تصویر صفحه + صدای خروجی تب (صدای بقیه‌ی شرکت‌کننده‌ها)
+    // محدود کردن فریم‌ریت مهم‌ترین فاکتور برای کاهش حجم ضبط صفحه‌ست،
+    // چون محتوای اسکرین‌شیر (متن/اسلاید/UI) معمولاً ساکنه.
     _displayStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { displaySurface: 'browser' },
+        video: {
+            displaySurface: 'browser',
+            frameRate: { ideal: preset.frameRate, max: preset.frameRate },
+        },
         audio: true,
     })
 
-    // ۲. گرفتن میکروفون خودمون جدا
-    _micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    // ۲. گرفتن میکروفون خودمون جدا (مونو کافیه، حجم صدا رو کم می‌کنه)
+    _micStream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1 },
+    })
 
     // ۳. میکس کردن دو منبع صدا با Web Audio API
     _audioContext = new AudioContext()
@@ -47,14 +89,16 @@ export async function startLocalRecording() {
 
     _recordedChunks = []
 
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-        ? 'video/webm;codecs=vp9,opus'
-        : 'video/webm'
+    const mimeType = pickMimeType([
+        'video/webm;codecs=av01,opus',
+        'video/webm;codecs=vp9,opus',
+        'video/webm',
+    ])
 
     _mediaRecorder = new MediaRecorder(combinedStream, {
         mimeType,
-        videoBitsPerSecond: 1_000_000,
-        audioBitsPerSecond: 96_000,
+        videoBitsPerSecond: preset.videoBitsPerSecond,
+        audioBitsPerSecond: preset.audioBitsPerSecond,
     })
 
     _mediaRecorder.ondataavailable = (e) => {
@@ -106,9 +150,16 @@ let _voiceMicStream = null
 let _voiceDisplayStream = null
 let _voiceAudioContext = null
 
-export async function startVoiceRecording() {
-    // میکروفون خودمون
-    _voiceMicStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+/**
+ * @param {'low'|'medium'|'high'} quality پیش‌فرض: 'medium'
+ */
+export async function startVoiceRecording(quality = 'medium') {
+    const preset = resolveQualityPreset(quality)
+
+    // میکروفون خودمون (مونو، چون فقط صدای گفتاره نه موسیقی)
+    _voiceMicStream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1 },
+    })
 
     // صدای خروجی تب (صدای بقیه‌ی شرکت‌کننده‌ها) — بدون نیاز به گرفتن تصویر واقعی صفحه
     _voiceDisplayStream = await navigator.mediaDevices.getDisplayMedia({
@@ -139,7 +190,7 @@ export async function startVoiceRecording() {
 
     _voiceMediaRecorder = new MediaRecorder(destination.stream, {
         mimeType,
-        audioBitsPerSecond: 64_000,
+        audioBitsPerSecond: preset.audioBitsPerSecond,
     })
 
     _voiceMediaRecorder.ondataavailable = (e) => {
