@@ -1,35 +1,26 @@
-import { useCallback, useRef, useEffect } from 'react'
+import { useCallback, useRef } from 'react'
 import { useMeetingStore } from '../store/meeting-store'
 import { sendMessage } from '../store/meeting-actions'
 import {
   selectMessages,
   selectUnreadCount,
   selectIsChatOpen,
+  selectIsChatAtBottom,
 } from '../store/meeting-selectors'
 
-/**
- * مدیریت چت جلسه
- */
 export function useChat() {
   const messages = useMeetingStore(selectMessages)
   const unreadCount = useMeetingStore(selectUnreadCount)
   const isChatOpen = useMeetingStore(selectIsChatOpen)
+  const isAtBottom = useMeetingStore(selectIsChatAtBottom)
   const bottomRef = useRef(null)
-
-  // اسکرول به پایین با هر پیام جدید
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages.length])
-
-  // const send = useCallback((text) => {
-  //   if (!text?.trim()) return
-  //   sendMessage(text)
-  // }, [])
+  const markAsRead = useMeetingStore((s) => s.markMessagesAsRead)
+  const setChatAtBottom = useMeetingStore((s) => s.setChatAtBottom)
 
   const send = useCallback((text, replyTo) => {
     if (!text?.trim()) return
     sendMessage(text, replyTo)
-}, [])
+  }, [])
 
   const openChat = useCallback(() => {
     useMeetingStore.getState().openChat()
@@ -42,5 +33,8 @@ export function useChat() {
     send,
     openChat,
     bottomRef,
+    markAsRead,
+    setChatAtBottom,
+    isAtBottom,
   }
 }

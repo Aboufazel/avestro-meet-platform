@@ -23,6 +23,7 @@
  * @property {boolean} isLocal
  * @property {MediaStreamTrack} track
  * @property {JitsiTrack} jitsiTrack - فقط برای attach/detach نگه داشته می‌شه
+ * @property {'active'|'inactive'|'interrupted'|'restoring'|null} streamingStatus
  */
 
 /**
@@ -68,6 +69,10 @@ export function mapTrack(jitsiTrack) {
     isLocal: jitsiTrack.isLocal(),
     track: jitsiTrack.getTrack(),
     jitsiTrack,
+    streamingStatus:
+      typeof jitsiTrack.getTrackStreamingStatus === 'function'
+        ? jitsiTrack.getTrackStreamingStatus()
+        : null,
   }
 }
 

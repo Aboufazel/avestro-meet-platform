@@ -21,6 +21,9 @@ export const selectParticipants =
 export const selectActiveSpeakerId =
     (s) => s.activeSpeakerId
 
+export const selectPinnedParticipantId = (s) => s.pinnedParticipantId
+export const selectFocusedParticipantId = (s) => s.focusedParticipantId
+
 export const selectParticipantList = (s) =>
     Array.from(s.participants.values())
 
@@ -103,6 +106,9 @@ export const selectUnreadCount =
 export const selectIsChatOpen =
     (s) => s.isChatOpen
 
+export const selectLastReadMessageId = (s) => s.lastReadMessageId
+export const selectIsChatAtBottom = (s) => s.isChatAtBottom
+
 // ─────────────────────────────────────────────────────────────
 // UI
 // ─────────────────────────────────────────────────────────────
@@ -120,6 +126,8 @@ export const selectSelectedAudioOutputId =
     (s) => s.selectedAudioOutputId
 
 export const selectRenegotiationTick = (s) => s.renegotiationTick
+export const selectRenegotiationTickFor = (participantId) => (s) =>
+    s.renegotiationTicks?.[participantId] ?? 0
 
 export const selectIsRecording = (s) => s.isRecording
 export const selectRecordingSeconds = (s) => s.recordingSeconds

@@ -26,6 +26,8 @@ export const JITSI_EVENTS = {
 
   CONNECTION_ESTABLISHED: 'connectionEstablished',
   CONNECTION_INTERRUPTED: 'connectionInterrupted',
+  CONNECTION_RESTORED: 'connectionRestored',
+  TRACK_STREAMING_STATUS_CHANGED: 'trackStreamingStatusChanged',
   CONNECTION_FAILED: 'connectionFailed',
 }
 

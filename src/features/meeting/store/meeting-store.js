@@ -14,6 +14,8 @@ export const useMeetingStore = create((set, get) => ({
     status: MEETING_STATUS.IDLE,
     error: null,
     renegotiationTick: 0,
+    // tick جداگانه برای هر participant تا با تغییر track یک نفر، ویدیوی همه re-attach نشود
+    renegotiationTicks: {},
 
     // ─────────────────────────────────────────────────────────────
     // ROOM
@@ -28,6 +30,8 @@ export const useMeetingStore = create((set, get) => ({
 
     participants: new Map(),
     activeSpeakerId: null,
+    pinnedParticipantId: null,
+    focusedParticipantId: null,
 
     // state اولیه:
     isRecording: false,
@@ -71,13 +75,15 @@ export const useMeetingStore = create((set, get) => ({
 
     messages: [],
     unreadCount: 0,
+    lastReadMessageId: null,
     isChatOpen: false,
+    isChatAtBottom: true,
 
     // ─────────────────────────────────────────────────────────────
     // UI
     // ─────────────────────────────────────────────────────────────
 
-    isPanelOpen: false,
+    isPanelOpen: true,
     activePanelTab: 'participants',
 
     // =============================================================
@@ -203,6 +209,21 @@ export const useMeetingStore = create((set, get) => ({
                 state.participants.get(participantId)
 
             if (!participant) {
+                return {}
+            }
+
+            // اگر هیچ مقداری واقعاً عوض نشده، state را عوض نکن؛ وگرنه کل
+            // Map کپی می‌شود و همه‌ی subscriber ها دوباره رندر می‌شوند.
+            let changed = false
+
+            for (const key of Object.keys(updates)) {
+                if (participant[key] !== updates[key]) {
+                    changed = true
+                    break
+                }
+            }
+
+            if (!changed) {
                 return {}
             }
 
@@ -435,6 +456,41 @@ export const useMeetingStore = create((set, get) => ({
     // مهم‌ترین بخش Real-time
     // ─────────────────────────────────────────────────────────────
 
+    // ─────────────────────────────────────────────────────────────
+    // TRACK STREAMING STATUS
+    //
+    // این status مستقیماً از lib-jitsi-meet می‌آید.
+    // inactive می‌تواند وضعیت طبیعی Last-N/BWE باشد؛ فقط status را
+    // نگه می‌داریم تا restoring بتواند lifecycle اتصال ویدیو را sync کند.
+    // ─────────────────────────────────────────────────────────────
+
+    _updateTrackStreamingStatus: ({track, status}) =>
+        set((state) => {
+            if (!track?.participantId || !track?.type) {
+                return {}
+            }
+
+            const key =
+                `${track.participantId}-${track.type}`
+
+            const tracks = new Map(state.tracks)
+            const existing = tracks.get(key)
+
+            if (!existing) {
+                tracks.set(key, {
+                    ...track,
+                    streamingStatus: status || null,
+                })
+            } else {
+                tracks.set(key, {
+                    ...existing,
+                    streamingStatus: status || null,
+                })
+            }
+
+            return {tracks}
+        }),
+
     _updateTrackMute: (track) =>
         set((state) => {
             if (!track?.participantId || !track?.type) {
@@ -536,7 +592,16 @@ export const useMeetingStore = create((set, get) => ({
 
 
 // اکشن جدید:
-    _bumpRenegotiationTick: () => set((state) => ({renegotiationTick: state.renegotiationTick + 1})),
+    _bumpRenegotiationTick: (participantId) =>
+        set((state) => ({
+            renegotiationTick: state.renegotiationTick + 1,
+            renegotiationTicks: participantId
+                ? {
+                    ...state.renegotiationTicks,
+                    [participantId]: (state.renegotiationTicks[participantId] || 0) + 1,
+                }
+                : state.renegotiationTicks,
+        })),
     _setScreenSharing: (enabled, track = null) =>
         set((state) => {
             const participants =
@@ -568,17 +633,32 @@ export const useMeetingStore = create((set, get) => ({
     // ─────────────────────────────────────────────────────────────
 
     _addMessage: (message) =>
-        set((state) => ({
-            messages: [
-                ...state.messages,
-                message,
-            ],
+        set((state) => {
+            if (!message) return {}
 
-            unreadCount:
-                state.isChatOpen
-                    ? 0
+            const messages = [...state.messages, message]
+            const isLocal =
+                Boolean(message.isLocal) ||
+                Boolean(
+                    state.localParticipantId &&
+                    message.participantId === state.localParticipantId
+                )
+
+            const shouldMarkRead =
+                !isLocal &&
+                state.isChatOpen &&
+                state.isChatAtBottom
+
+            return {
+                messages,
+                unreadCount: isLocal || shouldMarkRead
+                    ? state.unreadCount
                     : state.unreadCount + 1,
-        })),
+                ...(shouldMarkRead
+                    ? { lastReadMessageId: message.id || null }
+                    : {}),
+            }
+        }),
 
     // =============================================================
     // PUBLIC UI ACTIONS
@@ -604,10 +684,34 @@ export const useMeetingStore = create((set, get) => ({
     togglePanel: (tab) =>
         set((state) => {
             if (state.activePanelTab === tab && state.isPanelOpen) {
-                return {isPanelOpen: false}
+                return {
+                    isPanelOpen: false,
+                    isChatOpen: false,
+                }
             }
-            return {isPanelOpen: true, activePanelTab: tab}
+            return {
+                isPanelOpen: true,
+                activePanelTab: tab,
+                isChatOpen: tab === 'chat',
+            }
         }),
+
+    setPinnedParticipant: (participantId) => set({ pinnedParticipantId: participantId || null }),
+    togglePinnedParticipant: (participantId) => set((state) => ({
+        pinnedParticipantId:
+            state.pinnedParticipantId === participantId
+                ? null
+                : participantId
+    })),
+    setFocusedParticipant: (participantId) =>
+        set({ focusedParticipantId: participantId || null }),
+    toggleFocusedParticipant: (participantId) =>
+        set((state) => ({
+            focusedParticipantId:
+                state.focusedParticipantId === participantId
+                    ? null
+                    : participantId
+        })),
 
     toggleMeetingMute: () =>
         set((state) => ({
@@ -630,11 +734,22 @@ export const useMeetingStore = create((set, get) => ({
             selectedAudioOutputId: id,
         }),
 
+    setChatAtBottom: (isAtBottom) =>
+        set({ isChatAtBottom: Boolean(isAtBottom) }),
+
+    markMessagesAsRead: () =>
+        set((state) => {
+            const last = state.messages[state.messages.length - 1]
+            return {
+                unreadCount: 0,
+                lastReadMessageId: last?.id || state.lastReadMessageId || null,
+            }
+        }),
+
     openChat: () =>
         set({
             isPanelOpen: true,
             activePanelTab: 'chat',
-            unreadCount: 0,
             isChatOpen: true,
         }),
 
@@ -658,8 +773,12 @@ export const useMeetingStore = create((set, get) => ({
 
             participants: new Map(),
             activeSpeakerId: null,
+    pinnedParticipantId: null,
+            focusedParticipantId: null,
 
             tracks: new Map(),
+            renegotiationTick: 0,
+            renegotiationTicks: {},
 
             isAudioMuted: true,
             isVideoMuted: true,
@@ -672,9 +791,11 @@ export const useMeetingStore = create((set, get) => ({
 
             messages: [],
             unreadCount: 0,
+            lastReadMessageId: null,
             isChatOpen: false,
+            isChatAtBottom: true,
 
-            isPanelOpen: false,
+            isPanelOpen: true,
             activePanelTab: 'participants',
         }),
 }))

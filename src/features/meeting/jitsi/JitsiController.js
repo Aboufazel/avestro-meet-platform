@@ -2,8 +2,11 @@ import {JITSI_EVENTS, MEETING_STATUS} from './jitsi-events.js'
 import {
     CONNECTION_CONFIG,
     CONFERENCE_CONFIG,
-    RECEIVER_QUALITY,
     RECONNECT_CONFIG,
+    JITSI_INIT_OPTIONS,
+    LOCAL_VIDEO_CONFIG,
+    RECEIVER_QUALITY,
+    PERF,
 } from './jitsi-config.js'
 import {
     mapParticipant,
@@ -64,19 +67,16 @@ function ensureJitsiInitialized() {
         return JitsiMeetJS
     }
 
-    JitsiMeetJS.init({
-        /**
-         * Keep audio levels enabled because connection quality
-         * and audio-level related functionality may depend on it.
-         *
-         * IMPORTANT:
-         * JitsiMeetJS.init() itself does not create local
-         * microphone/camera tracks.
-         */
-        disableAudioLevels: false,
-
-        disableThirdPartyRequests: true,
-    })
+    /**
+     * disableAudioLevels / audioLevelsInterval / pcStatsInterval از
+     * IJitsiMeetJSOptions هستند. فاصله‌ی audio level روی دستگاه ضعیف بیشتر
+     * است تا polling پیوسته CPU را اشغال نکند.
+     *
+     * IMPORTANT:
+     * JitsiMeetJS.init() itself does not create local
+     * microphone/camera tracks.
+     */
+    JitsiMeetJS.init(JITSI_INIT_OPTIONS)
 
     JitsiMeetJS.setLogLevel(
         JitsiMeetJS.logLevels.WARN
@@ -124,6 +124,9 @@ export class JitsiController {
         // وضعیت reconnect برای پایداری روی نت ضعیف
         this._reconnectAttempts = 0
         this._reconnectTimer = null
+        this._connectionFallbackTimer = null
+        this._iceRestartTimer = null
+        this._iceRestartInFlight = false
         this._isReconnecting = false
 
 // آخرین اطلاعات join برای reconnect (بدون درخواست دوباره میکروفون/دوربین)
@@ -134,6 +137,16 @@ export class JitsiController {
         // =====================================================================
 
         this._qualityCache = new Map()
+
+        // Last receive-quality priority sent to Jitsi. Avoid repeating the
+        // same bridge update when the React participant store refreshes.
+        // وضعیت دریافت ویدیو (receiver constraints)
+        // _remoteVideoSources: sourceName -> {participantId, videoType}
+        // _receiverIntent    : آخرین درخواست UI (چه کسانی بزرگ/قابل‌دیدن‌اند)
+        // _receiverKey       : برای جلوگیری از ارسال تکراری یک پیام به bridge
+        this._remoteVideoSources = new Map()
+        this._receiverIntent = null
+        this._receiverKey = null
 
         // =====================================================================
         // Screen sharing
@@ -170,6 +183,12 @@ export class JitsiController {
 
         this._audioTrackCreating = false
         this._videoTrackCreating = false
+
+        // Local audio outbound recovery only.
+        // This is intentionally isolated from reconnect / ICE / video logic.
+        this._localAudioRecoveryInFlight = false
+        this._localAudioRecoveryLastAt = 0
+        this._localAudioRecoveryCooldownMs = 2500
         this._screenShareTransitioning = false
 
         // =====================================================================
@@ -271,6 +290,13 @@ export class JitsiController {
             email?.trim() || ''
 
         this._isLeaving = false
+
+        // قبلاً این مقدار هیچ‌جا ست نمی‌شد و _attemptReconnect همیشه
+        // بلافاصله return می‌کرد؛ یعنی reconnect کامل هرگز اجرا نمی‌شد.
+        this._lastJoinParams = {
+            displayName: this._displayName,
+            email: this._email,
+        }
 
         try {
             this._setStatus(
@@ -457,6 +483,16 @@ export class JitsiController {
 
         try {
             if (audioTrack.isMuted()) {
+                // Before unmuting, verify that the underlying local source is
+                // still alive. A stale/ended JitsiLocalTrack can otherwise make
+                // the UI look unmuted while no microphone data is actually sent.
+                if (this._isLocalAudioTrackBroken(audioTrack)) {
+                    return this._recoverLocalAudioTrack(
+                        audioTrack,
+                        'toggle-audio-health-check'
+                    )
+                }
+
                 await audioTrack.unmute()
             } else {
                 await audioTrack.mute()
@@ -740,6 +776,9 @@ export class JitsiController {
 
                         cameraDeviceId:
                         deviceId,
+
+                        resolution:
+                        LOCAL_VIDEO_CONFIG.resolution,
                     }
                 )
 
@@ -777,6 +816,8 @@ export class JitsiController {
                     oldTrack
                 )
             }
+
+            this._tuneLocalCamera(newTrack)
 
             this._emit(
                 JITSI_EVENTS.TRACK_ADDED,
@@ -878,22 +919,212 @@ export class JitsiController {
 
 
     /**
-     * به Jitsi اعلام می‌کند کدام شرکت‌کننده‌ها الان "بزرگ" نمایش داده
-     * می‌شوند (active speaker / کسی که صحبت می‌کند) تا سرور فقط برای
-     * آن‌ها کیفیت بالا بفرستد و برای بقیه (تایل‌های کوچک) کیفیت پایین.
+     * کنترل دریافت ویدیو از bridge.
+     *
+     * قبلاً این‌جا conference.selectParticipants صدا زده می‌شد که در API فعلی
+     * lib-jitsi-meet وجود ندارد؛ پس کد همیشه false برمی‌گرداند و هیچ اولویتی
+     * اعمال نمی‌شد. API درست setReceiverConstraints است که با «source name»
+     * کار می‌کند، نه participantId.
+     *
+     * @param {object}   intent
+     * @param {string[]} intent.onStageIds  شرکت‌کننده‌های «بزرگ» (pin/focus/screen/speaker)
+     * @param {string[]} intent.visibleIds  شرکت‌کننده‌هایی که تایل ویدیوی‌شان دیده می‌شود (به ترتیب اولویت)
+     * @param {boolean}  intent.paused      true = هیچ ویدیویی نگیر (تب مخفی / صفحه خاموش)
      */
-    setPreferredParticipants(participantIds = []) {
-        if (!this._conference) return false
+    setReceiverPriority({
+                            onStageIds = [],
+                            visibleIds = [],
+                            paused = false,
+                        } = {}) {
+        this._receiverIntent = {
+            onStageIds: [...new Set(onStageIds.filter(Boolean).map(String))],
+            visibleIds: [...new Set(visibleIds.filter(Boolean).map(String))],
+            paused: Boolean(paused),
+        }
 
-        try {
-            if (typeof this._conference.selectParticipants === 'function') {
-                this._conference.selectParticipants(participantIds)
+        return this._applyReceiverConstraints()
+    }
+
+    _sourcesOfParticipant(participantId) {
+        const result = []
+
+        for (const [sourceName, info] of this._remoteVideoSources) {
+            if (info.participantId === participantId) {
+                result.push({sourceName, videoType: info.videoType})
             }
-            return true
-        } catch (error) {
-            console.warn('[JitsiController] selectParticipants failed:', error)
+        }
+
+        return result
+    }
+
+    _applyReceiverConstraints() {
+        const conference = this._conference
+        const intent = this._receiverIntent
+
+        if (!conference || !intent) {
             return false
         }
+
+        const maxVideos = PERF.maxRemoteVideos
+        const SCREEN_HEIGHT = Math.max(RECEIVER_QUALITY.LARGE, 720)
+
+        let message
+
+        if (intent.paused) {
+            // حالت فقط‌صدا: هیچ ویدیویی دریافت/decode نشود.
+            message = {
+                lastN: 0,
+                selectedSources: [],
+                onStageSources: [],
+                defaultConstraints: {maxHeight: RECEIVER_QUALITY.SMALL},
+                constraints: {},
+            }
+        } else {
+            const onStageSources = []
+            const constraints = {}
+
+            for (const id of intent.onStageIds) {
+                const sources = this._sourcesOfParticipant(id)
+                const hasDesktop = sources.some((s) => s.videoType === 'desktop')
+
+                for (const {sourceName, videoType} of sources) {
+                    // اگر کسی صفحه‌اش را اشتراک می‌گذارد، فقط صفحه «بزرگ» است
+                    // و دوربینش همان کیفیت کوچک پیش‌فرض را می‌گیرد.
+                    if (hasDesktop && videoType !== 'desktop') continue
+
+                    onStageSources.push(sourceName)
+                    constraints[sourceName] = {
+                        maxHeight:
+                            videoType === 'desktop'
+                                ? SCREEN_HEIGHT
+                                : RECEIVER_QUALITY.LARGE,
+                    }
+                }
+            }
+
+            const selected = [...onStageSources]
+
+            for (const id of intent.visibleIds) {
+                for (const {sourceName} of this._sourcesOfParticipant(id)) {
+                    if (!selected.includes(sourceName)) {
+                        selected.push(sourceName)
+                    }
+                }
+            }
+
+            const selectedSources = selected.slice(0, maxVideos)
+
+            message = {
+                lastN: maxVideos,
+                selectedSources,
+                onStageSources: onStageSources.filter((s) =>
+                    selectedSources.includes(s)
+                ),
+                defaultConstraints: {maxHeight: RECEIVER_QUALITY.SMALL},
+                constraints,
+            }
+        }
+
+        const key = JSON.stringify(message)
+
+        // React state می‌تواند مدام refresh شود؛ یک پیام یکسان را تکرار نکن.
+        if (key === this._receiverKey) {
+            return true
+        }
+
+        this._receiverKey = key
+
+        try {
+            if (typeof conference.setReceiverConstraints === 'function') {
+                conference.setReceiverConstraints(message)
+            } else {
+                // fallback برای نسخه‌های قدیمی lib
+                conference.setLastN?.(message.lastN)
+                conference.setReceiverVideoConstraint?.(
+                    intent.onStageIds.length
+                        ? RECEIVER_QUALITY.LARGE
+                        : RECEIVER_QUALITY.SMALL
+                )
+            }
+
+            return true
+        } catch (error) {
+            this._receiverKey = null
+            console.warn('[JitsiController] setReceiverConstraints failed:', error)
+            return false
+        }
+    }
+
+    /**
+     * محدود کردن خروجی دوربین خودمان تا انکودر دستگاه کمتر فشار بخورد.
+     * - setSenderVideoConstraint: رزولوشن/لایه‌های simulcast ارسالی
+     * - applyConstraints(frameRate): best-effort (در API ساخت track گزینه‌ای
+     *   برای فریم‌ریت وجود ندارد)
+     */
+    _tuneLocalCamera(track) {
+        try {
+            const mediaTrack = track?.getTrack?.()
+            const settings = mediaTrack?.getSettings?.() || {}
+            const maxFps = LOCAL_VIDEO_CONFIG.maxFps
+
+            if (
+                mediaTrack?.applyConstraints &&
+                maxFps &&
+                (!settings.frameRate || settings.frameRate > maxFps + 1)
+            ) {
+                // width/height فعلی را هم می‌دهیم تا applyConstraints
+                // رزولوشن را به پیش‌فرض دستگاه برنگرداند.
+                const constraints = {frameRate: {ideal: maxFps, max: maxFps}}
+
+                if (settings.width) {
+                    constraints.width = {ideal: settings.width, max: settings.width}
+                }
+
+                if (settings.height) {
+                    constraints.height = {ideal: settings.height, max: settings.height}
+                }
+
+                mediaTrack.applyConstraints(constraints).catch(() => {})
+            }
+        } catch {
+        }
+
+        try {
+            this._conference
+                ?.setSenderVideoConstraint?.(LOCAL_VIDEO_CONFIG.maxHeight)
+                ?.catch?.(() => {})
+        } catch {
+        }
+    }
+
+    _resetReceiverState() {
+        this._remoteVideoSources.clear()
+        this._receiverIntent = null
+        this._receiverKey = null
+
+        // listener های streaming-status که روی track های remote گذاشته شده بود
+        // قبلاً هیچ‌وقت پاک نمی‌شدند و track ها را در حافظه نگه می‌داشتند.
+        if (this._trackStreamingListeners) {
+            for (const [track, entry] of this._trackStreamingListeners) {
+                try {
+                    track.off?.(entry.event, entry.handler)
+                } catch {
+                }
+            }
+
+            this._trackStreamingListeners.clear()
+        }
+    }
+
+    _withTimeout(promise, ms) {
+        let timer
+
+        return Promise.race([
+            Promise.resolve(promise),
+            new Promise((resolve) => {
+                timer = setTimeout(resolve, ms)
+            }),
+        ]).finally(() => clearTimeout(timer))
     }
 
     // =========================================================================
@@ -1404,6 +1635,7 @@ export class JitsiController {
             this._listeners.clear()
 
             this._qualityCache.clear()
+            this._resetReceiverState()
 
             this._connection = null
             this._conference = null
@@ -1462,7 +1694,11 @@ export class JitsiController {
                     }
 
                 const onEstablished =
-                    resolveOnce
+                    () => {
+                        clearTimeout(this._connectionFallbackTimer)
+                        this._connectionFallbackTimer = null
+                        resolveOnce()
+                    }
 
                 const onFailed =
                     (error) => {
@@ -1480,19 +1716,34 @@ export class JitsiController {
 
                 const onDisconnected =
                     () => {
-                        this._emit(
-                            JITSI_EVENTS.CONNECTION_INTERRUPTED
-                        )
-
-                        // قطع عمدی (کاربر خودش leave کرده) → هیچ تلاشی برای وصل شدن نکن
                         if (this._isLeaving || this._isDisposed) {
                             return
                         }
 
-                        // قطعی روی نت ضعیف موبایل → سعی کن دوباره وصل شی
-                        // به‌جای اینکه بلافاصله FAILED اعلام کنی و کاربر رو از جلسه بندازی بیرون
+                        // A temporary network loss can make the XMPP connection report
+                        // disconnected while the conference ICE path is still able to
+                        // recover. Do not tear down the conference immediately.
+                        // CONNECTION_DISCONNECTED belongs to the XMPP/server connection.
+                        // Do not emit the conference ICE interruption event here; the
+                        // conference-level CONNECTION_INTERRUPTED event is the authoritative
+                        // media/ICE signal and prevents duplicate reconnect UI/events.
                         this._setStatus(MEETING_STATUS.RECONNECTING)
-                        this._scheduleReconnect()
+
+                        clearTimeout(this._connectionFallbackTimer)
+                        this._connectionFallbackTimer = setTimeout(() => {
+                            if (this._isLeaving || this._isDisposed) {
+                                return
+                            }
+
+                            const conference = this._conference
+                            if (conference && typeof conference.isConnectionInterrupted === 'function') {
+                                if (!conference.isConnectionInterrupted()) {
+                                    return
+                                }
+                            }
+
+                            this._scheduleReconnect()
+                        }, 10000)
                     }
 
 
@@ -1641,9 +1892,19 @@ export class JitsiController {
             // را اضافه کنیم، نه اینکه کاربر دوباره اجازه بدهد)
             const savedLocalTracks = [...this._localTracks]
 
-            this._removeAllJitsiListeners()
-            this._connection = null
+            // قبلاً فقط listener ها حذف و ارجاع‌ها null می‌شد؛ conference و
+            // connection قدیمی (وب‌سوکت XMPP + PeerConnection + decoder ها)
+            // هرگز بسته نمی‌شدند و با هر قطعی کوتاه یک نسخه‌ی دیگر روی هم
+            // جمع می‌شد. این یکی از دلایل داغ‌شدن گوشی بعد از یک ساعت بود.
+            // timeout می‌گذاریم چون روی شبکه‌ی قطع leave/disconnect ممکن
+            // است هیچ‌وقت resolve نشود.
+            await this._withTimeout(this._leaveConference(), 4000)
+            await this._withTimeout(this._disconnect(), 4000)
+
             this._conference = null
+            this._connection = null
+            this._remoteVideoSources.clear()
+            this._receiverKey = null
 
             await this._connect()
             await this._joinConference({
@@ -1664,6 +1925,9 @@ export class JitsiController {
             this._isReconnecting = false
             this._setStatus(MEETING_STATUS.CONNECTED)
             this._emit(JITSI_EVENTS.CONNECTION_ESTABLISHED)
+
+            // محدودیت‌های دریافت ویدیو روی conference جدید دوباره اعمال شود
+            this._applyReceiverConstraints()
         } catch (error) {
             this._isReconnecting = false
             console.warn('[JitsiController] Reconnect attempt failed:', error)
@@ -1673,7 +1937,12 @@ export class JitsiController {
 
     _cancelReconnect() {
         clearTimeout(this._reconnectTimer)
+        clearTimeout(this._connectionFallbackTimer)
+        clearTimeout(this._iceRestartTimer)
         this._reconnectTimer = null
+        this._connectionFallbackTimer = null
+        this._iceRestartTimer = null
+        this._iceRestartInFlight = false
         this._isReconnecting = false
         this._reconnectAttempts = 0
     }
@@ -1780,6 +2049,70 @@ export class JitsiController {
                         ]
                     )
                 }
+
+                // =================================================================
+                // Conference connection / ICE state
+                // =================================================================
+                // lib-jitsi-meet exposes these events at conference level.
+                // Keep the existing full reconnect as a fallback for a real
+                // XMPP connection disconnect, but do NOT recreate the conference
+                // or media tracks for a temporary ICE interruption.
+
+                bind(
+                    JitsiMeetJS.events.conference.CONNECTION_INTERRUPTED,
+                    () => {
+                        if (this._isLeaving || this._isDisposed) {
+                            return
+                        }
+
+                        this._setStatus(MEETING_STATUS.RECONNECTING)
+                        this._emit(JITSI_EVENTS.CONNECTION_INTERRUPTED)
+
+                        clearTimeout(this._iceRestartTimer)
+                        this._iceRestartTimer = setTimeout(async () => {
+                            if (this._isLeaving || this._isDisposed || this._iceRestartInFlight) {
+                                return
+                            }
+
+                            const currentConference = this._conference
+                            if (!currentConference || typeof currentConference.isIceRestartSupported !== 'function' || !currentConference.isIceRestartSupported()) {
+                                return
+                            }
+
+                            if (typeof currentConference.isConnectionInterrupted === 'function' && !currentConference.isConnectionInterrupted()) {
+                                return
+                            }
+
+                            this._iceRestartInFlight = true
+                            try {
+                                await currentConference.restartJvbIce()
+                            } catch (error) {
+                                console.warn('[JitsiController] JVB ICE restart failed:', error)
+                            } finally {
+                                this._iceRestartInFlight = false
+                            }
+                        }, 3000)
+                    }
+                )
+
+                bind(
+                    JitsiMeetJS.events.conference.CONNECTION_RESTORED,
+                    () => {
+                        clearTimeout(this._iceRestartTimer)
+                        clearTimeout(this._connectionFallbackTimer)
+                        this._iceRestartTimer = null
+                        this._connectionFallbackTimer = null
+                        this._iceRestartInFlight = false
+
+                        if (this._isLeaving || this._isDisposed) {
+                            return
+                        }
+
+                        this._reconnectAttempts = 0
+                        this._setStatus(MEETING_STATUS.CONNECTED)
+                        this._emit(JITSI_EVENTS.CONNECTION_RESTORED)
+                    }
+                )
 
                 // =================================================================
                 // Conference joined
@@ -1980,6 +2313,140 @@ export class JitsiController {
                     (participantId, stats) => {
                         const downloadPacketLoss = stats?.packetLoss?.download ?? null
                         this._emitQualityThrottled(participantId, stats?.connectionQuality ?? null, downloadPacketLoss)
+                    }
+                )
+
+                // =================================================================
+                // Remote track streaming status
+                // =================================================================
+                // Jitsi reports active/inactive/interrupted/restoring for remote
+                // video streams. This is more precise than treating every black
+                // video as a conference reconnect problem.
+
+                bind(
+                    JitsiMeetJS.events.conference.TRACK_ADDED,
+                    (track) => {
+                        if (!track || track.isLocal()) {
+                            return
+                        }
+
+                        const streamingEvent =
+                            JitsiMeetJS.events.track?.TRACK_STREAMING_STATUS_CHANGED
+
+                        if (!streamingEvent || typeof track.on !== 'function') {
+                            return
+                        }
+
+                        const handler = (sourceName, status) => {
+                            this._emit(JITSI_EVENTS.TRACK_STREAMING_STATUS_CHANGED, {
+                                track: mapTrack(track),
+                                sourceName: sourceName || null,
+                                status: status || null,
+                            })
+                        }
+
+                        track.on(streamingEvent, handler)
+
+                        // Emit the current state immediately as well. A remote track can
+                        // already be active by the time our listener is attached, so waiting
+                        // only for the next status transition can leave the app without the
+                        // real current streaming state.
+                        if (typeof track.getTrackStreamingStatus === 'function') {
+                            try {
+                                const currentStatus = track.getTrackStreamingStatus()
+
+                                if (currentStatus) {
+                                    this._emit(JITSI_EVENTS.TRACK_STREAMING_STATUS_CHANGED, {
+                                        track: mapTrack(track),
+                                        sourceName: null,
+                                        status: currentStatus,
+                                    })
+                                }
+                            } catch (error) {
+                                console.warn(
+                                    '[JitsiController] Could not read remote track streaming status:',
+                                    error
+                                )
+                            }
+                        }
+
+                        this._trackStreamingListeners = this._trackStreamingListeners || new Map()
+                        this._trackStreamingListeners.set(track, {
+                            event: streamingEvent,
+                            handler,
+                        })
+                    }
+                )
+
+                bind(
+                    JitsiMeetJS.events.conference.TRACK_REMOVED,
+                    (track) => {
+                        const entry = this._trackStreamingListeners?.get(track)
+                        if (!entry || !track || typeof track.off !== 'function') {
+                            this._trackStreamingListeners?.delete(track)
+                            return
+                        }
+
+                        try {
+                            track.off(entry.event, entry.handler)
+                        } catch {
+                        }
+
+                        this._trackStreamingListeners.delete(track)
+                    }
+                )
+
+                // =================================================================
+                // Remote video sources -> receiver constraints
+                // setReceiverConstraints با source name کار می‌کند؛ این نگاشت
+                // participantId -> sourceName را نگه می‌دارد.
+                // =================================================================
+
+                bind(
+                    JitsiMeetJS.events.conference.TRACK_ADDED,
+                    (track) => {
+                        if (
+                            !track ||
+                            track.isLocal() ||
+                            track.getType() !== 'video'
+                        ) {
+                            return
+                        }
+
+                        const sourceName = track.getSourceName?.()
+
+                        if (!sourceName) {
+                            return
+                        }
+
+                        this._remoteVideoSources.set(sourceName, {
+                            participantId: track.getParticipantId(),
+                            videoType: track.getVideoType?.() || 'camera',
+                        })
+
+                        this._applyReceiverConstraints()
+                    }
+                )
+
+                bind(
+                    JitsiMeetJS.events.conference.TRACK_REMOVED,
+                    (track) => {
+                        if (
+                            !track ||
+                            track.isLocal() ||
+                            track.getType() !== 'video'
+                        ) {
+                            return
+                        }
+
+                        const sourceName = track.getSourceName?.()
+
+                        if (
+                            sourceName &&
+                            this._remoteVideoSources.delete(sourceName)
+                        ) {
+                            this._applyReceiverConstraints()
+                        }
                     }
                 )
 
@@ -2253,14 +2720,18 @@ export class JitsiController {
              *
              * Jitsi/WebRTC handles the browser media processing path.
              */
+            const createOptions = {
+                devices: [type],
+            }
+
+            // رزولوشن دوربین ارسالی. قبلاً هیچ محدودیتی اعمال نمی‌شد و
+            // دوربین با پیش‌فرض lib (تا ۷۲۰p و بیشتر) باز می‌شد.
+            if (type === 'video') {
+                createOptions.resolution = LOCAL_VIDEO_CONFIG.resolution
+            }
+
             const tracks =
-                await JitsiMeetJS.createLocalTracks(
-                    {
-                        devices: [
-                            type,
-                        ],
-                    }
-                )
+                await JitsiMeetJS.createLocalTracks(createOptions)
 
             track =
                 tracks?.[0]
@@ -2289,6 +2760,10 @@ export class JitsiController {
                 track
             )
 
+            if (type === 'video') {
+                this._tuneLocalCamera(track)
+            }
+
             this._emit(
                 JITSI_EVENTS.TRACK_ADDED,
                 mapTrack(track)
@@ -2316,25 +2791,6 @@ export class JitsiController {
                 this._videoTrackCreating =
                     false
             }
-        }
-    }
-
-    _adaptReceiverQuality(quality) {
-        if (!this._conference || typeof this._conference.setReceiverVideoConstraint !== 'function') {
-            return
-        }
-
-        const POOR_THRESHOLD = 30
-
-        try {
-            if (quality != null && quality < POOR_THRESHOLD) {
-                // شبکه ضعیف: فقط کیفیت خیلی پایین بگیر تا استریم قطع نشود
-                this._conference.setReceiverVideoConstraint(180)
-            } else {
-                this._conference.setReceiverVideoConstraint(RECEIVER_QUALITY.LARGE)
-            }
-        } catch (error) {
-            console.warn('[JitsiController] Adaptive receiver quality failed:', error)
         }
     }
 
@@ -2385,6 +2841,16 @@ export class JitsiController {
                     return
                 }
 
+                // بعد از unmute، Jitsi ممکن است دوربین را از نو باز کند و
+                // محدودیت فریم‌ریت از بین برود.
+                if (
+                    type === 'video' &&
+                    !muted &&
+                    track.getVideoType?.() !== 'desktop'
+                ) {
+                    this._tuneLocalCamera(track)
+                }
+
                 if (!this._conference) {
                     return
                 }
@@ -2428,6 +2894,260 @@ export class JitsiController {
 
         track.__jitsiControllerMuteHandler =
             onMuteChanged
+
+        // ---------------------------------------------------------------------
+        // Local audio health events
+        // ---------------------------------------------------------------------
+        //
+        // Jitsi explicitly exposes these events for local tracks. We only
+        // attach the recovery handlers to audio tracks; video/reconnect paths
+        // are deliberately untouched.
+        if (track.getType() === 'audio') {
+            const onNoDataFromSource = () => {
+                if (
+                    !track.isMuted() &&
+                    this._localTracks.includes(track)
+                ) {
+                    void this._recoverLocalAudioTrack(
+                        track,
+                        'no-data-from-source'
+                    )
+                }
+            }
+
+            const onLocalTrackStopped = () => {
+                if (
+                    !this._isLeaving &&
+                    this._localTracks.includes(track)
+                ) {
+                    void this._recoverLocalAudioTrack(
+                        track,
+                        'local-track-stopped'
+                    )
+                }
+            }
+
+            track.addEventListener(
+                JitsiMeetJS.events.track
+                    .NO_DATA_FROM_SOURCE,
+                onNoDataFromSource
+            )
+
+            track.addEventListener(
+                JitsiMeetJS.events.track
+                    .LOCAL_TRACK_STOPPED,
+                onLocalTrackStopped
+            )
+
+            track.__jitsiControllerNoDataFromSourceHandler =
+                onNoDataFromSource
+
+            track.__jitsiControllerLocalTrackStoppedHandler =
+                onLocalTrackStopped
+        }
+    }
+
+    /**
+     * Conservative local-audio health check.
+     *
+     * Do not use isReceivingData() as a standalone failure signal because
+     * Jitsi documents that it can be false while a track is muted/disposed.
+     */
+    _isLocalAudioTrackBroken(track) {
+        if (!track || track.getType?.() !== 'audio') {
+            return true
+        }
+
+        try {
+            if (track.isEnded?.()) {
+                return true
+            }
+
+            if (track.disposed) {
+                return true
+            }
+
+            if (
+                !track.isMuted() &&
+                typeof track.isReceivingData === 'function' &&
+                !track.isReceivingData()
+            ) {
+                return true
+            }
+        } catch {
+            return true
+        }
+
+        return false
+    }
+
+    /**
+     * Replace a broken local microphone without reconnecting the conference.
+     * The replacement uses the same microphone device when Jitsi exposes it.
+     */
+    async _recoverLocalAudioTrack(
+        oldTrack,
+        reason
+    ) {
+        if (
+            !oldTrack ||
+            oldTrack.getType?.() !== 'audio' ||
+            !this._conference ||
+            this._isLeaving ||
+            oldTrack.isMuted?.()
+        ) {
+            return false
+        }
+
+        if (this._localAudioRecoveryInFlight) {
+            return false
+        }
+
+        const now = Date.now()
+
+        if (
+            now - this._localAudioRecoveryLastAt <
+            this._localAudioRecoveryCooldownMs
+        ) {
+            return false
+        }
+
+        if (
+            !this._localTracks.includes(oldTrack)
+        ) {
+            return false
+        }
+
+        this._localAudioRecoveryInFlight = true
+        this._localAudioRecoveryLastAt = now
+
+        const JitsiMeetJS =
+            ensureJitsiInitialized()
+
+        let newTrack = null
+
+        try {
+            const deviceId =
+                oldTrack.getDeviceId?.()
+
+            const options = {
+                devices: ['audio'],
+            }
+
+            if (deviceId) {
+                options.micDeviceId = deviceId
+            }
+
+            console.warn(
+                '[JitsiController] Recovering local audio track:',
+                reason
+            )
+
+            const tracks =
+                await JitsiMeetJS.createLocalTracks(
+                    options
+                )
+
+            newTrack = tracks?.[0]
+
+            if (!newTrack) {
+                throw new Error(
+                    'Could not create replacement audio track'
+                )
+            }
+
+            this._bindLocalTrackEvents(
+                newTrack
+            )
+
+            await this._conference.replaceTrack(
+                oldTrack,
+                newTrack
+            )
+
+            this._replaceLocalTrack(
+                oldTrack,
+                newTrack
+            )
+
+            // The old track is no longer needed after replaceTrack succeeds.
+            this._unbindLocalAudioRecoveryEvents(
+                oldTrack
+            )
+
+            await this._safeDisposeTrack(
+                oldTrack
+            )
+
+            this._emit(
+                JITSI_EVENTS.TRACK_REMOVED,
+                mapTrack(oldTrack)
+            )
+
+            this._emit(
+                JITSI_EVENTS.TRACK_ADDED,
+                mapTrack(newTrack)
+            )
+
+            return true
+        } catch (error) {
+            if (newTrack) {
+                this._unbindLocalAudioRecoveryEvents(
+                    newTrack
+                )
+
+                await this._safeDisposeTrack(
+                    newTrack
+                )
+            }
+
+            console.warn(
+                '[JitsiController] Local audio recovery failed:',
+                error
+            )
+
+            return false
+        } finally {
+            this._localAudioRecoveryInFlight = false
+        }
+    }
+
+    _unbindLocalAudioRecoveryEvents(
+        track
+    ) {
+        if (!track) {
+            return
+        }
+
+        try {
+            const JitsiMeetJS =
+                ensureJitsiInitialized()
+
+            const noDataHandler =
+                track.__jitsiControllerNoDataFromSourceHandler
+
+            if (noDataHandler) {
+                track.removeEventListener(
+                    JitsiMeetJS.events.track
+                        .NO_DATA_FROM_SOURCE,
+                    noDataHandler
+                )
+                delete track.__jitsiControllerNoDataFromSourceHandler
+            }
+
+            const stoppedHandler =
+                track.__jitsiControllerLocalTrackStoppedHandler
+
+            if (stoppedHandler) {
+                track.removeEventListener(
+                    JitsiMeetJS.events.track
+                        .LOCAL_TRACK_STOPPED,
+                    stoppedHandler
+                )
+                delete track.__jitsiControllerLocalTrackStoppedHandler
+            }
+        } catch {
+        }
     }
 
     /**
@@ -2605,6 +3325,16 @@ export class JitsiController {
 
                 delete track.__jitsiControllerScreenStoppedHandler
             }
+
+            // -----------------------------------------------------------------
+            // Remove local-audio recovery listeners before disposing.
+            // This prevents our own recovery from reacting to intentional
+            // disposal of the old microphone track.
+            // -----------------------------------------------------------------
+
+            this._unbindLocalAudioRecoveryEvents(
+                track
+            )
 
             // -----------------------------------------------------------------
             // Dispose Jitsi track
@@ -2858,6 +3588,7 @@ export class JitsiController {
         this._disconnectWatchdogs.clear()
 
         this._qualityCache.clear()
+        this._resetReceiverState()
 
         this._screenShare = {
             active: false,

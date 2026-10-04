@@ -6,23 +6,66 @@ let _displayStream = null
 let _micStream = null
 let _audioContext = null
 
+// پریست‌های کیفیت ضبط ویدیو. برای ضبط صفحه (متن/اسلاید/UI) نیازی به
+// فریم‌ریت و بیت‌ریت بالا نیست؛ همین باعث کاهش چشمگیر حجم فایل می‌شه.
+export const RECORDING_QUALITY_PRESETS = {
+    low: {
+        frameRate: 8,
+        videoBitsPerSecond: 250_000,
+        audioBitsPerSecond: 32_000,
+    },
+    medium: {
+        frameRate: 12,
+        videoBitsPerSecond: 500_000,
+        audioBitsPerSecond: 48_000,
+    },
+    high: {
+        frameRate: 20,
+        videoBitsPerSecond: 1_200_000,
+        audioBitsPerSecond: 96_000,
+    },
+}
+
+function resolveQualityPreset(quality) {
+    return RECORDING_QUALITY_PRESETS[quality] ?? RECORDING_QUALITY_PRESETS.medium
+}
+
+// انتخاب کدک قابل پشتیبانی. ترتیب بر اساس «کم‌ترین بار CPU» است:
+// vp8 سبک‌ترین انکودر نرم‌افزاری است. av1 (که قبلاً اول لیست بود) روی
+// دستگاه‌های قدیمی سنگین‌ترین انتخاب ممکن است و ضبط را کند/داغ می‌کند.
+function pickMimeType(candidates) {
+    return candidates.find((c) => MediaRecorder.isTypeSupported(c)) ?? 'video/webm'
+}
+
 export function isRecordingSupported() {
     return typeof navigator.mediaDevices?.getDisplayMedia === 'function'
 }
 
-export async function startLocalRecording() {
+/**
+ * @param {'low'|'medium'|'high'} quality پیش‌فرض: 'medium'
+ */
+export async function startLocalRecording(quality = 'medium', onEnded = null) {
     if (!isRecordingSupported()) {
         throw new Error('مرورگر شما از ضبط لوکال پشتیبانی نمی‌کند.')
     }
 
+    const preset = resolveQualityPreset(quality)
+
     // ۱. گرفتن تصویر صفحه + صدای خروجی تب (صدای بقیه‌ی شرکت‌کننده‌ها)
+    // محدود کردن فریم‌ریت مهم‌ترین فاکتور برای کاهش حجم ضبط صفحه‌ست،
+    // چون محتوای اسکرین‌شیر (متن/اسلاید/UI) معمولاً ساکنه.
     _displayStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { displaySurface: 'browser' },
+        video: {
+            displaySurface: 'browser',
+            frameRate: { ideal: preset.frameRate, max: preset.frameRate },
+        },
         audio: true,
     })
 
-    // ۲. گرفتن میکروفون خودمون جدا
-    _micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    // ۲. گرفتن میکروفون خودمون جدا (مونو کافیه، حجم صدا رو کم می‌کنه)
+    _micStream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1 },
+    })
 
     // ۳. میکس کردن دو منبع صدا با Web Audio API
     _audioContext = new AudioContext()
@@ -47,14 +90,16 @@ export async function startLocalRecording() {
 
     _recordedChunks = []
 
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-        ? 'video/webm;codecs=vp9,opus'
-        : 'video/webm'
+    const mimeType = pickMimeType([
+        'video/webm;codecs=vp8,opus',
+        'video/webm;codecs=vp9,opus',
+        'video/webm',
+    ])
 
     _mediaRecorder = new MediaRecorder(combinedStream, {
         mimeType,
-        videoBitsPerSecond: 1_000_000,
-        audioBitsPerSecond: 96_000,
+        videoBitsPerSecond: preset.videoBitsPerSecond,
+        audioBitsPerSecond: preset.audioBitsPerSecond,
     })
 
     _mediaRecorder.ondataavailable = (e) => {
@@ -64,7 +109,9 @@ export async function startLocalRecording() {
     return new Promise((resolve, reject) => {
         // اگه کاربر از دیالوگ مرورگر "Stop sharing" رو بزنه
         _displayStream.getVideoTracks()[0].addEventListener('ended', () => {
-            stopLocalRecording()
+            // وقتی کاربر از دیالوگ مرورگر «Stop sharing» را می‌زند باید state و
+            // تایمر اپ هم بسته شود؛ قبلاً فقط recorder متوقف می‌شد.
+            stopLocalRecording().then((blob) => onEnded?.(blob))
         })
 
         _mediaRecorder.onerror = (e) => reject(e.error)
@@ -106,13 +153,27 @@ let _voiceMicStream = null
 let _voiceDisplayStream = null
 let _voiceAudioContext = null
 
-export async function startVoiceRecording() {
-    // میکروفون خودمون
-    _voiceMicStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+/**
+ * @param {'low'|'medium'|'high'} quality پیش‌فرض: 'medium'
+ */
+export async function startVoiceRecording(quality = 'medium', onEnded = null) {
+    const preset = resolveQualityPreset(quality)
+
+    // میکروفون خودمون (مونو، چون فقط صدای گفتاره نه موسیقی)
+    _voiceMicStream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1 },
+    })
 
     // صدای خروجی تب (صدای بقیه‌ی شرکت‌کننده‌ها) — بدون نیاز به گرفتن تصویر واقعی صفحه
+    // مرورگرها audio-only capture از تب را نمی‌دهند، پس ویدیو باید درخواست شود
+    // ولی استفاده نمی‌شود. قبلاً video:true بود و کل صفحه با فریم‌ریت کامل برای
+    // ساعت‌ها capture می‌شد (CPU/GPU بیهوده). حالا کوچک‌ترین/کندترین حالت.
     _voiceDisplayStream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,   // مرورگرها اجازه‌ی audio-only capture از تب رو نمیدن، پس ویدیو باید درخواست بشه ولی استفاده نمیشه
+        video: {
+            frameRate: { ideal: 1, max: 1 },
+            width: { max: 640 },
+            height: { max: 360 },
+        },
         audio: true,
     })
 
@@ -139,7 +200,7 @@ export async function startVoiceRecording() {
 
     _voiceMediaRecorder = new MediaRecorder(destination.stream, {
         mimeType,
-        audioBitsPerSecond: 64_000,
+        audioBitsPerSecond: preset.audioBitsPerSecond,
     })
 
     _voiceMediaRecorder.ondataavailable = (e) => {
@@ -148,7 +209,7 @@ export async function startVoiceRecording() {
 
     return new Promise((resolve, reject) => {
         _voiceDisplayStream.getVideoTracks()[0]?.addEventListener('ended', () => {
-            stopVoiceRecording()
+            stopVoiceRecording().then((blob) => onEnded?.(blob))
         })
 
         _voiceMediaRecorder.onerror = (e) => reject(e.error)
