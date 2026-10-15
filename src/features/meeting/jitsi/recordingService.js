@@ -210,6 +210,7 @@ async function createAudioMixer({getExtraAudioTracks, fallbackStreams = []}) {
             if (!sources.has(track.id)) {
                 try {
                     sources.set(track.id, connectStream(new MediaStream([track])))
+                    console.info('[recording] audio source added:', track.label || track.id, `(total ${sources.size})`)
                 } catch (e) {
                     console.warn('[recording] could not add audio track', e)
                 }
@@ -219,6 +220,15 @@ async function createAudioMixer({getExtraAudioTracks, fallbackStreams = []}) {
 
     sync()
     const timer = setInterval(sync, AUDIO_SYNC_INTERVAL_MS)
+
+    // اگر بعد از چند ثانیه هیچ منبع صدایی وصل نشده باشد، ضبط بی‌صدا خواهد بود
+    if (typeof getExtraAudioTracks === 'function') {
+        setTimeout(() => {
+            if (sources.size === 0) {
+                console.warn('[recording] no live audio sources connected — the recording will be silent')
+            }
+        }, 4000)
+    }
 
     return {
         stream: destination.stream,
