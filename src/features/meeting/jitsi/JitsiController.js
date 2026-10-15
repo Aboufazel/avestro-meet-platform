@@ -966,7 +966,7 @@ export class JitsiController {
         }
 
         const maxVideos = PERF.maxRemoteVideos
-        const SCREEN_HEIGHT = Math.max(RECEIVER_QUALITY.LARGE, 720)
+        const SCREEN_HEIGHT = RECEIVER_QUALITY.SCREEN
 
         let message
 
@@ -1172,10 +1172,18 @@ export class JitsiController {
                 // سرور فقط یک اسلات ویدیو به ازای هر نفر دارد (multi-stream ندارد)؛
                 // اگر برعکس انجام شود، سرور روی camera قفل می‌ماند و بقیه هیچ‌وقت
                 // desktop را نمی‌بینند.
+                // قبل از dispose map می‌کنیم (بعدش track دیگر قابل پرس‌وجو نیست)
+                const mappedCamera = mapTrack(cameraTrack)
+
                 await this._conference.removeTrack(cameraTrack)
                 cameraRemoved = true
 
                 await this._safeDisposeTrack(cameraTrack)
+
+                // دوربین دیگر وجود ندارد؛ استور هم باید خبردار شود، وگرنه
+                // track مرده‌ی `local-video` می‌ماند و دکمه‌ی دوربین روشن نشان
+                // داده می‌شود.
+                this._emit(JITSI_EVENTS.TRACK_REMOVED, mappedCamera)
 
                 await this._conference.addTrack(desktopTrack)
                 trackAttached = true
@@ -1268,10 +1276,16 @@ export class JitsiController {
 
         const desktopTrack = this._screenShare.desktopTrack
         const shouldRestoreCamera = this._screenShare.wasCameraActiveBefore
+        const mappedDesktop = desktopTrack ? mapTrack(desktopTrack) : null
 
         await this._conference.removeTrack(desktopTrack)
         this._removeLocalTrack(desktopTrack)
         await this._safeDisposeTrack(desktopTrack)
+
+        // اشتراک صفحه دیگر وجود ندارد؛ `local-desktop` از استور پاک شود
+        if (mappedDesktop) {
+            this._emit(JITSI_EVENTS.TRACK_REMOVED, mappedDesktop)
+        }
         
         try {
             if (!desktopTrack) {

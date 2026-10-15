@@ -4,6 +4,7 @@ import { useMeetingStore } from '../store/meeting-store'
 import { VideoTile } from './VideoTile'
 import { jitsiController } from '../jitsi/JitsiController'
 import { PERF } from '../jitsi/jitsi-config'
+import { useGridColumns } from '../hooks/useMediaQuery'
 
 export const VideoGrid = memo(function VideoGrid() {
   const { participants, count } = useParticipants()
@@ -62,6 +63,51 @@ export const VideoGrid = memo(function VideoGrid() {
       avatarParticipants,
     }
   }, [participants, pinnedParticipantId, focusedParticipantId])
+
+  const cols = useGridColumns()
+
+  // ---------------------------------------------------------------------------
+  // حالت سینمایی (Cinema)
+  //
+  // وقتی «کس دیگری» صفحه‌اش را اشتراک می‌گذارد، اشتراک صفحه بزرگ و مرکز توجه
+  // می‌شود و بقیه (از جمله خودمان) در یک شبکه‌ی ثابت ۳ ستونه (دسکتاپ) /
+  // ۲ ستونه (موبایل) زیرش می‌آیند. با پایان اشتراک، همه‌چیز به چیدمان قبلی
+  // برمی‌گردد (چون فقط از state مشتق می‌شود و چیزی ذخیره نمی‌شود).
+  //
+  // برای خودِ اشتراک‌گذار این حالت فعال نیست (نمایش صفحه‌ی خودش در بزرگ‌ترین
+  // قاب = تونل بی‌نهایت). Pin/Focus صریح کاربر همچنان اولویت دارد.
+  // ---------------------------------------------------------------------------
+  const cinemaMode = Boolean(
+    layout.priorityParticipant?.isScreenSharing &&
+      !layout.priorityParticipant.isLocal
+  )
+
+  const cinemaGroups = useMemo(() => {
+    if (!cinemaMode) return null
+
+    const priorityId = layout.priorityParticipant.id
+    const tiles = []
+    const avatars = []
+
+    for (const participant of participants) {
+      if (participant.id === priorityId) continue
+
+      const micOn = !participant.isAudioMuted
+      const hasVideo =
+        participant.hasVideo !== undefined
+          ? participant.hasVideo
+          : !participant.isVideoMuted
+
+      // تایل فقط برای کسی که صدا/تصویر دارد (صدا از طریق همین تایل پخش می‌شود)
+      if (micOn || hasVideo || participant.isScreenSharing) {
+        tiles.push(participant)
+      } else {
+        avatars.push(participant)
+      }
+    }
+
+    return { tiles, avatars }
+  }, [cinemaMode, participants, layout.priorityParticipant])
 
   // ---------------------------------------------------------------------------
   // بودجه‌ی ویدیو (Video budget)
@@ -158,7 +204,74 @@ export const VideoGrid = memo(function VideoGrid() {
     )
   }
 
+  const avatarSection = (list) =>
+    list.length > 0 && (
+      <section
+        className="meeting-avatar-section"
+        aria-label="شرکت‌کنندگان بدون دوربین و میکروفون"
+      >
+        <div className="meeting-section-label">بدون تصویر و صدا</div>
+        <div className="meeting-avatar-row">
+          {list.map((participant) => {
+            const initial =
+              participant.displayName?.trim()?.[0]?.toUpperCase() || '?'
+            return (
+              <div
+                key={participant.id}
+                className="meeting-avatar-item"
+                title={participant.displayName}
+              >
+                <div className="meeting-avatar-circle">{initial}</div>
+                <span>{participant.displayName || 'شرکت‌کننده'}</span>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+    )
+
+  if (cinemaMode && cinemaGroups) {
+    const sharer = layout.priorityParticipant
+
+    return (
+      <div className="meeting-layout is-cinema h-full min-h-0 p-2 sm:p-3 pb-[calc(98px+env(safe-area-inset-bottom))] lg:pb-[calc(106px+env(safe-area-inset-bottom))]">
+        <section className="meeting-cinema" aria-label="اشتراک صفحه">
+          <VideoTile
+            participantId={sharer.id}
+            videoEnabled={allowedVideoIds.has(sharer.id)}
+            isLarge
+            isPinned={sharer.id === pinnedParticipantId}
+            isFocused={sharer.id === focusedParticipantId}
+          />
+        </section>
+
+        {cinemaGroups.tiles.length > 0 && (
+          <section className="meeting-cinema-participants" aria-label="شرکت‌کنندگان">
+            <div
+              className="meeting-cinema-grid"
+              style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+            >
+              {cinemaGroups.tiles.map((participant) => (
+                <div key={participant.id} className="meeting-cinema-tile">
+                  <VideoTile
+                    participantId={participant.id}
+                    videoEnabled={participant.isLocal || allowedVideoIds.has(participant.id)}
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {avatarSection(cinemaGroups.avatars)}
+      </div>
+    )
+  }
+
   const { priorityParticipant, speakers, cameraParticipants, avatarParticipants } = layout
+
+  // پر کردن آخرین ردیف با جای خالی، بر اساس تعداد ستون واقعی (۳ دسکتاپ / ۲ موبایل)
+  const fillCount = (n) => (n === 0 ? 0 : n < cols ? cols - n : (cols - (n % cols)) % cols)
   const hasFocus = Boolean(priorityParticipant)
   const focusIsPinned = priorityParticipant?.id === pinnedParticipantId
   const focusIsExplicit = priorityParticipant?.id === focusedParticipantId
@@ -203,14 +316,15 @@ export const VideoGrid = memo(function VideoGrid() {
             <span>{speakers.length} نفر با میکروفون روشن</span>
           </div>
           <div
-            className={`meeting-speaker-grid count-${Math.min(speakers.length, 7)}`}
+            className="meeting-speaker-grid"
+            style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
           >
             {speakers.map((participant) => (
               <div key={participant.id} className="meeting-speaker-tile">
                 <VideoTile participantId={participant.id} videoEnabled={participant.isLocal || allowedVideoIds.has(participant.id)} />
               </div>
             ))}
-            {Array.from({ length: speakers.length <= 3 ? 3 - speakers.length : speakers.length <= 6 ? 6 - speakers.length : 0 }).map((_, index) => (
+            {Array.from({ length: fillCount(speakers.length) }).map((_, index) => (
               <div
                 key={`speaker-placeholder-${index}`}
                 className="meeting-empty-tile meeting-speaker-tile"
@@ -229,13 +343,16 @@ export const VideoGrid = memo(function VideoGrid() {
       {cameraParticipants.length > 0 && (
         <section className="meeting-camera-section" aria-label="دوربین‌های روشن">
           <div className="meeting-section-label">دوربین</div>
-          <div className={`meeting-camera-grid count-${Math.min(cameraParticipants.length, 6)}`}>
+          <div
+            className="meeting-camera-grid"
+            style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+          >
             {cameraParticipants.map((participant) => (
               <div key={participant.id} className="meeting-camera-tile">
                 <VideoTile participantId={participant.id} videoEnabled={participant.isLocal || allowedVideoIds.has(participant.id)} />
               </div>
             ))}
-            {Array.from({ length: cameraParticipants.length <= 3 ? 3 - cameraParticipants.length : cameraParticipants.length <= 6 ? 6 - cameraParticipants.length : 0 }).map((_, index) => (
+            {Array.from({ length: fillCount(cameraParticipants.length) }).map((_, index) => (
               <div
                 key={`camera-placeholder-${index}`}
                 className="meeting-empty-tile meeting-camera-tile"
@@ -251,30 +368,7 @@ export const VideoGrid = memo(function VideoGrid() {
         </section>
       )}
 
-      {avatarParticipants.length > 0 && (
-        <section
-          className="meeting-avatar-section"
-          aria-label="شرکت‌کنندگان بدون دوربین و میکروفون"
-        >
-          <div className="meeting-section-label">بدون تصویر و صدا</div>
-          <div className="meeting-avatar-row">
-            {avatarParticipants.map((participant) => {
-              const initial =
-                participant.displayName?.trim()?.[0]?.toUpperCase() || '?'
-              return (
-                <div
-                  key={participant.id}
-                  className="meeting-avatar-item"
-                  title={participant.displayName}
-                >
-                  <div className="meeting-avatar-circle">{initial}</div>
-                  <span>{participant.displayName || 'شرکت‌کننده'}</span>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      )}
+      {avatarSection(avatarParticipants)}
 
       {!hasFocus &&
         !speakers.length &&

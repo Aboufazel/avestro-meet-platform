@@ -622,9 +622,20 @@ export const useMeetingStore = create((set, get) => ({
                 }
             }
 
+            // با پایان اشتراک، track محلی صفحه هم از استور پاک شود؛ وگرنه
+            // VideoTile (desktopTrack || videoTrack) همچنان track مرده را
+            // نشان می‌دهد و تایل سیاه می‌ماند.
+            let tracks = state.tracks
+
+            if (!enabled && tracks.has('local-desktop')) {
+                tracks = new Map(tracks)
+                tracks.delete('local-desktop')
+            }
+
             return {
                 isScreenSharing: enabled,
                 participants,
+                tracks,
             }
         }),
 

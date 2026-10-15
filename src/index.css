@@ -700,15 +700,6 @@
   flex: 1 1 auto;
   max-height: none;
 }
-.meeting-speaker-grid.count-1 { grid-template-columns: minmax(0, 1fr); }
-.meeting-speaker-grid.count-2,
-.meeting-speaker-grid.count-3,
-.meeting-speaker-grid.count-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.meeting-speaker-grid.count-5,
-.meeting-speaker-grid.count-6,
-.meeting-speaker-grid.count-7 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.meeting-speaker-grid.count-7 { overflow-y: auto; }
-
 @media (max-width: 767px) {
   .meeting-speaker-stage.is-single {
     flex-basis: clamp(250px, 48vh, 500px);
@@ -717,31 +708,10 @@
   }
   .meeting-speaker-stage.is-single .meeting-speaker-grid {
     grid-auto-rows: minmax(220px, 1fr);
-  }
-  .meeting-speaker-grid.count-1 { grid-template-columns: minmax(0, 1fr); }
-  .meeting-speaker-grid.count-2,
-  .meeting-speaker-grid.count-3,
-  .meeting-speaker-grid.count-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .meeting-speaker-grid.count-5,
-  .meeting-speaker-grid.count-6,
-  .meeting-speaker-grid.count-7 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+  }}
 
 /* Reply is an intentional action, not a hover-only affordance. */
 .room-chat-reply-action { opacity: 1 !important; visibility: visible !important; }
-
-/* Camera section follows the same density rule: one camera gets the full row. */
-.meeting-camera-grid.count-1 { grid-template-columns: minmax(0, 1fr); }
-.meeting-camera-grid.count-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.meeting-camera-grid.count-3,
-.meeting-camera-grid.count-4 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-@media (max-width: 767px) {
-  .meeting-camera-grid.count-1 { grid-template-columns: minmax(0, 1fr); }
-  .meeting-camera-grid.count-2,
-  .meeting-camera-grid.count-3,
-  .meeting-camera-grid.count-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
 
 /* =========================================================
    Stable participant slots
@@ -782,33 +752,6 @@
   font-size: 18px;
   font-weight: 300;
 }
-
-/* One-to-three participants keep the same three-slot composition. */
-.meeting-speaker-grid.count-1,
-.meeting-speaker-grid.count-2,
-.meeting-speaker-grid.count-3,
-.meeting-camera-grid.count-1,
-.meeting-camera-grid.count-2,
-.meeting-camera-grid.count-3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.meeting-speaker-grid.count-4 {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-.meeting-speaker-grid.count-5,
-.meeting-speaker-grid.count-6 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.meeting-camera-grid.count-4 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-.meeting-camera-grid.count-5,
-.meeting-camera-grid.count-6 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
 /* Do not let the old single-item flex sizing override the stable slots. */
 .meeting-speaker-stage.is-single {
   flex: 0 0 auto;
@@ -824,15 +767,6 @@
 }
 
 @media (max-width: 767px) {
-  .meeting-speaker-grid.count-1,
-  .meeting-speaker-grid.count-2,
-  .meeting-speaker-grid.count-3,
-  .meeting-camera-grid.count-1,
-  .meeting-camera-grid.count-2,
-  .meeting-camera-grid.count-3 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .meeting-speaker-stage.is-single {
     flex: 0 0 auto;
     min-height: 0;
@@ -848,4 +782,44 @@
   .meeting-stage-dot,
   .room-weak-wave i,
   .room-glow { animation: none !important; }
+}
+
+/* =========================================================
+   ستون‌های ثابت
+   تعداد ستون شبکه‌ها از VideoGrid (inline style) می‌آید: ۳ در دسکتاپ و
+   ۲ در موبایل؛ دیگر با تعداد شرکت‌کننده‌ها عوض نمی‌شود.
+   ========================================================= */
+
+/* =========================================================
+   حالت سینمایی اشتراک صفحه (فقط برای بیننده‌ها)
+   اشتراک صفحه بزرگ و بالا؛ بقیه در شبکه‌ی ۳ ستونه / ۲ ستونه زیرش.
+   ========================================================= */
+.meeting-layout.is-cinema { gap: 10px; }
+.meeting-layout.is-cinema > * { flex-shrink: 0; }
+
+.meeting-cinema {
+  position: relative;
+  width: 100%;
+  height: clamp(320px, 62vh, 820px);
+  border-radius: 20px;
+  background: #000;
+  box-shadow: 0 22px 70px rgba(0,0,0,.5);
+}
+.meeting-cinema > div { width: 100%; height: 100%; }
+
+.meeting-cinema-participants { min-width: 0; }
+.meeting-cinema-grid {
+  display: grid;
+  gap: 10px;
+}
+.meeting-cinema-tile { min-width: 0; }
+.meeting-cinema-tile > div { width: 100%; }
+
+@media (max-width: 767px) {
+  .meeting-layout.is-cinema { gap: 8px; }
+  .meeting-cinema {
+    height: clamp(200px, 30vh, 320px);
+    border-radius: 16px;
+  }
+  .meeting-cinema-grid { gap: 7px; }
 }

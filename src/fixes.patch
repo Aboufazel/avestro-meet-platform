@@ -160,7 +160,7 @@
 +        }
 +
 +        const maxVideos = PERF.maxRemoteVideos
-+        const SCREEN_HEIGHT = Math.max(RECEIVER_QUALITY.LARGE, 720)
++        const SCREEN_HEIGHT = RECEIVER_QUALITY.SCREEN
 +
 +        let message
 +
@@ -172,7 +172,7 @@
 +                onStageSources: [],
 +                defaultConstraints: {maxHeight: RECEIVER_QUALITY.SMALL},
 +                constraints: {},
-+            }
+             }
 +        } else {
 +            const onStageSources = []
 +            const constraints = {}
@@ -180,7 +180,9 @@
 +            for (const id of intent.onStageIds) {
 +                const sources = this._sourcesOfParticipant(id)
 +                const hasDesktop = sources.some((s) => s.videoType === 'desktop')
-+
+ 
+-            this._preferredParticipantsKey = key
+-            this._conference.selectParticipants(normalizedIds)
 +                for (const {sourceName, videoType} of sources) {
 +                    // اگر کسی صفحه‌اش را اشتراک می‌گذارد، فقط صفحه «بزرگ» است
 +                    // و دوربینش همان کیفیت کوچک پیش‌فرض را می‌گیرد.
@@ -194,10 +196,8 @@
 +                                : RECEIVER_QUALITY.LARGE,
 +                    }
 +                }
-             }
- 
--            this._preferredParticipantsKey = key
--            this._conference.selectParticipants(normalizedIds)
++            }
++
 +            const selected = [...onStageSources]
 +
 +            for (const id of intent.visibleIds) {
@@ -327,7 +327,44 @@
      // =========================================================================
  // Screen Share
  // =========================================================================
-@@ -1444,7 +1635,7 @@
+@@ -981,11 +1172,19 @@
+                 // سرور فقط یک اسلات ویدیو به ازای هر نفر دارد (multi-stream ندارد)؛
+                 // اگر برعکس انجام شود، سرور روی camera قفل می‌ماند و بقیه هیچ‌وقت
+                 // desktop را نمی‌بینند.
++                // قبل از dispose map می‌کنیم (بعدش track دیگر قابل پرس‌وجو نیست)
++                const mappedCamera = mapTrack(cameraTrack)
++
+                 await this._conference.removeTrack(cameraTrack)
+                 cameraRemoved = true
+ 
+                 await this._safeDisposeTrack(cameraTrack)
+ 
++                // دوربین دیگر وجود ندارد؛ استور هم باید خبردار شود، وگرنه
++                // track مرده‌ی `local-video` می‌ماند و دکمه‌ی دوربین روشن نشان
++                // داده می‌شود.
++                this._emit(JITSI_EVENTS.TRACK_REMOVED, mappedCamera)
++
+                 await this._conference.addTrack(desktopTrack)
+                 trackAttached = true
+ 
+@@ -1077,10 +1276,16 @@
+ 
+         const desktopTrack = this._screenShare.desktopTrack
+         const shouldRestoreCamera = this._screenShare.wasCameraActiveBefore
++        const mappedDesktop = desktopTrack ? mapTrack(desktopTrack) : null
+ 
+         await this._conference.removeTrack(desktopTrack)
+         this._removeLocalTrack(desktopTrack)
+         await this._safeDisposeTrack(desktopTrack)
++
++        // اشتراک صفحه دیگر وجود ندارد؛ `local-desktop` از استور پاک شود
++        if (mappedDesktop) {
++            this._emit(JITSI_EVENTS.TRACK_REMOVED, mappedDesktop)
++        }
+         
+         try {
+             if (!desktopTrack) {
+@@ -1444,7 +1649,7 @@
              this._listeners.clear()
  
              this._qualityCache.clear()
@@ -336,7 +373,7 @@
  
              this._connection = null
              this._conference = null
-@@ -1701,9 +1892,19 @@
+@@ -1701,9 +1906,19 @@
              // را اضافه کنیم، نه اینکه کاربر دوباره اجازه بدهد)
              const savedLocalTracks = [...this._localTracks]
  
@@ -358,7 +395,7 @@
  
              await this._connect()
              await this._joinConference({
-@@ -1724,6 +1925,9 @@
+@@ -1724,6 +1939,9 @@
              this._isReconnecting = false
              this._setStatus(MEETING_STATUS.CONNECTED)
              this._emit(JITSI_EVENTS.CONNECTION_ESTABLISHED)
@@ -368,7 +405,7 @@
          } catch (error) {
              this._isReconnecting = false
              console.warn('[JitsiController] Reconnect attempt failed:', error)
-@@ -2193,6 +2397,60 @@
+@@ -2193,6 +2411,60 @@
                  )
  
                  // =================================================================
@@ -429,7 +466,7 @@
                  // Track mute changed
                  //
                  // Local tracks already have their own listener.
-@@ -2462,14 +2720,18 @@
+@@ -2462,14 +2734,18 @@
               *
               * Jitsi/WebRTC handles the browser media processing path.
               */
@@ -455,7 +492,7 @@
  
              track =
                  tracks?.[0]
-@@ -2498,6 +2760,10 @@
+@@ -2498,6 +2774,10 @@
                  track
              )
  
@@ -466,7 +503,7 @@
              this._emit(
                  JITSI_EVENTS.TRACK_ADDED,
                  mapTrack(track)
-@@ -2575,6 +2841,16 @@
+@@ -2575,6 +2855,16 @@
                      return
                  }
  
@@ -483,7 +520,7 @@
                  if (!this._conference) {
                      return
                  }
-@@ -3312,7 +3588,7 @@
+@@ -3312,7 +3602,7 @@
          this._disconnectWatchdogs.clear()
  
          this._qualityCache.clear()
@@ -515,7 +552,7 @@
  // =============================================================================
  export function isMobileDevice() {
    if (typeof navigator === 'undefined') return false
-@@ -40,92 +41,112 @@
+@@ -40,92 +41,116 @@
    return isMobileUA || isTouchMac
  }
  
@@ -555,6 +592,9 @@
 +  // کیفیت دریافتی: تایل بزرگ (focus / active speaker) در مقابل تایل کوچک
 +  receiveLargeHeight: { low: 360, medium: 480, high: 720 }[DEVICE_TIER],
 +  receiveSmallHeight: 180,
++
++  // اشتراک صفحه در قاب سینمایی بزرگ نمایش داده می‌شود؛ متن باید خوانا بماند
++  receiveScreenHeight: { low: 720, medium: 720, high: 1080 }[DEVICE_TIER],
 +
 +  // فاصله‌ی اندازه‌گیری audio level (ms). پیش‌فرض خود lib خیلی پرتکرار است.
 +  audioLevelsInterval: { low: 1000, medium: 500, high: 300 }[DEVICE_TIER],
@@ -692,9 +732,52 @@
 -  SMALL: 180,
 +  LARGE: PERF.receiveLargeHeight,
 +  SMALL: PERF.receiveSmallHeight,
++  SCREEN: PERF.receiveScreenHeight,
  }
  
  // =============================================================================
+--- a/features/meeting/jitsi/jitsi-mappers.js
++++ b/features/meeting/jitsi/jitsi-mappers.js
+@@ -59,12 +59,38 @@
+  * @param {JitsiTrack} jitsiTrack
+  * @returns {AppTrack}
+  */
++/**
++ * نوع track برای اپ: 'audio' | 'video' | 'desktop'
++ *
++ * در lib-jitsi-meet اشتراک صفحه هم یک track از نوع 'video' است؛ فقط
++ * getVideoType() مشخص می‌کند 'desktop' است یا 'camera'. استور و UI به نوع
++ * 'desktop' تکیه دارند (کلید `${id}-desktop`، isScreenSharing و ...). قبلاً
++ * این‌جا فقط getType() برگردانده می‌شد، پس اشتراک صفحه‌ی دیگران هیچ‌وقت
++ * به‌عنوان اشتراک صفحه شناخته نمی‌شد و مثل یک دوربین معمولی نمایش داده می‌شد.
++ */
++function resolveTrackType(jitsiTrack) {
++  const type = jitsiTrack.getType()
++
++  if (type === 'video') {
++    const videoType =
++      typeof jitsiTrack.getVideoType === 'function'
++        ? jitsiTrack.getVideoType()
++        : jitsiTrack.videoType
++
++    if (videoType === 'desktop') {
++      return 'desktop'
++    }
++  }
++
++  return type
++}
++
+ export function mapTrack(jitsiTrack) {
+   return {
+     participantId: jitsiTrack.isLocal()
+       ? 'local'
+       : jitsiTrack.getParticipantId(),
+-    type: jitsiTrack.getType(),
++    type: resolveTrackType(jitsiTrack),
+     isMuted: jitsiTrack.isMuted(),
+     isLocal: jitsiTrack.isLocal(),
+     track: jitsiTrack.getTrack(),
 --- a/features/meeting/jitsi/recordingService.js
 +++ b/features/meeting/jitsi/recordingService.js
 @@ -30,8 +30,9 @@
@@ -824,7 +907,28 @@
      _setScreenSharing: (enabled, track = null) =>
          set((state) => {
              const participants =
-@@ -751,6 +777,8 @@
+@@ -596,9 +622,20 @@
+                 }
+             }
+ 
++            // با پایان اشتراک، track محلی صفحه هم از استور پاک شود؛ وگرنه
++            // VideoTile (desktopTrack || videoTrack) همچنان track مرده را
++            // نشان می‌دهد و تایل سیاه می‌ماند.
++            let tracks = state.tracks
++
++            if (!enabled && tracks.has('local-desktop')) {
++                tracks = new Map(tracks)
++                tracks.delete('local-desktop')
++            }
++
+             return {
+                 isScreenSharing: enabled,
+                 participants,
++                tracks,
+             }
+         }),
+ 
+@@ -751,6 +788,8 @@
              focusedParticipantId: null,
  
              tracks: new Map(),
@@ -960,7 +1064,7 @@
  }
 --- a/features/meeting/components/VideoGrid.jsx
 +++ b/features/meeting/components/VideoGrid.jsx
-@@ -1,8 +1,9 @@
+@@ -1,8 +1,10 @@
 -import { memo, useEffect, useMemo } from 'react'
 +import { memo, useEffect, useMemo, useState } from 'react'
  import { useParticipants } from '../hooks/useParticipants'
@@ -968,10 +1072,11 @@
  import { VideoTile } from './VideoTile'
  import { jitsiController } from '../jitsi/JitsiController'
 +import { PERF } from '../jitsi/jitsi-config'
++import { useGridColumns } from '../hooks/useMediaQuery'
  
  export const VideoGrid = memo(function VideoGrid() {
    const { participants, count } = useParticipants()
-@@ -62,42 +63,84 @@
+@@ -62,42 +64,129 @@
      }
    }, [participants, pinnedParticipantId, focusedParticipantId])
  
@@ -983,6 +1088,55 @@
 -        (p) => p.id === pinnedParticipantId && !p.isLocal
 -      )
 -      if (pinned) return pinned.id
++  const cols = useGridColumns()
++
++  // ---------------------------------------------------------------------------
++  // حالت سینمایی (Cinema)
++  //
++  // وقتی «کس دیگری» صفحه‌اش را اشتراک می‌گذارد، اشتراک صفحه بزرگ و مرکز توجه
++  // می‌شود و بقیه (از جمله خودمان) در یک شبکه‌ی ثابت ۳ ستونه (دسکتاپ) /
++  // ۲ ستونه (موبایل) زیرش می‌آیند. با پایان اشتراک، همه‌چیز به چیدمان قبلی
++  // برمی‌گردد (چون فقط از state مشتق می‌شود و چیزی ذخیره نمی‌شود).
++  //
++  // برای خودِ اشتراک‌گذار این حالت فعال نیست (نمایش صفحه‌ی خودش در بزرگ‌ترین
++  // قاب = تونل بی‌نهایت). Pin/Focus صریح کاربر همچنان اولویت دارد.
++  // ---------------------------------------------------------------------------
++  const cinemaMode = Boolean(
++    layout.priorityParticipant?.isScreenSharing &&
++      !layout.priorityParticipant.isLocal
++  )
++
++  const cinemaGroups = useMemo(() => {
++    if (!cinemaMode) return null
++
++    const priorityId = layout.priorityParticipant.id
++    const tiles = []
++    const avatars = []
++
++    for (const participant of participants) {
++      if (participant.id === priorityId) continue
++
++      const micOn = !participant.isAudioMuted
++      const hasVideo =
++        participant.hasVideo !== undefined
++          ? participant.hasVideo
++          : !participant.isVideoMuted
++
++      // تایل فقط برای کسی که صدا/تصویر دارد (صدا از طریق همین تایل پخش می‌شود)
++      if (micOn || hasVideo || participant.isScreenSharing) {
++        tiles.push(participant)
++      } else {
++        avatars.push(participant)
++      }
+     }
+ 
+-    const screenSharer = participants.find(
+-      (p) => p.isScreenSharing && !p.isLocal
+-    )
+-    if (screenSharer) return screenSharer.id
++    return { tiles, avatars }
++  }, [cinemaMode, participants, layout.priorityParticipant])
++
 +  // ---------------------------------------------------------------------------
 +  // بودجه‌ی ویدیو (Video budget)
 +  //
@@ -1004,7 +1158,12 @@
 +      layout.priorityParticipant && !layout.priorityParticipant.isLocal
 +        ? layout.priorityParticipant
 +        : null
-+
+ 
+-    if (activeSpeakerId) {
+-      const active = participants.find(
+-        (p) => p.id === activeSpeakerId && !p.isLocal
+-      )
+-      if (active) return active.id
 +    const activeSpeaker = activeSpeakerId
 +      ? remote.find((p) => p.id === activeSpeakerId) || null
 +      : null
@@ -1014,10 +1173,8 @@
 +      if (p && hasLiveVideo(p) && !ordered.includes(p.id)) ordered.push(p.id)
      }
  
--    const screenSharer = participants.find(
--      (p) => p.isScreenSharing && !p.isLocal
--    )
--    if (screenSharer) return screenSharer.id
+-    return null
+-  }, [participants, pinnedParticipantId, activeSpeakerId])
 +    push(priorityRemote)
 +    push(activeSpeaker)
 +    remote.forEach(push)
@@ -1041,22 +1198,6 @@
 +  )
 +  const isRecording = useMeetingStore((s) => s.isRecording)
  
--    if (activeSpeakerId) {
--      const active = participants.find(
--        (p) => p.id === activeSpeakerId && !p.isLocal
--      )
--      if (active) return active.id
--    }
-+  useEffect(() => {
-+    const onVisibility = () => setPageHidden(document.hidden)
-+    document.addEventListener('visibilitychange', onVisibility)
-+    return () => document.removeEventListener('visibilitychange', onVisibility)
-+  }, [])
- 
--    return null
--  }, [participants, pinnedParticipantId, activeSpeakerId])
-+  const paused = pageHidden && !isRecording
- 
    useEffect(() => {
 -    const timer = window.setTimeout(() => {
 -      jitsiController.setPreferredParticipants(
@@ -1065,6 +1206,14 @@
 -          : []
 -      )
 -    }, 900)
++    const onVisibility = () => setPageHidden(document.hidden)
++    document.addEventListener('visibilitychange', onVisibility)
++    return () => document.removeEventListener('visibilitychange', onVisibility)
++  }, [])
++
++  const paused = pageHidden && !isRecording
++
++  useEffect(() => {
 +    // قطع ویدیو با ۳ ثانیه تأخیر (تا جابه‌جایی کوتاه بین تب‌ها لگ نزند)،
 +    // اما برگشت و تغییر گوینده سریع اعمال شود.
 +    const timer = window.setTimeout(
@@ -1084,16 +1233,88 @@
  
    if (count === 0) {
      return (
-@@ -110,7 +153,7 @@
+@@ -110,12 +199,79 @@
    if (count === 1 && !layout.priorityParticipant) {
      return (
        <div className="h-full min-h-0 p-2 sm:p-3 pb-[calc(96px+env(safe-area-inset-bottom))]">
 -        <VideoTile participantId={participants[0].id} isLarge />
 +        <VideoTile participantId={participants[0].id} isLarge videoEnabled={participants[0].isLocal || allowedVideoIds.has(participants[0].id)} />
++      </div>
++    )
++  }
++
++  const avatarSection = (list) =>
++    list.length > 0 && (
++      <section
++        className="meeting-avatar-section"
++        aria-label="شرکت‌کنندگان بدون دوربین و میکروفون"
++      >
++        <div className="meeting-section-label">بدون تصویر و صدا</div>
++        <div className="meeting-avatar-row">
++          {list.map((participant) => {
++            const initial =
++              participant.displayName?.trim()?.[0]?.toUpperCase() || '?'
++            return (
++              <div
++                key={participant.id}
++                className="meeting-avatar-item"
++                title={participant.displayName}
++              >
++                <div className="meeting-avatar-circle">{initial}</div>
++                <span>{participant.displayName || 'شرکت‌کننده'}</span>
++              </div>
++            )
++          })}
++        </div>
++      </section>
++    )
++
++  if (cinemaMode && cinemaGroups) {
++    const sharer = layout.priorityParticipant
++
++    return (
++      <div className="meeting-layout is-cinema h-full min-h-0 p-2 sm:p-3 pb-[calc(98px+env(safe-area-inset-bottom))] lg:pb-[calc(106px+env(safe-area-inset-bottom))]">
++        <section className="meeting-cinema" aria-label="اشتراک صفحه">
++          <VideoTile
++            participantId={sharer.id}
++            videoEnabled={allowedVideoIds.has(sharer.id)}
++            isLarge
++            isPinned={sharer.id === pinnedParticipantId}
++            isFocused={sharer.id === focusedParticipantId}
++          />
++        </section>
++
++        {cinemaGroups.tiles.length > 0 && (
++          <section className="meeting-cinema-participants" aria-label="شرکت‌کنندگان">
++            <div
++              className="meeting-cinema-grid"
++              style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
++            >
++              {cinemaGroups.tiles.map((participant) => (
++                <div key={participant.id} className="meeting-cinema-tile">
++                  <VideoTile
++                    participantId={participant.id}
++                    videoEnabled={participant.isLocal || allowedVideoIds.has(participant.id)}
++                  />
++                </div>
++              ))}
++            </div>
++          </section>
++        )}
++
++        {avatarSection(cinemaGroups.avatars)}
        </div>
      )
    }
-@@ -128,6 +171,7 @@
+ 
+   const { priorityParticipant, speakers, cameraParticipants, avatarParticipants } = layout
++
++  // پر کردن آخرین ردیف با جای خالی، بر اساس تعداد ستون واقعی (۳ دسکتاپ / ۲ موبایل)
++  const fillCount = (n) => (n === 0 ? 0 : n < cols ? cols - n : (cols - (n % cols)) % cols)
+   const hasFocus = Boolean(priorityParticipant)
+   const focusIsPinned = priorityParticipant?.id === pinnedParticipantId
+   const focusIsExplicit = priorityParticipant?.id === focusedParticipantId
+@@ -128,6 +284,7 @@
            <section className="meeting-focus-view" aria-label="نمای اصلی">
              <VideoTile
                participantId={priorityParticipant.id}
@@ -1101,7 +1322,13 @@
                isLarge
                isPinned={focusIsPinned}
                isFocused={focusIsExplicit}
-@@ -163,7 +207,7 @@
+@@ -159,14 +316,15 @@
+             <span>{speakers.length} نفر با میکروفون روشن</span>
+           </div>
+           <div
+-            className={`meeting-speaker-grid count-${Math.min(speakers.length, 7)}`}
++            className="meeting-speaker-grid"
++            style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
            >
              {speakers.map((participant) => (
                <div key={participant.id} className="meeting-speaker-tile">
@@ -1109,19 +1336,84 @@
 +                <VideoTile participantId={participant.id} videoEnabled={participant.isLocal || allowedVideoIds.has(participant.id)} />
                </div>
              ))}
-             {Array.from({ length: speakers.length <= 3 ? 3 - speakers.length : speakers.length <= 6 ? 6 - speakers.length : 0 }).map((_, index) => (
-@@ -188,7 +232,7 @@
-           <div className={`meeting-camera-grid count-${Math.min(cameraParticipants.length, 6)}`}>
+-            {Array.from({ length: speakers.length <= 3 ? 3 - speakers.length : speakers.length <= 6 ? 6 - speakers.length : 0 }).map((_, index) => (
++            {Array.from({ length: fillCount(speakers.length) }).map((_, index) => (
+               <div
+                 key={`speaker-placeholder-${index}`}
+                 className="meeting-empty-tile meeting-speaker-tile"
+@@ -185,13 +343,16 @@
+       {cameraParticipants.length > 0 && (
+         <section className="meeting-camera-section" aria-label="دوربین‌های روشن">
+           <div className="meeting-section-label">دوربین</div>
+-          <div className={`meeting-camera-grid count-${Math.min(cameraParticipants.length, 6)}`}>
++          <div
++            className="meeting-camera-grid"
++            style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
++          >
              {cameraParticipants.map((participant) => (
                <div key={participant.id} className="meeting-camera-tile">
 -                <VideoTile participantId={participant.id} />
 +                <VideoTile participantId={participant.id} videoEnabled={participant.isLocal || allowedVideoIds.has(participant.id)} />
                </div>
              ))}
-             {Array.from({ length: cameraParticipants.length <= 3 ? 3 - cameraParticipants.length : cameraParticipants.length <= 6 ? 6 - cameraParticipants.length : 0 }).map((_, index) => (
+-            {Array.from({ length: cameraParticipants.length <= 3 ? 3 - cameraParticipants.length : cameraParticipants.length <= 6 ? 6 - cameraParticipants.length : 0 }).map((_, index) => (
++            {Array.from({ length: fillCount(cameraParticipants.length) }).map((_, index) => (
+               <div
+                 key={`camera-placeholder-${index}`}
+                 className="meeting-empty-tile meeting-camera-tile"
+@@ -207,30 +368,7 @@
+         </section>
+       )}
+ 
+-      {avatarParticipants.length > 0 && (
+-        <section
+-          className="meeting-avatar-section"
+-          aria-label="شرکت‌کنندگان بدون دوربین و میکروفون"
+-        >
+-          <div className="meeting-section-label">بدون تصویر و صدا</div>
+-          <div className="meeting-avatar-row">
+-            {avatarParticipants.map((participant) => {
+-              const initial =
+-                participant.displayName?.trim()?.[0]?.toUpperCase() || '?'
+-              return (
+-                <div
+-                  key={participant.id}
+-                  className="meeting-avatar-item"
+-                  title={participant.displayName}
+-                >
+-                  <div className="meeting-avatar-circle">{initial}</div>
+-                  <span>{participant.displayName || 'شرکت‌کننده'}</span>
+-                </div>
+-              )
+-            })}
+-          </div>
+-        </section>
+-      )}
++      {avatarSection(avatarParticipants)}
+ 
+       {!hasFocus &&
+         !speakers.length &&
 --- a/features/meeting/components/VideoTile.jsx
 +++ b/features/meeting/components/VideoTile.jsx
-@@ -29,7 +29,6 @@
+@@ -12,15 +12,10 @@
+     SignalHigh,
+     SignalMedium,
+     SignalLow,
+-    Pin,
+-    PinOff,
+-    ZoomIn,
+-    ZoomOut,
+-    MoreHorizontal,
+-    Maximize2,
+-    Minimize2,
+ } from 'lucide-react'
+ 
++import {TileActionsMenu} from './TileActionsMenu'
++
+ import {useParticipant} from '../hooks/useParticipants'
+ 
+ import {useParticipantTracks} from '../hooks/useTracks'
+@@ -29,7 +24,6 @@
  
  import {
      selectIsMeetingMuted,
@@ -1129,7 +1421,7 @@
  } from '../store/meeting-selectors'
  
  export const VideoTile = memo(
-@@ -38,15 +37,20 @@
+@@ -38,15 +32,20 @@
          isLarge = false,
          isPinned = false,
          isFocused = false,
@@ -1151,7 +1443,16 @@
              )
  
          const {
-@@ -206,7 +210,8 @@
+@@ -99,8 +98,6 @@
+         // ---------------------------------------------------------------------
+         const [isVisible, setIsVisible] = useState(isLarge)
+         const [zoom, setZoom] = useState(100)
+-        const [mobileActionsOpen, setMobileActionsOpen] = useState(false)
+-        const [desktopActionsOpen, setDesktopActionsOpen] = useState(false)
+         const togglePinnedParticipant = useMeetingStore((s) => s.togglePinnedParticipant)
+         const toggleFocusedParticipant = useMeetingStore((s) => s.toggleFocusedParticipant)
+ 
+@@ -206,7 +203,8 @@
              if (
                  !videoRef.current ||
                  !activeTrack?.jitsiTrack ||
@@ -1161,7 +1462,7 @@
              ) {
                  return
              }
-@@ -239,6 +244,7 @@
+@@ -239,6 +237,7 @@
                  ? renegotiationTick
                  : null,
              isVisible,
@@ -1169,7 +1470,7 @@
  
              ...(isSafariOrIOS
                  ? [renegotiationTick]
-@@ -325,7 +331,8 @@
+@@ -325,7 +324,8 @@
          const isVideoOff =
              !activeTrack ||
              activeTrack.isMuted ||
@@ -1179,7 +1480,7 @@
  
          const isAudioMuted =
              participant.isAudioMuted
-@@ -403,7 +410,7 @@
+@@ -403,7 +403,7 @@
  
                  {participant.isConnectionInterrupted &&
                      !isVideoOff && (
@@ -1188,42 +1489,86 @@
                              <div className="flex flex-col items-center gap-2">
                                  <span className="w-3 h-3 rounded-full bg-yellow-400 animate-pulse" />
  
-@@ -473,7 +480,7 @@
-                     <button
-                         type="button"
-                         onClick={() => setDesktopActionsOpen((value) => !value)}
+@@ -468,69 +468,16 @@
+                     </div>
+                 )}
+ 
+-                {/* Desktop: one unobtrusive action trigger. The menu never covers the video controls permanently. */}
+-                <div className="hidden md:block absolute top-2 left-2 z-40 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+-                    <button
+-                        type="button"
+-                        onClick={() => setDesktopActionsOpen((value) => !value)}
 -                        className="room-control w-9 h-9 rounded-xl flex items-center justify-center bg-black/45 backdrop-blur-md border border-white/10 text-white/80 hover:text-white shadow-lg"
-+                        className="room-control w-9 h-9 rounded-xl flex items-center justify-center bg-black/65 border border-white/10 text-white/80 hover:text-white"
-                         title="گزینه‌های تصویر"
-                         aria-label="گزینه‌های تصویر"
-                     >
-@@ -481,7 +488,7 @@
-                     </button>
- 
-                     {desktopActionsOpen && (
+-                        title="گزینه‌های تصویر"
+-                        aria-label="گزینه‌های تصویر"
+-                    >
+-                        <MoreHorizontal size={17} />
+-                    </button>
+-
+-                    {desktopActionsOpen && (
 -                        <div className="absolute left-0 top-10 w-44 rounded-2xl border room-border bg-[var(--room-surface)]/98 backdrop-blur-2xl p-1.5 shadow-[0_20px_60px_rgba(0,0,0,.45)] room-sheet">
-+                        <div className="absolute left-0 top-10 w-44 rounded-2xl border room-border bg-[var(--room-surface)] p-1.5 shadow-[0_20px_60px_rgba(0,0,0,.45)] room-sheet">
-                             <button type="button" onClick={() => { togglePinnedParticipant(participant.id); setDesktopActionsOpen(false) }} className="w-full h-10 px-3 rounded-xl flex items-center gap-2 text-xs text-white/80 hover:bg-white/[.06]">
-                                 {isPinned ? <PinOff size={15} /> : <Pin size={15} />}
-                                 <span>{isPinned ? 'برداشتن پین' : 'پین کردن'}</span>
-@@ -506,7 +513,7 @@
-                 <button
-                     type="button"
-                     onClick={() => setMobileActionsOpen(true)}
+-                            <button type="button" onClick={() => { togglePinnedParticipant(participant.id); setDesktopActionsOpen(false) }} className="w-full h-10 px-3 rounded-xl flex items-center gap-2 text-xs text-white/80 hover:bg-white/[.06]">
+-                                {isPinned ? <PinOff size={15} /> : <Pin size={15} />}
+-                                <span>{isPinned ? 'برداشتن پین' : 'پین کردن'}</span>
+-                            </button>
+-                            <button type="button" onClick={() => { toggleFocusedParticipant(participant.id); setDesktopActionsOpen(false) }} className="w-full h-10 px-3 rounded-xl flex items-center gap-2 text-xs text-white/80 hover:bg-white/[.06]">
+-                                {isFocused ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+-                                <span>{isFocused ? 'خروج از Focus' : 'ورود به Focus'}</span>
+-                            </button>
+-                            <button type="button" onClick={() => setZoom((z) => Math.min(160, z + 10))} className="w-full h-10 px-3 rounded-xl flex items-center gap-2 text-xs text-white/80 hover:bg-white/[.06]">
+-                                <ZoomIn size={15} /><span>نمایش بزرگ‌تر</span>
+-                            </button>
+-                            {zoom !== 100 && (
+-                                <button type="button" onClick={() => setZoom(100)} className="w-full h-9 px-3 rounded-xl flex items-center gap-2 text-[11px] text-white/50 hover:bg-white/[.06]">
+-                                    <ZoomOut size={14} /><span>بازنشانی اندازه ({zoom}%)</span>
+-                                </button>
+-                            )}
+-                        </div>
+-                    )}
+-                </div>
+-
+-                {/* Mobile: compact action trigger lives inside the tile footer, not above the frame. */}
+-                <button
+-                    type="button"
+-                    onClick={() => setMobileActionsOpen(true)}
 -                    className="md:hidden absolute bottom-2 left-2 z-40 w-8 h-8 rounded-lg flex items-center justify-center bg-black/55 backdrop-blur-md border border-white/10 text-white/80 shadow-lg active:scale-95 transition-transform"
-+                    className="md:hidden absolute bottom-2 left-2 z-40 w-8 h-8 rounded-lg flex items-center justify-center bg-black/65 border border-white/10 text-white/80 active:scale-95 transition-transform"
-                     title="گزینه‌های تصویر"
-                     aria-label="گزینه‌های تصویر"
-                 >
-@@ -514,7 +521,7 @@
-                 </button>
- 
-                 {mobileActionsOpen && (
+-                    title="گزینه‌های تصویر"
+-                    aria-label="گزینه‌های تصویر"
+-                >
+-                    <MoreHorizontal size={16} />
+-                </button>
+-
+-                {mobileActionsOpen && (
 -                    <div className="md:hidden fixed inset-x-3 bottom-[calc(78px+env(safe-area-inset-bottom))] z-[90] rounded-[22px] border room-border bg-[var(--room-surface)]/98 backdrop-blur-2xl p-2 shadow-[0_24px_70px_rgba(0,0,0,.5)] room-sheet">
-+                    <div className="md:hidden fixed inset-x-3 bottom-[calc(78px+env(safe-area-inset-bottom))] z-[90] rounded-[22px] border room-border bg-[var(--room-surface)] p-2 shadow-[0_24px_70px_rgba(0,0,0,.5)] room-sheet">
-                         <div className="px-2 pt-1 pb-2 flex items-center justify-between">
-                             <span className="text-xs text-white/55 truncate">گزینه‌های {participant.displayName}</span>
-                             <button type="button" onClick={() => setMobileActionsOpen(false)} className="text-xs text-white/40 px-2 py-1">بستن</button>
+-                        <div className="px-2 pt-1 pb-2 flex items-center justify-between">
+-                            <span className="text-xs text-white/55 truncate">گزینه‌های {participant.displayName}</span>
+-                            <button type="button" onClick={() => setMobileActionsOpen(false)} className="text-xs text-white/40 px-2 py-1">بستن</button>
+-                        </div>
+-                        <div className="grid grid-cols-2 gap-2">
+-                            <button type="button" onClick={() => { togglePinnedParticipant(participant.id); setMobileActionsOpen(false) }} className={`h-12 rounded-2xl flex flex-col items-center justify-center gap-1 border ${isPinned ? 'bg-[var(--room-blue)] text-white border-[var(--room-blue)]/50' : 'bg-white/[.05] text-white/75 border-white/10'}`}>
+-                                {isPinned ? <PinOff size={17} /> : <Pin size={17} />}<span className="text-[10px]">{isPinned ? 'برداشتن پین' : 'پین کردن'}</span>
+-                            </button>
+-                            <button type="button" onClick={() => { toggleFocusedParticipant(participant.id); setMobileActionsOpen(false) }} className={`h-12 rounded-2xl flex flex-col items-center justify-center gap-1 border ${isFocused ? 'bg-[var(--room-blue)] text-white border-[var(--room-blue)]/50' : 'bg-white/[.05] text-white/75 border-white/10'}`}>
+-                                {isFocused ? <Minimize2 size={17} /> : <Maximize2 size={17} />}<span className="text-[10px]">{isFocused ? 'خروج از Focus' : 'Focus'}</span>
+-                            </button>
+-                            <button type="button" onClick={() => { setZoom((z) => Math.min(160, z + 10)); setMobileActionsOpen(false) }} className="h-12 rounded-2xl flex flex-col items-center justify-center gap-1 bg-white/[.05] text-white/75 border border-white/10"><ZoomIn size={17} /><span className="text-[10px]">بزرگ‌تر</span></button>
+-                            <button type="button" onClick={() => { setZoom(100); setMobileActionsOpen(false) }} className="h-12 rounded-2xl flex flex-col items-center justify-center gap-1 bg-white/[.05] text-white/75 border border-white/10"><ZoomOut size={17} /><span className="text-[10px]">بازنشانی</span></button>
+-                        </div>
+-                    </div>
+-                )}
++                <TileActionsMenu
++                    name={participant.displayName}
++                    isPinned={isPinned}
++                    isFocused={isFocused}
++                    zoom={zoom}
++                    onTogglePin={() => togglePinnedParticipant(participant.id)}
++                    onToggleFocus={() => toggleFocusedParticipant(participant.id)}
++                    onZoomIn={() => setZoom((z) => Math.min(160, z + 10))}
++                    onZoomReset={() => setZoom(100)}
++                />
+ 
+                 {/* --------------------------------------------------------- */}
+                 {/* Bottom bar                                                  */}
 --- a/index.css
 +++ b/index.css
 @@ -135,7 +135,9 @@
@@ -1278,7 +1623,107 @@
    color: rgba(255,255,255,.72);
    padding: 5px 8px;
    border-radius: 10px;
-@@ -839,4 +841,11 @@
+@@ -698,15 +700,6 @@
+   flex: 1 1 auto;
+   max-height: none;
+ }
+-.meeting-speaker-grid.count-1 { grid-template-columns: minmax(0, 1fr); }
+-.meeting-speaker-grid.count-2,
+-.meeting-speaker-grid.count-3,
+-.meeting-speaker-grid.count-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+-.meeting-speaker-grid.count-5,
+-.meeting-speaker-grid.count-6,
+-.meeting-speaker-grid.count-7 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+-.meeting-speaker-grid.count-7 { overflow-y: auto; }
+-
+ @media (max-width: 767px) {
+   .meeting-speaker-stage.is-single {
+     flex-basis: clamp(250px, 48vh, 500px);
+@@ -715,32 +708,11 @@
+   }
+   .meeting-speaker-stage.is-single .meeting-speaker-grid {
+     grid-auto-rows: minmax(220px, 1fr);
+-  }
+-  .meeting-speaker-grid.count-1 { grid-template-columns: minmax(0, 1fr); }
+-  .meeting-speaker-grid.count-2,
+-  .meeting-speaker-grid.count-3,
+-  .meeting-speaker-grid.count-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+-  .meeting-speaker-grid.count-5,
+-  .meeting-speaker-grid.count-6,
+-  .meeting-speaker-grid.count-7 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+-}
++  }}
+ 
+ /* Reply is an intentional action, not a hover-only affordance. */
+ .room-chat-reply-action { opacity: 1 !important; visibility: visible !important; }
+ 
+-/* Camera section follows the same density rule: one camera gets the full row. */
+-.meeting-camera-grid.count-1 { grid-template-columns: minmax(0, 1fr); }
+-.meeting-camera-grid.count-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+-.meeting-camera-grid.count-3,
+-.meeting-camera-grid.count-4 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+-@media (max-width: 767px) {
+-  .meeting-camera-grid.count-1 { grid-template-columns: minmax(0, 1fr); }
+-  .meeting-camera-grid.count-2,
+-  .meeting-camera-grid.count-3,
+-  .meeting-camera-grid.count-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+-}
+-
+-
+ /* =========================================================
+    Stable participant slots
+    Keep a predictable visual grid even when only one or two
+@@ -780,33 +752,6 @@
+   font-size: 18px;
+   font-weight: 300;
+ }
+-
+-/* One-to-three participants keep the same three-slot composition. */
+-.meeting-speaker-grid.count-1,
+-.meeting-speaker-grid.count-2,
+-.meeting-speaker-grid.count-3,
+-.meeting-camera-grid.count-1,
+-.meeting-camera-grid.count-2,
+-.meeting-camera-grid.count-3 {
+-  grid-template-columns: repeat(3, minmax(0, 1fr));
+-}
+-
+-.meeting-speaker-grid.count-4 {
+-  grid-template-columns: repeat(2, minmax(0, 1fr));
+-}
+-.meeting-speaker-grid.count-5,
+-.meeting-speaker-grid.count-6 {
+-  grid-template-columns: repeat(3, minmax(0, 1fr));
+-}
+-
+-.meeting-camera-grid.count-4 {
+-  grid-template-columns: repeat(3, minmax(0, 1fr));
+-}
+-.meeting-camera-grid.count-5,
+-.meeting-camera-grid.count-6 {
+-  grid-template-columns: repeat(3, minmax(0, 1fr));
+-}
+-
+ /* Do not let the old single-item flex sizing override the stable slots. */
+ .meeting-speaker-stage.is-single {
+   flex: 0 0 auto;
+@@ -822,15 +767,6 @@
+ }
+ 
+ @media (max-width: 767px) {
+-  .meeting-speaker-grid.count-1,
+-  .meeting-speaker-grid.count-2,
+-  .meeting-speaker-grid.count-3,
+-  .meeting-camera-grid.count-1,
+-  .meeting-camera-grid.count-2,
+-  .meeting-camera-grid.count-3 {
+-    grid-template-columns: repeat(2, minmax(0, 1fr));
+-  }
+-
+   .meeting-speaker-stage.is-single {
+     flex: 0 0 auto;
+     min-height: 0;
+@@ -839,4 +775,51 @@
      grid-template-columns: repeat(2, minmax(0, 1fr));
      grid-auto-rows: minmax(130px, 1fr);
    }
@@ -1291,4 +1736,44 @@
 +  .meeting-stage-dot,
 +  .room-weak-wave i,
 +  .room-glow { animation: none !important; }
++}
++
++/* =========================================================
++   ستون‌های ثابت
++   تعداد ستون شبکه‌ها از VideoGrid (inline style) می‌آید: ۳ در دسکتاپ و
++   ۲ در موبایل؛ دیگر با تعداد شرکت‌کننده‌ها عوض نمی‌شود.
++   ========================================================= */
++
++/* =========================================================
++   حالت سینمایی اشتراک صفحه (فقط برای بیننده‌ها)
++   اشتراک صفحه بزرگ و بالا؛ بقیه در شبکه‌ی ۳ ستونه / ۲ ستونه زیرش.
++   ========================================================= */
++.meeting-layout.is-cinema { gap: 10px; }
++.meeting-layout.is-cinema > * { flex-shrink: 0; }
++
++.meeting-cinema {
++  position: relative;
++  width: 100%;
++  height: clamp(320px, 62vh, 820px);
++  border-radius: 20px;
++  background: #000;
++  box-shadow: 0 22px 70px rgba(0,0,0,.5);
++}
++.meeting-cinema > div { width: 100%; height: 100%; }
++
++.meeting-cinema-participants { min-width: 0; }
++.meeting-cinema-grid {
++  display: grid;
++  gap: 10px;
++}
++.meeting-cinema-tile { min-width: 0; }
++.meeting-cinema-tile > div { width: 100%; }
++
++@media (max-width: 767px) {
++  .meeting-layout.is-cinema { gap: 8px; }
++  .meeting-cinema {
++    height: clamp(200px, 30vh, 320px);
++    border-radius: 16px;
++  }
++  .meeting-cinema-grid { gap: 7px; }
 +}

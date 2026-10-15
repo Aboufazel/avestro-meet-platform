@@ -78,6 +78,9 @@ export const PERF = {
   receiveLargeHeight: { low: 360, medium: 480, high: 720 }[DEVICE_TIER],
   receiveSmallHeight: 180,
 
+  // اشتراک صفحه در قاب سینمایی بزرگ نمایش داده می‌شود؛ متن باید خوانا بماند
+  receiveScreenHeight: { low: 720, medium: 720, high: 1080 }[DEVICE_TIER],
+
   // فاصله‌ی اندازه‌گیری audio level (ms). پیش‌فرض خود lib خیلی پرتکرار است.
   audioLevelsInterval: { low: 1000, medium: 500, high: 300 }[DEVICE_TIER],
 }
@@ -147,6 +150,7 @@ export const LOCAL_VIDEO_CONFIG = {
 export const RECEIVER_QUALITY = {
   LARGE: PERF.receiveLargeHeight,
   SMALL: PERF.receiveSmallHeight,
+  SCREEN: PERF.receiveScreenHeight,
 }
 
 // =============================================================================
