@@ -51,6 +51,15 @@ export function isLowEndDevice() {
   return cores <= 4 || memory <= 2
 }
 
+/**
+ * مک/iOS/Safari: انکودر H264 سخت‌افزاری (VideoToolbox) دارد و VP8/VP9 نرم‌افزاری
+ * اجرا می‌شود (CPU بالا و داغ شدن). برای این دستگاه‌ها H264 را اول می‌گذاریم.
+ */
+export function isAppleDevice() {
+  if (typeof navigator === 'undefined') return false
+  return /Macintosh|iPhone|iPad|iPod/i.test(navigator.userAgent || '')
+}
+
 const IS_MOBILE = isMobileDevice()
 const IS_LOW_END = isLowEndDevice()
 
@@ -66,16 +75,16 @@ export const PERF = {
 
   // حداکثر تعداد ویدیوی «زنده» که هم‌زمان decode می‌شود (دریافتی از bridge).
   // بقیه‌ی شرکت‌کننده‌ها فقط صدا + آواتار دارند.
-  maxRemoteVideos: { low: 4, medium: 6, high: 12 }[DEVICE_TIER],
+  maxRemoteVideos: { low: 3, medium: 5, high: 8 }[DEVICE_TIER],
 
   // ارتفاع ویدیوی ارسالی دوربین خودمان (encode روی CPU/GPU گوشی)
-  sendHeight: { low: 360, medium: 480, high: 720 }[DEVICE_TIER],
+  sendHeight: { low: 360, medium: 360, high: 480 }[DEVICE_TIER],
 
   // سقف فریم‌ریت دوربین ارسالی (best-effort؛ پایین‌تر = انکودر خنک‌تر)
-  sendMaxFps: { low: 20, medium: 24, high: 30 }[DEVICE_TIER],
+  sendMaxFps: { low: 15, medium: 20, high: 24 }[DEVICE_TIER],
 
   // کیفیت دریافتی: تایل بزرگ (focus / active speaker) در مقابل تایل کوچک
-  receiveLargeHeight: { low: 360, medium: 480, high: 720 }[DEVICE_TIER],
+  receiveLargeHeight: { low: 360, medium: 360, high: 540 }[DEVICE_TIER],
   receiveSmallHeight: 180,
 
   // اشتراک صفحه در قاب سینمایی بزرگ نمایش داده می‌شود؛ متن باید خوانا بماند
@@ -91,7 +100,10 @@ export const PERF = {
 // این گزینه‌ها طبق IJitsiMeetJSOptions مستندات lib-jitsi-meet معتبرند.
 // =============================================================================
 export const JITSI_INIT_OPTIONS = {
-  disableAudioLevels: false,
+  // audio level در هیچ‌جای اپ استفاده نمی‌شود (active speaker از سرور می‌آید)،
+  // ولی برای هر track یک AnalyserNode دائمی اجرا می‌کند.
+  disableAudioLevels: true,
+  desktopSharingFrameRate: { min: 5, max: 10 },
   audioLevelsInterval: PERF.audioLevelsInterval,
   disableThirdPartyRequests: true,
 }
@@ -118,12 +130,19 @@ export const CONFERENCE_CONFIG = {
 
     // کدک نرم‌افزاری سنگین (AV1/VP9) روی دستگاه ضعیف = CPU بالا = گرما.
     // VP8 روی همه‌جا کار می‌کند و H264 معمولاً hardware-accelerated است.
-    codecPreferenceOrder:
-      DEVICE_TIER === 'high' ? ['VP9', 'VP8', 'H264'] : ['VP8', 'H264'],
-    mobileCodecPreferenceOrder: ['VP8', 'H264'],
+    // VP9 نرم‌افزاری روی دسکتاپ مصرف CPU را بالا می‌برد؛ حذف شد.
+    codecPreferenceOrder: isAppleDevice() ? ['H264', 'VP8'] : ['VP8', 'H264'],
+    mobileCodecPreferenceOrder: isAppleDevice() ? ['H264', 'VP8'] : ['VP8', 'H264'],
   },
 
   p2p: { enabled: false },
+
+  // بدون کانال bridge، setReceiverConstraints/lastN بی‌اثر می‌شود و کلاینت
+  // همه‌ی ویدیوها را دریافت می‌کند (لگ + داغ شدن).
+  openBridgeChannel: true,
+
+  // اشتراک صفحه: پیش‌فرض lib فقط ۵fps است
+  desktopSharingFrameRate: { min: 5, max: 10 },
 
   // این دو تشخیص هیچ‌جای اپ استفاده نشده‌اند ولی هرکدام یک پردازش صوتی
   // دائمی روی میکروفون اجرا می‌کنند.
@@ -161,3 +180,5 @@ export const RECONNECT_CONFIG = {
   baseDelayMs: 1000, // تلاش اول بعد از ۱ ثانیه
   maxDelayMs: 15000, // سقف فاصله بین تلاش‌ها
 }
+// فریم‌ریت اشتراک صفحه (برای createLocalTracks({devices:['desktop']}))
+export const DESKTOP_SHARING_FRAME_RATE = { min: 5, max: 10 }

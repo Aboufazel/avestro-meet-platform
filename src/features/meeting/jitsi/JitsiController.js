@@ -4,6 +4,7 @@ import {
     CONFERENCE_CONFIG,
     RECONNECT_CONFIG,
     JITSI_INIT_OPTIONS,
+    DESKTOP_SHARING_FRAME_RATE,
     LOCAL_VIDEO_CONFIG,
     RECEIVER_QUALITY,
     PERF,
@@ -1067,21 +1068,38 @@ export class JitsiController {
             const settings = mediaTrack?.getSettings?.() || {}
             const maxFps = LOCAL_VIDEO_CONFIG.maxFps
 
-            if (
-                mediaTrack?.applyConstraints &&
-                maxFps &&
-                (!settings.frameRate || settings.frameRate > maxFps + 1)
-            ) {
-                // width/height فعلی را هم می‌دهیم تا applyConstraints
-                // رزولوشن را به پیش‌فرض دستگاه برنگرداند.
-                const constraints = {frameRate: {ideal: maxFps, max: maxFps}}
+            // بعضی مرورگرها (به‌خصوص Safari روی مک) وقتی فقط ارتفاع خواسته شود
+            // تصویر ۴:۳ می‌دهند و در تایل ۱۶:۹ نوار سیاه می‌افتد. نسبت ۱۶:۹ را
+            // صریحاً می‌خواهیم؛ اگر دوربین پشتیبانی کند همان را می‌دهد و اگر نه
+            // همان حالت قبلی می‌ماند (applyConstraints با ideal هرگز reject نمی‌کند).
+            const TARGET_RATIO = 16 / 9
+            const ratio =
+                settings.width && settings.height ? settings.width / settings.height : null
+            const needsWide = ratio !== null && Math.abs(ratio - TARGET_RATIO) > 0.05
+            const needsFps = Boolean(maxFps) && (!settings.frameRate || settings.frameRate > maxFps + 1)
 
-                if (settings.width) {
-                    constraints.width = {ideal: settings.width, max: settings.width}
+            if (mediaTrack?.applyConstraints && (needsWide || needsFps)) {
+                const constraints = {}
+
+                if (needsFps) {
+                    constraints.frameRate = {ideal: maxFps, max: maxFps}
                 }
 
-                if (settings.height) {
-                    constraints.height = {ideal: settings.height, max: settings.height}
+                if (needsWide) {
+                    const h = LOCAL_VIDEO_CONFIG.maxHeight
+                    const w = Math.round((h * TARGET_RATIO) / 2) * 2
+                    constraints.aspectRatio = {ideal: TARGET_RATIO}
+                    constraints.width = {ideal: w}
+                    constraints.height = {ideal: h}
+                } else {
+                    // width/height فعلی را هم می‌دهیم تا applyConstraints
+                    // رزولوشن را به پیش‌فرض دستگاه برنگرداند.
+                    if (settings.width) {
+                        constraints.width = {ideal: settings.width, max: settings.width}
+                    }
+                    if (settings.height) {
+                        constraints.height = {ideal: settings.height, max: settings.height}
+                    }
                 }
 
                 mediaTrack.applyConstraints(constraints).catch(() => {})
@@ -1155,6 +1173,8 @@ export class JitsiController {
         try {
             const tracks = await JitsiMeetJS.createLocalTracks({
                 devices: ['desktop'],
+                // پیش‌فرض lib برای اشتراک صفحه ۵fps است (کند و پرش‌دار)
+                desktopSharingFrameRate: DESKTOP_SHARING_FRAME_RATE,
             })
 
             desktopTrack = tracks?.[0]
@@ -3171,6 +3191,40 @@ export class JitsiController {
      * Both camera and desktop tracks have getType() === 'video'.
      * Use _findCameraTrack() when you specifically need the camera.
      */
+    /**
+     * همه‌ی MediaStreamTrackهای صوتی زنده (خودم + بقیه‌ی شرکت‌کننده‌ها).
+     * recordingService از این برای میکس صدای ضبط استفاده می‌کند؛ به صدای تب
+     * و دیالوگ مرورگر نیازی نیست و روی Safari هم کار می‌کند.
+     *
+     * @returns {MediaStreamTrack[]}
+     */
+    getAudioMediaTracks() {
+        const out = []
+
+        try {
+            for (const t of this._localTracks) {
+                if (t.getType() === 'audio') {
+                    const mt = t.getTrack?.()
+                    if (mt && mt.readyState === 'live') out.push(mt)
+                }
+            }
+
+            const participants = this._conference?.getParticipants?.() ?? []
+            for (const participant of participants) {
+                for (const t of participant.getTracks?.() ?? []) {
+                    if (t.getType?.() === 'audio') {
+                        const mt = t.getTrack?.()
+                        if (mt && mt.readyState === 'live') out.push(mt)
+                    }
+                }
+            }
+        } catch (error) {
+            console.warn('[JitsiController] getAudioMediaTracks failed:', error)
+        }
+
+        return out
+    }
+
     _findLocalTrack(
         type
     ) {

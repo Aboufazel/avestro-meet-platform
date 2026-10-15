@@ -173,7 +173,7 @@ export const ChatPanel = memo(function ChatPanel() {
                     <button
                         type="button"
                         onClick={scrollToBottom}
-                        className="sticky bottom-2 mx-auto flex items-center gap-1.5 rounded-full bg-olive-700/95 border border-olive-600 px-3 py-1.5 text-[11px] text-olive-100 shadow-lg backdrop-blur-md hover:bg-olive-600 transition-colors"
+                        className="sticky bottom-2 mx-auto flex items-center gap-1.5 rounded-full bg-olive-700/95 border border-olive-600 px-3 py-1.5 text-[11px] text-olive-100 shadow-lg hover:bg-olive-600 transition-colors"
                     >
                         <ArrowDown size={13} />
                         پیام‌های جدید

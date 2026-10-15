@@ -82,3 +82,10 @@
 - `JitsiController.startScreenShare`: بعد از حذف دوربین، `TRACK_REMOVED` برای آن emit می‌شود (قبلاً track مرده‌ی `local-video` در استور می‌ماند).
 - `JitsiController.stopScreenShare`: `TRACK_REMOVED` برای track صفحه emit می‌شود.
 - `meeting-store._setScreenSharing(false)`: کلید `local-desktop` را هم پاک می‌کند (وگرنه بعد از پایان اشتراک، تایل خودمان سیاه می‌ماند).
+
+## دور دوم اصلاحات (ضبط، لگ، گرما، اشتراک صفحه)
+- recordingService.js بازنویسی شد: سقف رزولوشن، صدا از trackهای Jitsi، timeslice + IndexedDB، mp4 برای Safari، resume AudioContext
+- jitsi-config.js: audio levels خاموش، openBridgeChannel، H264 اول روی مک/iOS، VP9 حذف، سقف ویدیوی دریافتی/ارسالی پایین‌تر، فریم‌ریت اشتراک صفحه
+- JitsiController.js: desktopSharingFrameRate، متد getAudioMediaTracks
+- meeting-actions.js: تایمر ضبط با ساعت واقعی، بازیابی ضبط‌های نیمه‌تمام در join
+- index.css/VideoGrid: حالت سینمایی دسکتاپ دو ستونه؛ VideoTile بدون transform دائمی؛ حذف backdrop-blur

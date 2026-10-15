@@ -800,7 +800,7 @@
 .meeting-cinema {
   position: relative;
   width: 100%;
-  height: clamp(320px, 62vh, 820px);
+  height: clamp(280px, 50vh, 720px);
   border-radius: 20px;
   background: #000;
   box-shadow: 0 22px 70px rgba(0,0,0,.5);
@@ -814,6 +814,37 @@
 }
 .meeting-cinema-tile { min-width: 0; }
 .meeting-cinema-tile > div { width: 100%; }
+
+/* دسکتاپ: اشتراک صفحه سمت راست بزرگ، شرکت‌کننده‌ها در ستون کناری (بدون اسکرول کل صفحه) */
+@media (min-width: 1024px) {
+  .meeting-layout.is-cinema {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr) auto;
+    column-gap: 12px;
+    row-gap: 10px;
+    overflow: hidden;
+  }
+  .meeting-layout.is-cinema > .meeting-cinema {
+    grid-column: 1;
+    grid-row: 1;
+    height: 100%;
+    min-height: 0;
+  }
+  .meeting-layout.is-cinema > .meeting-cinema-participants {
+    grid-column: 2;
+    grid-row: 1;
+    width: clamp(280px, 24vw, 380px);
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  .meeting-layout.is-cinema > :not(.meeting-cinema):not(.meeting-cinema-participants) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .meeting-cinema-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px; }
+}
 
 @media (max-width: 767px) {
   .meeting-layout.is-cinema { gap: 8px; }

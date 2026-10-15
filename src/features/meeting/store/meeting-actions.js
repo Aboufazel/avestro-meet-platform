@@ -1,7 +1,7 @@
 import {jitsiController} from '../jitsi/JitsiController.js'
 import {JITSI_EVENTS} from '../jitsi/jitsi-events.js'
 import {useMeetingStore} from './meeting-store.js'
-import {startLocalRecording, stopLocalRecording, downloadRecording} from '../jitsi/recordingService.js'
+import {startLocalRecording, stopLocalRecording, downloadRecording, recoverOrphanedRecordings} from '../jitsi/recordingService.js'
 import {useAuthStore} from "../../../store/authStore.js";
 import {startVoiceRecording, stopVoiceRecording} from '../jitsi/recordingService.js'
 
@@ -18,18 +18,42 @@ import {startVoiceRecording, stopVoiceRecording} from '../jitsi/recordingService
 
 let _voiceRecordingInterval = null
 
+// صدای ضبط مستقیم از trackهای Jitsi می‌آید (نه صدای تب)
+const _recordingAudioOptions = {
+    getExtraAudioTracks: () => jitsiController.getAudioMediaTracks(),
+}
+
+/**
+ * ضبط‌های نیمه‌تمامِ جلسه‌ی قبلی (کرش/بسته شدن تب) را دانلود می‌کند.
+ */
+export async function recoverUnsavedRecordings() {
+    try {
+        const items = await recoverOrphanedRecordings()
+        for (const {blob, kind, startedAt} of items) {
+            const stamp = new Date(startedAt || Date.now()).toISOString().slice(0, 19)
+            downloadRecording(blob, `${kind === 'voice' ? 'صدای-جلسه' : 'جلسه'}-بازیابی-${stamp}`)
+        }
+    } catch (error) {
+        console.warn('[meeting-actions] recover failed:', error)
+    }
+}
+
 export async function startVoiceRec() {
     try {
         await startVoiceRecording('medium', async (blob) => {
             clearInterval(_voiceRecordingInterval)
             useMeetingStore.getState()._setVoiceRecording(false)
             if (blob) {
-                downloadRecording(blob, `صدای-جلسه-${new Date().toISOString().slice(0, 19)}.webm`)
+                downloadRecording(blob, `صدای-جلسه-${new Date().toISOString().slice(0, 19)}`)
             }
-        })
+        }, _recordingAudioOptions)
         useMeetingStore.getState()._setVoiceRecording(true)
+        // تایمر بر اساس ساعت واقعی (setInterval در تب پس‌زمینه عقب می‌افتد)
+        const voiceStartedAt = Date.now()
         _voiceRecordingInterval = setInterval(() => {
-            useMeetingStore.getState()._incrementVoiceRecordingSeconds()
+            const st = useMeetingStore.getState()
+            const target = Math.floor((Date.now() - voiceStartedAt) / 1000)
+            for (let i = st.voiceRecordingSeconds; i < target; i++) st._incrementVoiceRecordingSeconds()
         }, 1000)
     } catch (error) {
         console.warn('[meeting-actions] Failed to start voice recording:', error)
@@ -42,7 +66,7 @@ export async function stopVoiceRec() {
     const blob = await stopVoiceRecording()
     useMeetingStore.getState()._setVoiceRecording(false)
     if (blob) {
-        downloadRecording(blob, `صدای-جلسه-${new Date().toISOString().slice(0, 19)}.webm`)
+        downloadRecording(blob, `صدای-جلسه-${new Date().toISOString().slice(0, 19)}`)
     }
 }
 
@@ -63,12 +87,15 @@ export async function startRecording() {
             clearInterval(_recordingInterval)
             useMeetingStore.getState()._setRecording(false)
             if (blob) {
-                downloadRecording(blob, `جلسه-${new Date().toISOString().slice(0, 19)}.webm`)
+                downloadRecording(blob, `جلسه-${new Date().toISOString().slice(0, 19)}`)
             }
-        })
+        }, _recordingAudioOptions)
         useMeetingStore.getState()._setRecording(true)
+        const startedAt = Date.now()
         _recordingInterval = setInterval(() => {
-            useMeetingStore.getState()._incrementRecordingSeconds()
+            const st = useMeetingStore.getState()
+            const target = Math.floor((Date.now() - startedAt) / 1000)
+            for (let i = st.recordingSeconds; i < target; i++) st._incrementRecordingSeconds()
         }, 1000)
     } catch (error) {
         console.warn('[meeting-actions] Failed to start recording:', error)
@@ -81,7 +108,7 @@ export async function stopRecording() {
     const blob = await stopLocalRecording()
     useMeetingStore.getState()._setRecording(false)
     if (blob) {
-        downloadRecording(blob, `جلسه-${new Date().toISOString().slice(0, 19)}.webm`)
+        downloadRecording(blob, `جلسه-${new Date().toISOString().slice(0, 19)}`)
     }
 }
 
@@ -90,6 +117,9 @@ export async function stopRecording() {
  */
 export async function joinMeeting({roomName, displayName, email = ''}) {
     const store = useMeetingStore.getState()
+
+    // ضبط‌های نیمه‌تمام جلسه‌ی قبلی (کرش/بسته شدن تب) را بازیابی کن
+    recoverUnsavedRecordings()
 
     // اگر listener های قبلی باقی مانده‌اند، پاک شوند
     _unbindAll()

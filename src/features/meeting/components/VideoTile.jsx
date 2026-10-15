@@ -333,9 +333,9 @@ export const VideoTile = memo(
         const isScreenShare =
             !!desktopTrack
 
-        // دوربین کاربر باید مثل آینه نمایش داده شود؛ اشتراک صفحه هرگز mirror نمی‌شود.
-        // این مقدار مستقل از کلاس CSS نگه داشته می‌شود تا بعد از attach شدن track توسط Jitsi
-        // نیز حالت mirror حتماً روی خود عنصر video اعمال شود.
+        // فقط تصویر دوربین خودمان (روی صفحه‌ی خودمان) مثل آینه نمایش داده می‌شود؛
+        // چیزی که برای بقیه ارسال می‌شود تغییری نمی‌کند. اشتراک صفحه و ویدیوی
+        // دیگران هرگز mirror نمی‌شود.
         const shouldMirrorVideo =
             Boolean(participant?.isLocal && !isScreenShare)
 
@@ -343,9 +343,10 @@ export const VideoTile = memo(
             const element = videoRef.current
             if (!element) return
 
-            element.style.transform = shouldMirrorVideo
-                ? `scaleX(-1) scale(${zoom / 100})`
-                : `scale(${zoom / 100})`
+            element.style.transform =
+                shouldMirrorVideo || zoom !== 100
+                    ? `${shouldMirrorVideo ? 'scaleX(-1) ' : ''}scale(${zoom / 100})`
+                    : ''
             element.style.transformOrigin = 'center center'
         }, [shouldMirrorVideo, zoom, activeTrack?.jitsiTrack])
 
@@ -426,11 +427,14 @@ export const VideoTile = memo(
                         muted={
                             participant.isLocal
                         }
-                        className="w-full h-full object-contain bg-black !rounded-[18px] transition-transform duration-300 ease-out"
+                        className="w-full h-full object-contain bg-black !rounded-[18px]"
                         style={{
-                            transform: shouldMirrorVideo
-                                ? `scaleX(-1) scale(${zoom / 100})`
-                                : `scale(${zoom / 100})`,
+                            // transform فقط وقت لزوم (mirror خودم/zoom)؛ transform دائمی یک
+                            // لایه‌ی GPU جدا برای هر ویدیو می‌سازد.
+                            transform:
+                                shouldMirrorVideo || zoom !== 100
+                                    ? `${shouldMirrorVideo ? 'scaleX(-1) ' : ''}scale(${zoom / 100})`
+                                    : undefined,
                             transformOrigin: 'center center',
                         }}
                     />
