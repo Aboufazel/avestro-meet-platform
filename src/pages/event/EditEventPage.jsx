@@ -11,6 +11,7 @@ import {Card} from '../../components/ui/Card'
 import {JalaliDateTimePicker} from '../../components/ui/JalaliDateTimePicker'
 import {isoToLocalValue} from '../../utils/jalali'
 import {useRoom, useUpdateRoom} from '../../hooks/useRooms'
+import ClassFeatureSettings from './ClassFeatureSettings'
 
 
 const schema = yup.object({
@@ -299,6 +300,11 @@ export default function EditEventPage() {
 
                         </div>
 
+
+                        {/* Classroom-only module settings; seminar UI stays unchanged. */}
+                        {room.kind === 'class' && (
+                            <ClassFeatureSettings slug={room.slug} />
+                        )}
 
                         {/* Private */}
                         <div className="flex items-center gap-3 p-4 bg-[#f8faff] rounded-xl border border-[#e5eaf2]">

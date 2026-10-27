@@ -17,7 +17,12 @@ import { useRoomFeatures } from '../../hooks/useRoomFeatures'
 import { useClassAccess } from '../../hooks/useClassAccess'
 import { useMediaQuery } from '../../features/meeting/hooks/useMediaQuery'
 import { ClassLayout } from '../../features/meeting/components/ClassLayout'
+import { VideoTile } from '../../features/meeting/components/VideoTile'
+import { useParticipants } from '../../features/meeting/hooks/useParticipants'
 import { ClassAccessContext } from '../../features/meeting/ClassAccessContext'
+import { PenTool, Maximize2, Minimize2, Video } from 'lucide-react'
+import './classroom-stage.css'
+import WhiteboardPanel from '../../features/whiteboard/WhiteboardPanel'
 
 export default function RoomPage() {
   const { slug: roomName } = useParams()
@@ -33,6 +38,7 @@ export default function RoomPage() {
   const canParticipants = can('participants_list')
   const canScreenShare = can('screen_share')
   const canRecord = can('recording')
+  const canWhiteboard = has('whiteboard')
 
   // ───── کنترل صحبت/تصویر (لحظه‌ای از طریق WebSocket) ─────
   // بر اساس فعال‌بودن ماژول است، نه نوع رویداد؛ پس هر امکان برای سمینار هم قابل روشن‌کردن است.
@@ -45,12 +51,34 @@ export default function RoomPage() {
   const isDesktop = useMediaQuery('(min-width: 768px)')
   const inlineChat = classLayout && !isDesktop // موبایلِ کلاس: گفتگو همیشه زیر صحنه است
   const [attendanceOpen, setAttendanceOpen] = useState(false)
+  const [whiteboardOpen, setWhiteboardOpen] = useState(false)
+  const [whiteboardObjects, setWhiteboardObjects] = useState([])
+  const [teacherVideoExpanded, setTeacherVideoExpanded] = useState(false)
   const storeHand = useMeetingStore((s) => !!s.participants.get(s.localParticipantId)?.isHandRaised)
 
   const { error, isConnecting, isReconnecting, isAudioMuted, isVideoMuted, isScreenSharing, isConnected, leave, toggleAudio, toggleVideo, toggleScreenShare } = useJitsi(roomName)
+  const { participants } = useParticipants()
+  const teacherParticipant = participants.find((participant) => participant.isTeacher) || null
 
-  const access = useClassAccess(roomName, { enabled: isConnected && (moderated || handFeature) })
+  const access = useClassAccess(roomName, { enabled: isConnected && (moderated || handFeature || canWhiteboard) })
   const me = access.me
+  const whiteboardSettings = settings('whiteboard')
+  const studentsCanDraw = Boolean(whiteboardSettings.students_can_draw)
+
+  useEffect(() => {
+    if (!access.whiteboardState) return
+    setWhiteboardObjects(access.whiteboardState.objects || [])
+    setWhiteboardOpen(Boolean(access.whiteboardState.is_open))
+  }, [access.whiteboardState])
+
+  const openWhiteboard = () => {
+    setWhiteboardOpen(true)
+    access.setWhiteboardOpen(true)
+  }
+  const closeWhiteboard = () => {
+    setWhiteboardOpen(false)
+    access.setWhiteboardOpen(false)
+  }
 
   // معلم خودش را برای چیدمان کلاس علامت می‌زند (فقط نمایشی)
   useEffect(() => {
@@ -118,6 +146,49 @@ export default function RoomPage() {
             <main className={`relative flex-1 min-w-0 min-h-0 room-surface overflow-hidden ${inlineChat ? '' : 'rounded-[20px] border room-border room-panel-shadow'}`}>
               <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_42%,rgba(77,125,255,.08),transparent_34%)]" />
               {classLayout ? <ClassLayout showChat={canChat} onStopShare={toggleScreenShare} /> : <VideoGrid />}
+              {canWhiteboard && isHostRole && !whiteboardOpen && <button type="button" onClick={openWhiteboard} className="absolute top-3 right-3 z-30 flex items-center gap-2 rounded-xl border room-border bg-[var(--room-surface)]/95 px-3 py-2 text-xs text-white shadow-lg transition hover:bg-[var(--room-elevated)]" aria-label="بازکردن تخته تعاملی"><PenTool size={16} /><span>تخته تعاملی</span></button>}
+              {canWhiteboard && whiteboardOpen && (
+                <div className={`classroom-whiteboard-layout ${teacherVideoExpanded ? 'teacher-video-expanded' : ''}`}>
+                  <WhiteboardPanel
+                    initialObjects={whiteboardObjects}
+                    onObjectsChange={(next) => {
+                      setWhiteboardObjects(next)
+                      access.updateWhiteboardObjects(next)
+                    }}
+                    onClose={closeWhiteboard}
+                    onClear={() => {
+                      setWhiteboardObjects([])
+                      access.clearWhiteboard()
+                    }}
+                    readOnly={!isHostRole && !studentsCanDraw}
+                    isHost={isHostRole}
+                  />
+                  {teacherParticipant && (
+                    <aside className="classroom-teacher-panel" aria-label="تصویر زنده مدرس">
+                      <div className="classroom-teacher-heading">
+                        <span className="classroom-teacher-live-dot" />
+                        <span>مدرس</span>
+                        <button
+                          type="button"
+                          className="classroom-teacher-expand"
+                          onClick={() => setTeacherVideoExpanded((expanded) => !expanded)}
+                          aria-label={teacherVideoExpanded ? 'کوچک‌کردن تصویر مدرس' : 'بزرگ‌کردن تصویر مدرس'}
+                          title={teacherVideoExpanded ? 'کوچک‌کردن تصویر مدرس' : 'بزرگ‌کردن تصویر مدرس'}
+                        >
+                          {teacherVideoExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                        </button>
+                      </div>
+                      <div className="classroom-teacher-video">
+                        <VideoTile participantId={teacherParticipant.id} preferCamera isLarge videoEnabled playAudio={false} />
+                      </div>
+                      <div className="classroom-teacher-caption">
+                        <Video size={14} />
+                        <span>{teacherParticipant.hasVideo ? 'تصویر زنده مدرس' : 'دوربین مدرس خاموش است'}</span>
+                      </div>
+                    </aside>
+                  )}
+                </div>
+              )}
               {isReconnecting && <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 room-pop"><div className="flex items-center gap-2 rounded-full bg-[var(--room-surface)] border room-border px-4 py-2 text-xs shadow-xl"><span className="w-2 h-2 rounded-full bg-[var(--room-warning)] animate-pulse" /><span>اتصال ضعیف است؛ در حال برقراری مجدد...</span></div></div>}
               <MeetingControls isAudioMuted={isAudioMuted} isVideoMuted={isVideoMuted} isScreenSharing={isScreenSharing} onToggleAudio={toggleAudio} onToggleVideo={toggleVideo} onToggleScreenShare={handleToggleScreenShare} onLeave={leave} canChat={canChat && !inlineChat} canParticipants={canParticipants && (!inlineChat || isHostRole)} canScreenShare={canScreenShare || isScreenSharing} showHand={canHand} isHandRaised={isHandRaised} onToggleHand={handleToggleHand} showMic={showMic} showCamera={showCamera} showAttendance={canAttendance} onOpenAttendance={() => setAttendanceOpen(true)} docked={inlineChat} showSettings={!inlineChat || isHostRole} />
             </main>

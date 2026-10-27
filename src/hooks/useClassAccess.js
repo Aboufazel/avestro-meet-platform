@@ -24,7 +24,9 @@ export function useClassAccess(slug, { enabled = false } = {}) {
   const [me, setMe] = useState(null)
   const [roster, setRoster] = useState([])
   const [connected, setConnected] = useState(false)
+  const [whiteboardState, setWhiteboardState] = useState(null)
   const wsRef = useRef(null)
+  const pendingMessagesRef = useRef([])
 
   useEffect(() => {
     if (!slug || !enabled) return undefined
@@ -40,12 +42,18 @@ export function useClassAccess(slug, { enabled = false } = {}) {
       }
       const ws = new WebSocket(`${wsBase()}/ws/rooms/${encodeURIComponent(slug)}/?eid=${encodeURIComponent(eid)}`)
       wsRef.current = ws
-      ws.onopen = () => { retry = 0; setConnected(true) }
+      ws.onopen = () => {
+        retry = 0
+        setConnected(true)
+        const queued = pendingMessagesRef.current.splice(0)
+        queued.forEach((message) => ws.send(JSON.stringify(message)))
+      }
       ws.onmessage = (ev) => {
         try {
           const msg = JSON.parse(ev.data)
           if (msg.type === 'me') setMe(msg)
           else if (msg.type === 'roster') setRoster(msg.items || [])
+          else if (msg.type === 'whiteboard_state') setWhiteboardState(msg)
         } catch { /* پیام نامعتبر */ }
       }
       ws.onclose = (ev) => {
@@ -63,13 +71,16 @@ export function useClassAccess(slug, { enabled = false } = {}) {
       clearTimeout(timer)
       wsRef.current?.close()
       wsRef.current = null
+      pendingMessagesRef.current = []
       setConnected(false)
+      setWhiteboardState(null)
     }
   }, [slug, enabled])
 
   const send = useCallback((msg) => {
     const ws = wsRef.current
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg))
+    else if (ws && ws.readyState === WebSocket.CONNECTING) pendingMessagesRef.current.push(msg)
   }, [])
 
   return {
@@ -80,5 +91,9 @@ export function useClassAccess(slug, { enabled = false } = {}) {
     grant: useCallback((key, audio = true, video = true) => send({ type: 'grant', key, audio, video }), [send]),
     revoke: useCallback((key) => send({ type: 'revoke', key }), [send]),
     lowerHand: useCallback((key) => send({ type: 'lower_hand', key }), [send]),
+    whiteboardState,
+    updateWhiteboardObjects: useCallback((objects) => send({ type: 'whiteboard_update', objects }), [send]),
+    setWhiteboardOpen: useCallback((is_open) => send({ type: 'whiteboard_open', is_open }), [send]),
+    clearWhiteboard: useCallback(() => send({ type: 'whiteboard_clear' }), [send]),
   }
 }

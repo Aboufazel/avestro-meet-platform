@@ -329,12 +329,12 @@ export const useMeetingStore = create((set, get) => ({
                             !!track.isMuted
                     }
 
-                    if (
-                        track.type === 'video' ||
-                        track.type === 'desktop'
-                    ) {
-                        updates.isVideoMuted =
-                            !!track.isMuted
+                    // وضعیت دوربین فقط از camera/video track می‌آید.
+                    // desktop track منبع جداگانه‌ای است؛ اگر mute آن را به
+                    // isVideoMuted نسبت بدهیم، وضعیت دوربین مدرس اشتباه می‌شود
+                    // و تصویر کوچک دوربین هنگام اشتراک صفحه یا تخته پنهان می‌ماند.
+                    if (track.type === 'video') {
+                        updates.isVideoMuted = !!track.isMuted
                     }
 
                     if (track.type === 'desktop') {

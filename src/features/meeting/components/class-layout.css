@@ -26,8 +26,8 @@
   left: 8px;
   bottom: 8px;
   z-index: 10;
-  width: 132px;
-  height: 176px;
+  width: 176px;
+  height: 112px;
   border-radius: 12px;
   overflow: hidden;
   background: #000;
@@ -164,7 +164,7 @@
   }
   .cl-stage.is-expanded { height: 62vh; height: 62dvh; }
   .cl-expand { display: flex; }
-  .cl-pip { width: 84px; height: 112px; left: 6px; bottom: 6px; }
+  .cl-pip { width: 112px; height: 72px; left: 6px; bottom: 6px; }
   .cl-strip { padding: 8px; border-bottom: 1px solid var(--room-border); }
   .cl-tile { width: 88px; height: 64px; border-radius: 10px; }
   .cl-more { height: 64px; min-width: 64px; }
