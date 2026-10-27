@@ -36,7 +36,8 @@ import {
  * 5. Screen-share permission is requested only after startScreenShare().
  * 6. Remote participants/tracks are available after conference join.
  * 7. Local media tracks are created lazily.
- * 8. Camera <-> screen-share uses replaceTrack when possible.
+ * 8. Classroom screen-share keeps camera and desktop as independent tracks when
+ *    the Jitsi deployment supports multi-stream video.
  * 9. Async operations are protected against race conditions.
  * 10. Local tracks are disposed safely.
  * 11. Echo mitigation is delegated to WebRTC/Jitsi audio processing.
@@ -146,6 +147,7 @@ export class JitsiController {
         // _receiverIntent    : آخرین درخواست UI (چه کسانی بزرگ/قابل‌دیدن‌اند)
         // _receiverKey       : برای جلوگیری از ارسال تکراری یک پیام به bridge
         this._remoteVideoSources = new Map()
+        this._trackVideoTypeListeners = new Map()
         this._receiverIntent = null
         this._receiverKey = null
 
@@ -191,6 +193,7 @@ export class JitsiController {
         this._localAudioRecoveryLastAt = 0
         this._localAudioRecoveryCooldownMs = 2500
         this._screenShareTransitioning = false
+        this._screenShareStatePublisher = null
 
         // =====================================================================
         // Initialize Jitsi core.
@@ -1138,6 +1141,17 @@ export class JitsiController {
 
             this._trackStreamingListeners.clear()
         }
+
+        if (this._trackVideoTypeListeners) {
+            for (const [track, entry] of this._trackVideoTypeListeners) {
+                try {
+                    track.off?.(entry.event, entry.handler)
+                } catch {
+                }
+            }
+
+            this._trackVideoTypeListeners.clear()
+        }
     }
 
     _withTimeout(promise, ms) {
@@ -1160,6 +1174,62 @@ export class JitsiController {
      *
      * This is the ONLY place where desktop capture is requested.
      */
+    setScreenShareStatePublisher(publisher) {
+        this._screenShareStatePublisher = typeof publisher === 'function' ? publisher : null
+    }
+
+    _publishAuthoritativeScreenShareState(isSharing) {
+        const participantId = this._conference?.myUserId?.()
+        if (!participantId || typeof this._screenShareStatePublisher !== 'function') return false
+        try {
+            this._screenShareStatePublisher(participantId, Boolean(isSharing))
+            return true
+        } catch (error) {
+            console.warn('[JitsiController] WebSocket screen-share state publish failed:', error)
+            return false
+        }
+    }
+
+    applyAuthoritativeScreenShareState({ participantId, isSharing } = {}) {
+        if (!participantId) return
+        this._emit(JITSI_EVENTS.SCREEN_SHARE_STATE_RECEIVED, {
+            participantId,
+            isSharing: Boolean(isSharing),
+        })
+        if (!isSharing) {
+            for (const [sourceName, source] of this._remoteVideoSources) {
+                if (source?.participantId === participantId && source?.videoType === 'desktop') {
+                    this._remoteVideoSources.delete(sourceName)
+                }
+            }
+            this._receiverKey = null
+            this._applyReceiverConstraints()
+        }
+    }
+
+    _broadcastScreenShareState(isSharing) {
+        const conference = this._conference
+        if (!conference || typeof conference.sendEndpointMessage !== 'function') {
+            return false
+        }
+
+        try {
+            // Empty endpoint id broadcasts to every participant in lib-jitsi-meet.
+            const result = conference.sendEndpointMessage('', {
+                type: 'avestro-screen-share-state-v1',
+                isSharing: Boolean(isSharing),
+                sentAt: Date.now(),
+            })
+            result?.catch?.((error) => {
+                console.warn('[JitsiController] Screen-share state broadcast failed:', error)
+            })
+            return true
+        } catch (error) {
+            console.warn('[JitsiController] Screen-share state broadcast failed:', error)
+            return false
+        }
+    }
+
     async startScreenShare() {
         if (
             !this._conference ||
@@ -1174,93 +1244,55 @@ export class JitsiController {
 
         let desktopTrack = null
         let trackAttached = false
-        let cameraRemoved = false
 
         try {
             const tracks = await JitsiMeetJS.createLocalTracks({
                 devices: ['desktop'],
-                // پیش‌فرض lib برای اشتراک صفحه ۵fps است (کند و پرش‌دار)
                 desktopSharingFrameRate: DESKTOP_SHARING_FRAME_RATE,
             })
 
             desktopTrack = tracks?.[0]
-
             if (!desktopTrack) {
                 throw new Error('Could not create desktop track')
             }
 
-            const cameraTrack = this._findCameraTrack()
-
             this._bindLocalTrackEvents(desktopTrack)
 
-            if (cameraTrack) {
-                // مهم: اول camera را کامل از سرور حذف کن، بعد desktop را اضافه کن.
-                // سرور فقط یک اسلات ویدیو به ازای هر نفر دارد (multi-stream ندارد)؛
-                // اگر برعکس انجام شود، سرور روی camera قفل می‌ماند و بقیه هیچ‌وقت
-                // desktop را نمی‌بینند.
-                // قبل از dispose map می‌کنیم (بعدش track دیگر قابل پرس‌وجو نیست)
-                const mappedCamera = mapTrack(cameraTrack)
+            // Camera and desktop are separate tracks. Keep the camera alive so
+            // participants can see the teacher while the shared content is shown.
+            await this._conference.addTrack(desktopTrack)
+            trackAttached = true
+            this._localTracks.push(desktopTrack)
 
-                await this._conference.removeTrack(cameraTrack)
-                cameraRemoved = true
-
-                await this._safeDisposeTrack(cameraTrack)
-
-                // دوربین دیگر وجود ندارد؛ استور هم باید خبردار شود، وگرنه
-                // track مرده‌ی `local-video` می‌ماند و دکمه‌ی دوربین روشن نشان
-                // داده می‌شود.
-                this._emit(JITSI_EVENTS.TRACK_REMOVED, mappedCamera)
-
-                await this._conference.addTrack(desktopTrack)
-                trackAttached = true
-
-                this._replaceLocalTrack(cameraTrack, desktopTrack)
-
-                this._screenShare.wasCameraActiveBefore = true
-            } else {
-                await this._conference.addTrack(desktopTrack)
-                trackAttached = true
-
-                this._localTracks.push(desktopTrack)
-                this._screenShare.wasCameraActiveBefore = false
+            this._screenShare = {
+                active: true,
+                desktopTrack,
+                wasCameraActiveBefore: Boolean(this._findCameraTrack()),
             }
 
-            this._screenShare.active = true
-            this._screenShare.desktopTrack = desktopTrack
-
             const stoppedHandler = this._handleDesktopTrackStopped
-
             desktopTrack.addEventListener(
                 JitsiMeetJS.events.track.LOCAL_TRACK_STOPPED,
                 stoppedHandler
             )
-
             desktopTrack.__jitsiControllerScreenStoppedHandler = stoppedHandler
 
-            this._emit(JITSI_EVENTS.TRACK_ADDED, mapTrack(desktopTrack))
-            this._emit(JITSI_EVENTS.SCREEN_SHARE_STARTED, mapTrack(desktopTrack))
-
+            const mappedDesktop = mapTrack(desktopTrack)
+            this._emit(JITSI_EVENTS.TRACK_ADDED, mappedDesktop)
+            this._emit(JITSI_EVENTS.SCREEN_SHARE_STARTED, mappedDesktop)
+            this._broadcastScreenShareState(true)
+            this._publishAuthoritativeScreenShareState(true)
             return true
         } catch (error) {
-            try {
-                if (trackAttached && desktopTrack) {
-                    await this._conference?.removeTrack(desktopTrack)
-                    this._removeLocalTrack(desktopTrack)
-                }
-
-                // اگر دوربین حذف شده بود ولی بعدش خطا خوردیم، برای اینکه
-                // کاربر کاملاً بدون تصویر نماند، یک دوربین تازه می‌سازیم.
-                if (cameraRemoved) {
-                    await this._createAndAddLocalTrack('video')
-                }
-            } catch (rollbackError) {
-                console.warn(
-                    '[JitsiController] Screen-share rollback failed:',
-                    rollbackError
-                )
-            }
-
             if (desktopTrack) {
+                if (trackAttached) {
+                    try {
+                        await this._conference?.removeTrack(desktopTrack)
+                    } catch (removeError) {
+                        console.warn('[JitsiController] Could not remove failed screen-share track:', removeError)
+                    }
+                }
+                this._removeLocalTrack(desktopTrack)
                 await this._safeDisposeTrack(desktopTrack)
             }
 
@@ -1271,23 +1303,18 @@ export class JitsiController {
             }
 
             const normalized = normalizeError(error, ERROR_CODES.SCREEN_SHARE_FAILED)
-
             console.warn('[JitsiController] Screen share failed:', normalized)
-
             this._emit(JITSI_EVENTS.SCREEN_SHARE_FAILED, normalized)
-
             return false
         } finally {
             this._screenShareTransitioning = false
         }
     }
 
-
     /**
-     * Stop screen sharing.
-     *
-     * A screen-share stop/failure must NEVER
-     * tear down the Jitsi connection.
+     * Stop only the desktop track. The camera track is independent and must
+     * remain active; this also keeps the remote store in sync when cleanup
+     * encounters a Jitsi removeTrack error.
      */
     async stopScreenShare() {
         if (!this._conference || !this._screenShare.active) {
@@ -1299,62 +1326,50 @@ export class JitsiController {
         }
 
         this._screenShareTransitioning = true
-
         const desktopTrack = this._screenShare.desktopTrack
-        const shouldRestoreCamera = this._screenShare.wasCameraActiveBefore
         const mappedDesktop = desktopTrack ? mapTrack(desktopTrack) : null
+        let removeError = null
 
-        await this._conference.removeTrack(desktopTrack)
-        this._removeLocalTrack(desktopTrack)
-        await this._safeDisposeTrack(desktopTrack)
-
-        // اشتراک صفحه دیگر وجود ندارد؛ `local-desktop` از استور پاک شود
-        if (mappedDesktop) {
-            this._emit(JITSI_EVENTS.TRACK_REMOVED, mappedDesktop)
+        // Publish control state and clear local UI before waiting for Jitsi's
+        // media negotiation/track removal. WebSocket synchronizes the UI;
+        // the actual video continues to travel over Jitsi.
+        this._screenShare = {
+            ...this._screenShare,
+            active: false,
         }
-        
-        try {
-            if (!desktopTrack) {
+        this._broadcastScreenShareState(false)
+        this._publishAuthoritativeScreenShareState(false)
+        this._emit(JITSI_EVENTS.SCREEN_SHARE_STOPPED)
 
-                this._screenShare = {
-                    active: false,
-                    desktopTrack: null,
-                    wasCameraActiveBefore: false,
+        try {
+            if (desktopTrack) {
+                try {
+                    await this._conference.removeTrack(desktopTrack)
+                } catch (error) {
+                    removeError = error
+                    console.warn('[JitsiController] Could not remove screen-share track cleanly:', error)
                 }
 
-                return false
+                this._removeLocalTrack(desktopTrack)
+                await this._safeDisposeTrack(desktopTrack)
+
+                if (mappedDesktop) {
+                    this._emit(JITSI_EVENTS.TRACK_REMOVED, mappedDesktop)
+                }
             }
 
+            return !removeError
+        } catch (error) {
+            const normalized = normalizeError(error, ERROR_CODES.SCREEN_SHARE_FAILED)
+            console.warn('[JitsiController] Screen share stop cleanup failed:', normalized)
+            this._emit(JITSI_EVENTS.SCREEN_SHARE_FAILED, normalized)
+            return false
+        } finally {
             this._screenShare = {
                 active: false,
                 desktopTrack: null,
                 wasCameraActiveBefore: false,
             }
-
-            if (shouldRestoreCamera) {
-                // دوربین را از صفر می‌سازیم — دقیقاً همان مسیر toggleVideo
-                // که همیشه درست کار کرده، نه resurrect کردن track قدیمی.
-                const restored = await this._createAndAddLocalTrack('video')
-
-                if (!restored) {
-                    console.warn(
-                        '[JitsiController] Failed to restore camera after screen share stopped'
-                    )
-                }
-            }
-
-            this._emit(JITSI_EVENTS.SCREEN_SHARE_STOPPED)
-
-            return true
-        } catch (error) {
-            const normalized = normalizeError(error, ERROR_CODES.SCREEN_SHARE_FAILED)
-
-            console.warn('[JitsiController] Screen share stop failed:', normalized)
-
-            this._emit(JITSI_EVENTS.SCREEN_SHARE_FAILED, normalized)
-
-            return false
-        } finally {
             this._screenShareTransitioning = false
         }
     }
@@ -2199,6 +2214,24 @@ export class JitsiController {
                 }
 
                 // =================================================================
+                // Explicit screen-share state sync
+                // Track removal is the primary signal, but this small endpoint
+                // message clears stale remote UI immediately if that event is
+                // delayed or lost by the installed Jitsi stack.
+                // =================================================================
+                const endpointMessageEvent = JitsiMeetJS.events.conference.ENDPOINT_MESSAGE_RECEIVED
+                if (endpointMessageEvent) {
+                    bind(endpointMessageEvent, (participant, payload, from) => {
+                        if (payload?.type !== 'avestro-screen-share-state-v1') return
+                        const participantId = participant?.getId?.() || from || null
+                        if (!participantId) return
+
+                        const isSharing = payload.isSharing === true
+                        this.applyAuthoritativeScreenShareState({ participantId, isSharing })
+                    })
+                }
+
+                // =================================================================
                 // Conference connection / ICE state
                 // =================================================================
                 // lib-jitsi-meet exposes these events at conference level.
@@ -2490,6 +2523,78 @@ export class JitsiController {
                     (participantId, stats) => {
                         const downloadPacketLoss = stats?.packetLoss?.download ?? null
                         this._emitQualityThrottled(participantId, stats?.connectionQuality ?? null, downloadPacketLoss)
+                    }
+                )
+
+                // =================================================================
+                // Remote video type changes
+                //
+                // Jitsi can create a remote video track before participant
+                // presence tells us whether it is a camera or desktop source.
+                // If we keep the initial type, the store may show the camera
+                // as a screen share (or vice versa), causing black/frozen tiles.
+                // =================================================================
+
+                bind(
+                    JitsiMeetJS.events.conference.TRACK_ADDED,
+                    (track) => {
+                        if (!track || track.isLocal() || track.getType() !== 'video') {
+                            return
+                        }
+
+                        const videoTypeEvent = JitsiMeetJS.events.track?.TRACK_VIDEOTYPE_CHANGED
+                        if (!videoTypeEvent || typeof track.on !== 'function') {
+                            return
+                        }
+
+                        const entry = {
+                            event: videoTypeEvent,
+                            handler: null,
+                            lastType: mapTrack(track).type,
+                        }
+                        entry.handler = () => {
+                            const mappedTrack = mapTrack(track)
+                            const sourceName = track.getSourceName?.()
+
+                            if (mappedTrack.type !== entry.lastType) {
+                                // Remove the old key, then add the corrected type.
+                                // Store removal is identity-safe, so it cannot delete
+                                // another camera track that reused the old key.
+                                this._emit(JITSI_EVENTS.TRACK_REMOVED, {
+                                    ...mappedTrack,
+                                    type: entry.lastType,
+                                })
+                                this._emit(JITSI_EVENTS.TRACK_ADDED, mappedTrack)
+                                entry.lastType = mappedTrack.type
+                            }
+
+                            if (sourceName) {
+                                this._remoteVideoSources.set(sourceName, {
+                                    participantId: track.getParticipantId(),
+                                    videoType: track.getVideoType?.() || 'camera',
+                                })
+                            }
+
+                            this._receiverKey = null
+                            this._applyReceiverConstraints()
+                        }
+
+                        track.on(videoTypeEvent, entry.handler)
+                        this._trackVideoTypeListeners.set(track, entry)
+                    }
+                )
+
+                bind(
+                    JitsiMeetJS.events.conference.TRACK_REMOVED,
+                    (track) => {
+                        const entry = this._trackVideoTypeListeners.get(track)
+                        if (!entry) return
+
+                        try {
+                            track.off?.(entry.event, entry.handler)
+                        } catch {
+                        }
+                        this._trackVideoTypeListeners.delete(track)
                     }
                 )
 

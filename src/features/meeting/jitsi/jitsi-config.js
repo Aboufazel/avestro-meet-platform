@@ -103,7 +103,7 @@ export const JITSI_INIT_OPTIONS = {
   // audio level در هیچ‌جای اپ استفاده نمی‌شود (active speaker از سرور می‌آید)،
   // ولی برای هر track یک AnalyserNode دائمی اجرا می‌کند.
   disableAudioLevels: true,
-  desktopSharingFrameRate: { min: 5, max: 10 },
+  desktopSharingFrameRate: { min: 5, max: 15 },
   audioLevelsInterval: PERF.audioLevelsInterval,
   disableThirdPartyRequests: true,
 }
@@ -141,8 +141,15 @@ export const CONFERENCE_CONFIG = {
   // همه‌ی ویدیوها را دریافت می‌کند (لگ + داغ شدن).
   openBridgeChannel: true,
 
+  // Send camera and desktop as separate video sources. Requires multi-stream
+  // support in the deployed Jitsi/Jicofo/JVB versions.
+  flags: {
+    sendMultipleVideoStreams: true,
+    receiveMultipleVideoStreams: true,
+  },
+
   // اشتراک صفحه: پیش‌فرض lib فقط ۵fps است
-  desktopSharingFrameRate: { min: 5, max: 10 },
+  desktopSharingFrameRate: { min: 5, max: 15 },
 
   // این دو تشخیص هیچ‌جای اپ استفاده نشده‌اند ولی هرکدام یک پردازش صوتی
   // دائمی روی میکروفون اجرا می‌کنند.
@@ -181,4 +188,4 @@ export const RECONNECT_CONFIG = {
   maxDelayMs: 15000, // سقف فاصله بین تلاش‌ها
 }
 // فریم‌ریت اشتراک صفحه (برای createLocalTracks({devices:['desktop']}))
-export const DESKTOP_SHARING_FRAME_RATE = { min: 5, max: 10 }
+export const DESKTOP_SHARING_FRAME_RATE = { min: 5, max: 15 }

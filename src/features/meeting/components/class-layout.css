@@ -67,10 +67,16 @@
 }
 .cl-share-title { flex: 1; min-width: 0; font-size: 12px; color: var(--room-text-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cl-share-stop {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 12;
   flex: none;
-  height: 30px;
-  padding: 0 14px;
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid rgba(255,255,255,.18);
   border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.35);
   font-size: 12px;
   font-weight: 600;
   color: #fff;

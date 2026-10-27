@@ -393,6 +393,19 @@ export const useMeetingStore = create((set, get) => ({
                 `${track.participantId}-${track.type}`
 
             const tracks = new Map(state.tracks)
+            const existingTrack = tracks.get(key)
+
+            // A remote video can initially be reported as 'camera' and then
+            // corrected to 'desktop' by lib-jitsi-meet. Do not let removal of
+            // that stale mapping delete a different camera track that has
+            // already claimed the same key.
+            const matchesStoredTrack =
+                !existingTrack || !track.jitsiTrack || existingTrack.jitsiTrack === track.jitsiTrack
+
+            if (!matchesStoredTrack) {
+                // A stale mapping must not change participant mute flags either.
+                return { tracks: state.tracks }
+            }
 
             tracks.delete(key)
 
@@ -608,6 +621,31 @@ export const useMeetingStore = create((set, get) => ({
                 }
                 : state.renegotiationTicks,
         })),
+    _clearRemoteScreenShare: (participantId) =>
+        set((state) => {
+            if (!participantId) return {}
+
+            const tracks = new Map(state.tracks)
+            for (const [key, track] of tracks) {
+                if (track?.participantId !== participantId) continue
+                const isDesktop = track.type === 'desktop' ||
+                    track.jitsiTrack?.getVideoType?.() === 'desktop' ||
+                    track.jitsiTrack?.videoType === 'desktop'
+                if (isDesktop) tracks.delete(key)
+            }
+
+            const participants = new Map(state.participants)
+            const participant = participants.get(participantId)
+            if (participant) {
+                participants.set(participantId, {
+                    ...participant,
+                    isScreenSharing: false,
+                })
+            }
+
+            return { tracks, participants }
+        }),
+
     _setScreenSharing: (enabled, track = null) =>
         set((state) => {
             const participants =

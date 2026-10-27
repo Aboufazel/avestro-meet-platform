@@ -38,6 +38,8 @@ export const VideoTile = memo(
         preferCamera = false,
         // false = صدا را از این تایل پخش نکن (وقتی همان فرد در تایل دیگری پخش می‌شود)
         playAudio = true,
+        // در حالت تخته، صدای شرکت‌کننده باید بماند ولی ویدئوی زیر لایه دوباره رندر نشود.
+        forceVideoOff = false,
     }) {
         const participant =
             useParticipant(
@@ -212,7 +214,8 @@ export const VideoTile = memo(
                 !videoRef.current ||
                 !activeTrack?.jitsiTrack ||
                 !isVisible ||
-                !videoEnabled
+                !videoEnabled ||
+                forceVideoOff
             ) {
                 return
             }
@@ -246,6 +249,7 @@ export const VideoTile = memo(
                 : null,
             isVisible,
             videoEnabled,
+            forceVideoOff,
 
             ...(isSafariOrIOS
                 ? [renegotiationTick]
@@ -330,6 +334,7 @@ export const VideoTile = memo(
             ]
 
         const isVideoOff =
+            forceVideoOff ||
             !activeTrack ||
             activeTrack.isMuted ||
             !isVisible ||

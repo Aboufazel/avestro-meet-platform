@@ -507,6 +507,22 @@ export async function joinMeeting({roomName, displayName, email = ''}) {
         )
     )
 
+    _unsubscribers.push(
+        jitsiController.on(
+            JITSI_EVENTS.SCREEN_SHARE_STATE_RECEIVED,
+            ({ participantId, isSharing }) => {
+                if (generation !== _joinGeneration || !participantId) return
+                const state = useMeetingStore.getState()
+                if (isSharing) {
+                    state._updateParticipant?.(participantId, { isScreenSharing: true })
+                } else {
+                    state._clearRemoteScreenShare(participantId)
+                    state._bumpRenegotiationTick(participantId)
+                }
+            }
+        )
+    )
+
     /**
      * شروع واقعی Jitsi
      */
@@ -748,6 +764,14 @@ export async function setVideoQuality(height) {
 /**
  * شروع screen share
  */
+export function setScreenShareStatePublisher(publisher) {
+    jitsiController.setScreenShareStatePublisher(publisher)
+}
+
+export function applyAuthoritativeScreenShareState(state) {
+    jitsiController.applyAuthoritativeScreenShareState(state)
+}
+
 export async function startScreenShare() {
     return jitsiController.startScreenShare()
 }

@@ -11,7 +11,7 @@ import { RoomHeader } from '../../components/shared/RoomHeader.jsx'
 import { SettingsModal } from '../../features/meeting/components/SettingsModal.jsx'
 import { useMeetingStore } from '../../features/meeting/store/meeting-store'
 import { selectIsMeetingMuted, selectIsRecording, selectRecordingSeconds, selectIsVoiceRecording, selectVoiceRecordingSeconds } from '../../features/meeting/store/meeting-selectors'
-import { startRecording, stopRecording, startVoiceRec, stopVoiceRec, raiseHand, markAsTeacher } from '../../features/meeting/store/meeting-actions'
+import { startRecording, stopRecording, startVoiceRec, stopVoiceRec, raiseHand, markAsTeacher, setScreenShareStatePublisher, applyAuthoritativeScreenShareState } from '../../features/meeting/store/meeting-actions'
 import toast from 'react-hot-toast'
 import { useRoomFeatures } from '../../hooks/useRoomFeatures'
 import { useClassAccess } from '../../hooks/useClassAccess'
@@ -60,8 +60,30 @@ export default function RoomPage() {
   const { participants } = useParticipants()
   const teacherParticipant = participants.find((participant) => participant.isTeacher) || null
 
-  const access = useClassAccess(roomName, { enabled: isConnected && (moderated || handFeature || canWhiteboard) })
+  const access = useClassAccess(roomName, { enabled: isConnected && (classLayout || moderated || handFeature || canWhiteboard) })
   const me = access.me
+
+  useEffect(() => {
+    if (!classLayout) {
+      setScreenShareStatePublisher(null)
+      access.setOnScreenShareState(null)
+      return () => {
+        setScreenShareStatePublisher(null)
+        access.setOnScreenShareState(null)
+      }
+    }
+
+    setScreenShareStatePublisher(isHostRole ? access.publishScreenShareState : null)
+    access.setOnScreenShareState((state) => applyAuthoritativeScreenShareState({
+      participantId: state.participant_id,
+      isSharing: state.is_sharing,
+    }))
+    return () => {
+      setScreenShareStatePublisher(null)
+      access.setOnScreenShareState(null)
+    }
+  }, [classLayout, isHostRole, access.publishScreenShareState, access.setOnScreenShareState])
+
   const whiteboardSettings = settings('whiteboard')
   const studentsCanDraw = Boolean(whiteboardSettings.students_can_draw)
 
@@ -145,7 +167,7 @@ export default function RoomPage() {
             <SidePanel canChat={canChat && !inlineChat} canParticipants={canParticipants} canControl={canControlMedia} onOpenAttendance={canAttendance ? () => setAttendanceOpen(true) : undefined} />
             <main className={`relative flex-1 min-w-0 min-h-0 room-surface overflow-hidden ${inlineChat ? '' : 'rounded-[20px] border room-border room-panel-shadow'}`}>
               <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_42%,rgba(77,125,255,.08),transparent_34%)]" />
-              {classLayout ? <ClassLayout showChat={canChat} onStopShare={toggleScreenShare} /> : <VideoGrid />}
+              {classLayout ? <ClassLayout showChat={canChat} onStopShare={toggleScreenShare} suppressVideo={whiteboardOpen} /> : <VideoGrid />}
               {canWhiteboard && isHostRole && !whiteboardOpen && <button type="button" onClick={openWhiteboard} className="absolute top-3 right-3 z-30 flex items-center gap-2 rounded-xl border room-border bg-[var(--room-surface)]/95 px-3 py-2 text-xs text-white shadow-lg transition hover:bg-[var(--room-elevated)]" aria-label="بازکردن تخته تعاملی"><PenTool size={16} /><span>تخته تعاملی</span></button>}
               {canWhiteboard && whiteboardOpen && (
                 <div className={`classroom-whiteboard-layout ${teacherVideoExpanded ? 'teacher-video-expanded' : ''}`}>

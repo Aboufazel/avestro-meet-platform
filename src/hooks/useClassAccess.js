@@ -26,6 +26,7 @@ export function useClassAccess(slug, { enabled = false } = {}) {
   const [connected, setConnected] = useState(false)
   const [whiteboardState, setWhiteboardState] = useState(null)
   const wsRef = useRef(null)
+  const onScreenShareStateRef = useRef(null)
   const pendingMessagesRef = useRef([])
 
   useEffect(() => {
@@ -54,6 +55,7 @@ export function useClassAccess(slug, { enabled = false } = {}) {
           if (msg.type === 'me') setMe(msg)
           else if (msg.type === 'roster') setRoster(msg.items || [])
           else if (msg.type === 'whiteboard_state') setWhiteboardState(msg)
+          else if (msg.type === 'screenshare_state') onScreenShareStateRef.current?.(msg)
         } catch { /* پیام نامعتبر */ }
       }
       ws.onclose = (ev) => {
@@ -92,6 +94,12 @@ export function useClassAccess(slug, { enabled = false } = {}) {
     revoke: useCallback((key) => send({ type: 'revoke', key }), [send]),
     lowerHand: useCallback((key) => send({ type: 'lower_hand', key }), [send]),
     whiteboardState,
+    publishScreenShareState: useCallback((participantId, isSharing) => send({
+      type: 'screenshare_state',
+      participant_id: participantId,
+      is_sharing: Boolean(isSharing),
+    }), [send]),
+    setOnScreenShareState: useCallback((handler) => { onScreenShareStateRef.current = handler }, []),
     updateWhiteboardObjects: useCallback((objects) => send({ type: 'whiteboard_update', objects }), [send]),
     setWhiteboardOpen: useCallback((is_open) => send({ type: 'whiteboard_open', is_open }), [send]),
     clearWhiteboard: useCallback(() => send({ type: 'whiteboard_clear' }), [send]),

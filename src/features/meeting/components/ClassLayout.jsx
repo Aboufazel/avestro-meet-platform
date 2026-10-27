@@ -14,14 +14,14 @@ const hasLiveVideo = (p) => p.isScreenSharing || (p.hasVideo !== undefined ? p.h
 /**
  * چیدمان «کلاس» (موبایل‌اول):
  *  • صحنه: اشتراک صفحه ← معلم ← گوینده‌ی فعال (Pin/Focus اولویت دارد)
- *  • دوربین معلم فقط وقتی کنار صحنه می‌ماند که واقعاً دوربینش روشن و جدا از اشتراک صفحه باشد
- *    (روی سرور فعلی یک اسلات ویدیو برای هر نفر هست؛ با اشتراک صفحه دوربین قطع می‌شود)
+ *  • دوربین معلم در کنار اشتراک صفحه می‌ماند؛ ارسال هم‌زمان دو منبع به پشتیبانی
+ *    multi-stream در نسخه‌های Jitsi سمت سرور و کلاینت نیاز دارد.
  *  • موبایل: صحنه‌ی بالا (قابل بزرگ‌کردن) ← نوار کوچک صحبت‌کننده‌ها ← گفتگو
  *  • دسکتاپ/تبلت: صحنه + ستون کنار برای صحبت‌کننده‌ها؛ گفتگو در SidePanel
  *
  * صدا: صدای هر نفر از تایل خودش پخش می‌شود، پس هر کس میکروفونش روشن است یک تایل mount دارد.
  */
-export const ClassLayout = memo(function ClassLayout({ showChat = true, onStopShare }) {
+export const ClassLayout = memo(function ClassLayout({ showChat = true, onStopShare, suppressVideo = false }) {
   const { participants, count } = useParticipants()
   const isDesktop = useMediaQuery('(min-width: 768px)')
   const [expanded, setExpanded] = useState(false)
@@ -41,9 +41,12 @@ export const ClassLayout = memo(function ClassLayout({ showChat = true, onStopSh
       (speaker && !speaker.isLocal ? speaker : null) ||
       participants.find((p) => !p.isLocal) || participants[0] || null
 
-    // کادر کوچک معلم: فقط وقتی صحنه چیز دیگری است و دوربین معلم واقعاً روشن است
+    // کادر دوربین معلم باید حتی هنگام اشتراک صفحه هم باقی بماند.
+    // در این حالت stage تصویر desktop را نشان می‌دهد و PiP همان شرکت‌کننده
+    // را با preferCamera=true به‌عنوان دوربین مستقل رندر می‌کند.
     const pipP =
-      teacher && stageP && stageP.id !== teacher.id && !teacher.isScreenSharing && !teacher.isVideoMuted
+      teacher && stageP && !teacher.isVideoMuted &&
+      (stageP.id !== teacher.id || teacher.isScreenSharing)
         ? teacher
         : null
 
@@ -93,6 +96,7 @@ export const ClassLayout = memo(function ClassLayout({ showChat = true, onStopSh
               participantId={stage.id}
               isLarge
               videoEnabled={stage.isLocal || allowed.has(stage.id)}
+              forceVideoOff={suppressVideo}
               isPinned={stage.id === pinnedId}
               isFocused={stage.id === focusedId}
             />
@@ -102,7 +106,7 @@ export const ClassLayout = memo(function ClassLayout({ showChat = true, onStopSh
         {stageIsOwnShare && (
           <div className="cl-share">
             <div className="cl-share-preview">
-              <VideoTile participantId={stage.id} isLarge videoEnabled />
+              <VideoTile participantId={stage.id} isLarge videoEnabled forceVideoOff={suppressVideo} />
             </div>
             <div className="cl-share-bar">
               <MonitorUp size={16} className="text-[var(--room-blue)] shrink-0" />
@@ -114,7 +118,7 @@ export const ClassLayout = memo(function ClassLayout({ showChat = true, onStopSh
 
         {pip && (
           <div className="cl-pip">
-            <VideoTile participantId={pip.id} preferCamera playAudio videoEnabled={pip.isLocal || allowed.has(pip.id)} />
+            <VideoTile participantId={pip.id} preferCamera playAudio videoEnabled={pip.isLocal || allowed.has(pip.id)} forceVideoOff={suppressVideo} />
           </div>
         )}
 
@@ -128,7 +132,7 @@ export const ClassLayout = memo(function ClassLayout({ showChat = true, onStopSh
         <div className="cl-strip">
           {strip.map((p) => (
             <div key={p.id} className="cl-tile">
-              <VideoTile participantId={p.id} videoEnabled={allowed.has(p.id)} />
+              <VideoTile participantId={p.id} videoEnabled={allowed.has(p.id)} forceVideoOff={suppressVideo} />
             </div>
           ))}
           {hiddenCount > 0 && (
