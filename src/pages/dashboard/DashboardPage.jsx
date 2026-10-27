@@ -1,3 +1,4 @@
+import { formatIsoJalali, formatIsoTime } from '../../utils/jalali'
 import { Link } from 'react-router-dom'
 import { Plus, Calendar, Users, Video, ExternalLink, Clock, Loader2, ArrowUpLeft, Activity, MoreHorizontal, ArrowLeft, Sparkles, Radio } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
@@ -98,8 +99,8 @@ export default function DashboardPage() {
                           <p className="font-medium text-sm truncate">{room.title}</p>
                         </div>
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 text-[11px] text-[#8d98aa]">
-                          {room.scheduled_at && <span className="inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />{new Date(room.scheduled_at).toLocaleDateString('fa-IR')}</span>}
-                          {room.scheduled_at && <span className="inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />{new Date(room.scheduled_at).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })}</span>}
+                          {room.scheduled_at && <span className="inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />{formatIsoJalali(room.scheduled_at)}</span>}
+                          {room.scheduled_at && <span className="inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />{formatIsoTime(room.scheduled_at)}</span>}
                           <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />{room.active_participants_count || 0}/{room.max_participants}</span>
                         </div>
                       </div>

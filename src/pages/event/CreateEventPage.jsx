@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
 import { ArrowRight } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Card } from '../../components/ui/Card'
+import { JalaliDateTimePicker } from '../../components/ui/JalaliDateTimePicker'
 import { useCreateRoom } from '../../hooks/useRooms'
 
 const schema = yup.object({
@@ -21,6 +22,7 @@ const schema = yup.object({
     .max(2000, 'حداکثر ۵۰۰ نفر')
     .required(),
   is_private: yup.boolean(),
+  kind: yup.string().oneOf(['meeting', 'class']).default('meeting'),
 })
 
 function slugify(text) {
@@ -33,9 +35,9 @@ function slugify(text) {
 export default function CreateEventPage() {
   const { mutate: createRoom, isPending } = useCreateRoom()
 
-  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm({
+  const { register, handleSubmit, setValue, watch, control, formState: { errors } } = useForm({
     resolver: yupResolver(schema),
-    defaultValues: { title: '', slug: '', description: '', scheduled_at: '', max_participants: 100, is_private: false },
+    defaultValues: { title: '', slug: '', description: '', scheduled_at: '', max_participants: 100, is_private: false, kind: 'meeting' },
   })
 
   const slug = watch('slug')
@@ -98,12 +100,17 @@ export default function CreateEventPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                label="تاریخ و ساعت برگزاری (اختیاری)"
-                type="datetime-local"
-                error={errors.scheduled_at?.message}
-                className="meet-auth-input"
-                {...register('scheduled_at')}
+              <Controller
+                name="scheduled_at"
+                control={control}
+                render={({ field }) => (
+                  <JalaliDateTimePicker
+                    label="تاریخ و ساعت برگزاری (اختیاری)"
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.scheduled_at?.message}
+                  />
+                )}
               />
               <Input
                 label="حداکثر شرکت‌کنندگان"
@@ -112,6 +119,16 @@ export default function CreateEventPage() {
                 className="meet-auth-input"
                 {...register('max_participants')}
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {[['meeting', 'جلسه', 'گفت‌وگوی عادی و کاری'], ['class', 'کلاس آموزشی', 'دست‌بلندکردن، حضور و غیاب و کنترل صدا و تصویر']].map(([value, title, hint]) => (
+                <label key={value} className="flex flex-col gap-1 p-4 bg-[#f8faff] rounded-xl border border-[#e5eaf2] cursor-pointer has-[:checked]:border-[#4f7cff] has-[:checked]:bg-[#edf2ff]">
+                  <input type="radio" value={value} className="sr-only" {...register('kind')} />
+                  <span className="text-sm font-medium text-[#101827]">{title}</span>
+                  <span className="text-xs text-[#8d98aa]">{hint}</span>
+                </label>
+              ))}
             </div>
 
             <div className="flex items-center gap-3 p-4 bg-[#f8faff] rounded-xl border border-[#e5eaf2]">

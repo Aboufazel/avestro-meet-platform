@@ -49,6 +49,7 @@ export function mapParticipant(jitsiParticipant, isLocal = false) {
     isVideoMuted: jitsiParticipant.isVideoMuted(),
     isScreenSharing: false,
     isModerator: jitsiParticipant.isModerator(),
+    isHandRaised: Number(jitsiParticipant.getProperty?.('raisedHand') || 0) > 0,
     isActiveSpeaker: false,
     isConnectionInterrupted: false,
     connectionQuality: 100,

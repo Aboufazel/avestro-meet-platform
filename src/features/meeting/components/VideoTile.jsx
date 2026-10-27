@@ -34,6 +34,10 @@ export const VideoTile = memo(
         isFocused = false,
         // false = بیرون از بودجه‌ی ویدیو: آواتار نشان بده و decode نکن
         videoEnabled = true,
+        // کلاس: همیشه تصویر «دوربین» را نشان بده (نه اشتراک صفحه) — برای کادر کوچک معلم
+        preferCamera = false,
+        // false = صدا را از این تایل پخش نکن (وقتی همان فرد در تایل دیگری پخش می‌شود)
+        playAudio = true,
     }) {
         const participant =
             useParticipant(
@@ -160,6 +164,7 @@ export const VideoTile = memo(
             if (
                 !audioRef.current ||
                 !audioTrack?.jitsiTrack ||
+                !playAudio ||
                 participant?.isLocal
             ) {
                 return
@@ -189,6 +194,7 @@ export const VideoTile = memo(
         }, [
             audioTrack?.jitsiTrack,
             participant?.isLocal,
+            playAudio,
         ])
 
         // ---------------------------------------------------------------------
@@ -196,8 +202,10 @@ export const VideoTile = memo(
         // ---------------------------------------------------------------------
 
         const activeTrack =
-            desktopTrack ||
-            videoTrack
+            preferCamera
+                ? videoTrack
+                : desktopTrack ||
+                  videoTrack
 
         useEffect(() => {
             if (
@@ -331,7 +339,7 @@ export const VideoTile = memo(
             participant.isAudioMuted
 
         const isScreenShare =
-            !!desktopTrack
+            !preferCamera && !!desktopTrack
 
         // فقط تصویر دوربین خودمان (روی صفحه‌ی خودمان) مثل آینه نمایش داده می‌شود؛
         // چیزی که برای بقیه ارسال می‌شود تغییری نمی‌کند. اشتراک صفحه و ویدیوی

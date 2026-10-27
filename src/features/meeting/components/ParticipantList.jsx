@@ -1,10 +1,14 @@
 import { memo } from 'react'
 import { useParticipants } from '../hooks/useParticipants'
 import { ParticipantItem } from './ParticipantItem'
+import { muteAllParticipants } from '../store/meeting-actions'
+import { HandQueue } from './HandQueue'
 
 export const ParticipantList = memo(
-  function ParticipantList() {
-    const { participants, count } = useParticipants()
+  function ParticipantList({ canControl = false }) {
+    const { participants: all, count } = useParticipants()
+    // دست‌های بلندشده بالای فهرست
+    const participants = [...all].sort((a, b) => Number(!!b.isHandRaised) - Number(!!a.isHandRaised))
 
     return (
       <div dir="rtl" className="flex flex-col h-full text-right">
@@ -19,7 +23,15 @@ export const ParticipantList = memo(
               {count} نفر
             </span>
           </div>
+          {canControl && (
+            <button type="button" onClick={() => muteAllParticipants('audio')}
+              className="mt-2 w-full text-xs rounded-lg border border-olive-700 py-1.5 text-olive-100 hover:bg-white/5">
+              قطع صدای همه
+            </button>
+          )}
         </div>
+
+        {canControl && <HandQueue />}
 
         {/* List */}
         <div className="flex-1 overflow-y-auto p-2">
@@ -35,6 +47,7 @@ export const ParticipantList = memo(
                 <ParticipantItem
                   key={participant.id}
                   participant={participant}
+                  canControl={canControl}
                 />
               ))}
             </div>

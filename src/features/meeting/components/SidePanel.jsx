@@ -9,7 +9,7 @@ const DEFAULT_PARTICIPANT_HEIGHT = 42
 const MIN_PARTICIPANT_HEIGHT = 24
 const MAX_PARTICIPANT_HEIGHT = 72
 
-export const SidePanel = memo(function SidePanel() {
+export const SidePanel = memo(function SidePanel({ canChat = true, canParticipants = true, canControl = false, onOpenAttendance }) {
   const isOpen = useMeetingStore(selectIsPanelOpen)
   const activeTab = useMeetingStore(selectActivePanelTab)
   const closePanel = useMeetingStore((s) => s.closePanel)
@@ -111,8 +111,8 @@ export const SidePanel = memo(function SidePanel() {
 
         <div className="h-[54px] shrink-0 flex items-center px-3 border-b room-border">
           <div className="flex items-center gap-1 flex-1 justify-start">
-            <TabButton active={activeTab === 'participants'} icon={<Users size={16} />} label="شرکت‌کنندگان" onClick={() => togglePanel('participants')} />
-            <TabButton active={activeTab === 'chat'} icon={<MessageSquare size={16} />} label="گفتگو" onClick={() => togglePanel('chat')} />
+            {canParticipants && <TabButton active={activeTab === 'participants'} icon={<Users size={16} />} label="شرکت‌کنندگان" onClick={() => togglePanel('participants')} />}
+            {canChat && <TabButton active={activeTab === 'chat'} icon={<MessageSquare size={16} />} label="گفتگو" onClick={() => togglePanel('chat')} />}
           </div>
           <button onClick={closePanel} className="room-control w-9 h-9 rounded-xl bg-white/[.045] text-white/50 hover:text-white flex items-center justify-center" aria-label="بستن">
             <X size={17} />
@@ -120,18 +120,18 @@ export const SidePanel = memo(function SidePanel() {
         </div>
 
         <div className="md:hidden flex-1 min-h-0 pb-[calc(78px+env(safe-area-inset-bottom))] overflow-hidden">
-          {activeTab === 'participants' ? <ParticipantList /> : <ChatPanel />}
+          {(canParticipants && (activeTab === 'participants' || !canChat)) ? <ParticipantList canControl={canControl} onOpenAttendance={onOpenAttendance} /> : (canChat ? <ChatPanel /> : null)}
         </div>
 
         <div ref={panelContentRef} className="hidden md:flex md:flex-col md:flex-1 md:min-h-0">
-          <section
-            className="min-h-0 border-b room-border flex flex-col shrink-0 overflow-hidden"
-            style={{ height: `${participantHeight}%` }}
+          {canParticipants && <section
+            className={`min-h-0 room-border flex flex-col overflow-hidden ${canChat ? 'border-b shrink-0' : 'flex-1'}`}
+            style={canChat ? { height: `${participantHeight}%` } : undefined}
           >
-            <ParticipantList />
-          </section>
+            <ParticipantList canControl={canControl} onOpenAttendance={onOpenAttendance} />
+          </section>}
 
-          <div
+          {canParticipants && canChat && <div
             role="separator"
             aria-label="تغییر ارتفاع شرکت‌کنندگان و گفتگو"
             aria-orientation="horizontal"
@@ -151,11 +151,11 @@ export const SidePanel = memo(function SidePanel() {
           >
             <span className="room-panel-resizer-line" />
             <span className="room-panel-resizer-grip"><GripVertical size={13} /></span>
-          </div>
+          </div>}
 
-          <div className="flex-1 min-h-0 overflow-hidden">
+          {canChat && <div className="flex-1 min-h-0 overflow-hidden">
             <ChatPanel />
-          </div>
+          </div>}
         </div>
       </aside>
     </>

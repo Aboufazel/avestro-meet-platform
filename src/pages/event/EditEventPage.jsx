@@ -1,6 +1,6 @@
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {useEffect} from 'react'
-import {useForm} from 'react-hook-form'
+import {useForm, Controller} from 'react-hook-form'
 import {yupResolver} from '@hookform/resolvers/yup'
 import * as yup from 'yup'
 import {ArrowRight, Loader2} from 'lucide-react'
@@ -8,6 +8,8 @@ import {ArrowRight, Loader2} from 'lucide-react'
 import {Button} from '../../components/ui/Button'
 import {Input} from '../../components/ui/Input'
 import {Card} from '../../components/ui/Card'
+import {JalaliDateTimePicker} from '../../components/ui/JalaliDateTimePicker'
+import {isoToLocalValue} from '../../utils/jalali'
 import {useRoom, useUpdateRoom} from '../../hooks/useRooms'
 
 
@@ -63,6 +65,7 @@ export default function EditEventPage() {
     const {
         register,
         watch,
+        control,
         handleSubmit,
         reset,
         formState: {errors},
@@ -87,7 +90,7 @@ export default function EditEventPage() {
             title: room.title || '',
             description: room.description || '',
             scheduled_at: room.scheduled_at
-                ? formatDateTimeLocal(room.scheduled_at)
+                ? isoToLocalValue(room.scheduled_at)
                 : '',
             max_participants: room.max_participants || 100,
             is_private: Boolean(room.is_private),
@@ -273,12 +276,17 @@ export default function EditEventPage() {
                         {/* Date + Participants */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-                            <Input
-                                className="meet-auth-input"
-                                label="تاریخ و ساعت برگزاری (اختیاری)"
-                                type="datetime-local"
-                                error={errors.scheduled_at?.message}
-                                {...register('scheduled_at')}
+                            <Controller
+                                name="scheduled_at"
+                                control={control}
+                                render={({field}) => (
+                                    <JalaliDateTimePicker
+                                        label="تاریخ و ساعت برگزاری (اختیاری)"
+                                        value={field.value}
+                                        onChange={field.onChange}
+                                        error={errors.scheduled_at?.message}
+                                    />
+                                )}
                             />
 
                             <Input
@@ -347,37 +355,4 @@ export default function EditEventPage() {
 
         </div>
     )
-}
-
-
-/**
- * تبدیل تاریخ ISO به فرمت مناسب datetime-local
- *
- * مثال:
- * 2026-09-01T18:00:00.000Z
- *
- * تبدیل می‌شود به:
- * 2026-09-01T21:30
- */
-function formatDateTimeLocal(value) {
-    const date = new Date(value)
-
-    if (Number.isNaN(date.getTime())) {
-        return ''
-    }
-
-    const pad = (number) =>
-        String(number).padStart(2, '0')
-
-    return [
-        date.getFullYear(),
-        '-',
-        pad(date.getMonth() + 1),
-        '-',
-        pad(date.getDate()),
-        'T',
-        pad(date.getHours()),
-        ':',
-        pad(date.getMinutes()),
-    ].join('')
 }

@@ -22,11 +22,15 @@ export function useLogin() {
     return useMutation({
         mutationFn: (data) => authService.login(data).then((r) => r.data),
         onSuccess: async (data) => {
-            setAuth(data.access, null)  // اول token رو ست کن
+            setAuth(data.access, null, data.refresh)  // اول token و refresh رو ست کن
             const me = await authService.me()  // بعد user رو بگیر
-            setAuth(data.access, me.data)
+            setAuth(data.access, me.data, data.refresh)
             toast.success('خوش آمدید!')
-            navigate('/dashboard')
+
+            // بازگشت به صفحه‌ی قبلی (مثلاً /join/slug) فقط برای مسیرهای داخلی
+            const next = new URLSearchParams(window.location.search).get('next')
+            const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard'
+            navigate(safeNext, {replace: true})
         },
         onError: (error) => {
             const msg = error.response?.data?.detail || 'نام کاربری یا رمز عبور اشتباه است'

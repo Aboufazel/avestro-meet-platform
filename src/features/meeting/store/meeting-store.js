@@ -152,6 +152,12 @@ export const useMeetingStore = create((set, get) => ({
                         isModerator:
                             participant.isModerator ?? false,
 
+                        isHandRaised:
+                            participant.isHandRaised ?? false,
+
+                        isTeacher:
+                            participant.isTeacher ?? false,
+
                         isActiveSpeaker:
                             participant.isActiveSpeaker ?? false,
                     }

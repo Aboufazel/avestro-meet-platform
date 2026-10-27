@@ -1,0 +1,180 @@
+/* چیدمان کلاس — موبایل‌اول. رنگ‌ها از متغیرهای تم اتاق (--room-*) می‌آید. */
+
+.cl-root {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 8px calc(100px + env(safe-area-inset-bottom));
+}
+
+/* ── صحنه ── */
+.cl-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #05080e;
+  border: 1px solid var(--room-border);
+}
+.cl-stage > .cl-fill { position: absolute; inset: 0; }
+
+.cl-pip {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 10;
+  width: 132px;
+  height: 176px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+  border: 2px solid var(--room-blue);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
+}
+
+.cl-expand {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 11;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: rgba(8, 15, 27, .72);
+  border: 1px solid var(--room-border-strong);
+  backdrop-filter: blur(6px);
+}
+
+/* اشتراک صفحه‌ی خودِ معلم: پیش‌نمایش بزرگ + نوار وضعیت پایین */
+.cl-share { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.cl-share-preview { position: relative; flex: 1; min-height: 0; background: #000; }
+.cl-share-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 12px;
+  background: var(--room-surface);
+  border-top: 1px solid var(--room-border);
+}
+.cl-share-title { flex: 1; min-width: 0; font-size: 12px; color: var(--room-text-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-share-stop {
+  flex: none;
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--room-danger);
+}
+
+/* ── نوار «صدا/تصویر دارند» ── */
+.cl-strip { display: flex; gap: 8px; flex-shrink: 0; overflow-x: auto; }
+.cl-tile {
+  position: relative;
+  flex: 0 0 auto;
+  width: 140px;
+  height: 96px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--room-border);
+  background: #0a111d;
+}
+.cl-more {
+  flex: 0 0 auto;
+  min-width: 72px;
+  height: 96px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--room-border);
+  background: rgba(255, 255, 255, .04);
+  color: var(--room-text-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* ── گفتگوی زیر صحنه (فقط موبایل) ── */
+.cl-chat {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--room-border);
+  background: var(--room-surface);
+}
+
+/* ── نوار کنترل چسبیده به پایین (موبایل) ── */
+.cl-dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  background: var(--room-surface);
+  border-top: 1px solid var(--room-border);
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+}
+.cl-dock-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+.cl-hand {
+  flex: 1;
+  height: 44px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2a1c00;
+  background: var(--room-warning);
+}
+.cl-hand.is-raised { background: rgba(245, 184, 75, .16); color: var(--room-warning); box-shadow: inset 0 0 0 1px rgba(245, 184, 75, .5); }
+
+/* ───────────── موبایل ───────────── */
+@media (max-width: 767px) {
+  .cl-root { padding: 0 0 calc(64px + env(safe-area-inset-bottom)); gap: 0; }
+  .cl-stage {
+    flex: none;
+    height: 36vh;
+    height: 36dvh;
+    min-height: 190px;
+    border-radius: 0;
+    border-width: 0 0 1px;
+  }
+  .cl-stage.is-expanded { height: 62vh; height: 62dvh; }
+  .cl-expand { display: flex; }
+  .cl-pip { width: 84px; height: 112px; left: 6px; bottom: 6px; }
+  .cl-strip { padding: 8px; border-bottom: 1px solid var(--room-border); }
+  .cl-tile { width: 88px; height: 64px; border-radius: 10px; }
+  .cl-more { height: 64px; min-width: 64px; }
+  .cl-chat { border: 0; border-radius: 0; }
+}
+
+/* ───────────── دسکتاپ / تبلت: نوار می‌شود ستون کنار صحنه ───────────── */
+@media (min-width: 768px) {
+  .cl-root { flex-direction: row; }
+  .cl-strip { flex-direction: column; width: 176px; overflow-x: hidden; overflow-y: auto; }
+  .cl-tile { width: 100%; height: 118px; }
+  .cl-more { width: 100%; height: 64px; }
+}

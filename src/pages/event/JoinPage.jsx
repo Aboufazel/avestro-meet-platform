@@ -1,3 +1,4 @@
+import { formatIsoJalali, formatIsoTime } from '../../utils/jalali'
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
@@ -66,7 +67,7 @@ export default function JoinPage() {
             <div className="relative grid grid-cols-2 gap-2 sm:gap-3 mt-5 sm:mt-10">
               <div className="rounded-xl sm:rounded-2xl bg-white/[.05] border border-white/[.07] p-3 sm:p-4"><Users className="w-4 h-4 text-[#54d9b0]" /><p className="text-lg font-bold mt-3">{room.active_participants_count || 0}<span className="text-white/25 text-sm font-normal"> / {room.max_participants}</span></p><p className="text-[10px] text-white/35 mt-1">شرکت‌کننده</p></div>
               <div className="rounded-xl sm:rounded-2xl bg-white/[.05] border border-white/[.07] p-3 sm:p-4"><Video className="w-4 h-4 text-[#9eb6ff]" /><p className="text-sm font-medium mt-3">جلسه آنلاین</p><p className="text-[10px] text-white/35 mt-1">آماده ورود</p></div>
-              {room.scheduled_at && <div className="col-span-2 rounded-2xl bg-white/[.04] border border-white/[.07] p-4 flex flex-wrap gap-5 text-xs text-white/50"><span className="inline-flex items-center gap-2"><Calendar className="w-4 h-4 text-[#6c93ff]" />{new Date(room.scheduled_at).toLocaleDateString('fa-IR')}</span><span className="inline-flex items-center gap-2"><Clock className="w-4 h-4 text-[#54d9b0]" />{new Date(room.scheduled_at).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })}</span></div>}
+              {room.scheduled_at && <div className="col-span-2 rounded-2xl bg-white/[.04] border border-white/[.07] p-4 flex flex-wrap gap-5 text-xs text-white/50"><span className="inline-flex items-center gap-2"><Calendar className="w-4 h-4 text-[#6c93ff]" />{formatIsoJalali(room.scheduled_at)}</span><span className="inline-flex items-center gap-2"><Clock className="w-4 h-4 text-[#54d9b0]" />{formatIsoTime(room.scheduled_at)}</span></div>}
             </div>
           </section>
 

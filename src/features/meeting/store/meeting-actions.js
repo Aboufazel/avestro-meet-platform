@@ -3,6 +3,7 @@ import {JITSI_EVENTS} from '../jitsi/jitsi-events.js'
 import {useMeetingStore} from './meeting-store.js'
 import {startLocalRecording, stopLocalRecording, downloadRecording, recoverOrphanedRecordings} from '../jitsi/recordingService.js'
 import {useAuthStore} from "../../../store/authStore.js";
+import {refreshAccessToken} from '../../../services/api.js'
 import {startVoiceRecording, stopVoiceRecording} from '../jitsi/recordingService.js'
 
 /**
@@ -137,8 +138,9 @@ export async function joinMeeting({roomName, displayName, email = ''}) {
     // قبل از اتصال واقعی به Jitsi، از بک‌اند اجازه بگیر (چک ظرفیت بر اساس پلن میزبان)
     store._setStatus('connecting')
     const allowed = await _checkRoomCapacity(roomName, externalId, displayName)
-    if (!allowed) {
-        store._setError({message: 'ظرفیت این جلسه بر اساس پلن میزبان تکمیل شده است.'})
+    if (generation !== _joinGeneration) return
+    if (!allowed.ok) {
+        store._setError({message: allowed.message})
         return
     }
 
@@ -513,6 +515,8 @@ export async function joinMeeting({roomName, displayName, email = ''}) {
             roomName,
             displayName,
             email,
+            token: allowed.token || null,
+            tokenProvider: () => _refreshJitsiToken(roomName, externalId),
         })
     } catch (error) {
         if (generation !== _joinGeneration) return
@@ -573,39 +577,85 @@ function _authHeaders() {
 }
 
 /**
- * چک ظرفیت روم و ثبت اولیه‌ی حضور — قبل از اتصال واقعی به Jitsi صدا زده می‌شود
+ * POST به بک‌اند با توکن؛ اگر توکن منقضی/نامعتبر بود (401)، یک بار بدون توکن تکرار می‌شود.
+ * endpointهای join/leave عمومی‌اند و با توکن خراب نباید شکست بخورند.
  */
-// async function _checkRoomCapacity(roomName, externalId) {
-//     try {
-//         const res = await fetch(`${API_BASE_URL}/rooms/${roomName}/join/`, {
-//             method: 'POST',
-//             headers: { 'Content-Type': 'application/json' },
-//             body: JSON.stringify({ external_participant_id: externalId }),
-//         })
-//         return res.ok
-//     } catch (error) {
-//         console.warn('[meeting-actions] Failed to check room capacity:', error)
-//         return true // اگه بک‌اند در دسترس نبود، اجازه بده وارد بشه (fail-open)
-//     }
-// }
-
-async function _checkRoomCapacity(roomName, externalId, displayName) {
-    try {
-        const res = await fetch(`${API_BASE_URL}/rooms/${roomName}/join/`, {
+async function _postWithAuth(url, body) {
+    const send = (token) =>
+        fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                ..._authHeaders(),
+                ...(token ? {Authorization: `Bearer ${token}`} : {}),
             },
-            body: JSON.stringify({
+            body,
+        })
+
+    const token = useAuthStore.getState().token
+    const res = await send(token)
+
+    // توکن منقضی شده: با refresh token تازه شود و با همان هویت تکرار شود.
+    // (هرگز بدون توکن تکرار نمی‌کنیم؛ وگرنه میزبان/مدیر مهمان حساب می‌شود.)
+    if (res.status === 401 && token) {
+        const fresh = await refreshAccessToken()
+        if (fresh) return send(fresh)
+    }
+
+    return res
+}
+
+/**
+ * چک ظرفیت روم و ثبت اولیه‌ی حضور — قبل از اتصال واقعی به Jitsi صدا زده می‌شود
+ */
+/**
+ * تمدید توکن Jitsi برای reconnect (اگر خطا بدهد، کنترلر از توکن قبلی استفاده می‌کند)
+ */
+async function _refreshJitsiToken(roomName, externalId) {
+    const res = await _postWithAuth(
+        `${API_BASE_URL}/rooms/${roomName}/jitsi-token/`,
+        JSON.stringify({external_participant_id: externalId})
+    )
+    if (!res.ok) throw new Error('token refresh failed')
+    const data = await res.json()
+    return data.jitsi_token || null
+}
+
+async function _checkRoomCapacity(roomName, externalId, displayName) {
+    try {
+        const res = await _postWithAuth(
+            `${API_BASE_URL}/rooms/${roomName}/join/`,
+            JSON.stringify({
                 external_participant_id: externalId,
                 guest_name: displayName || '',
-            }),
-        })
-        return res.ok
+            })
+        )
+
+        if (res.ok) {
+            const data = await res.json().catch(() => ({}))
+            // null = سرور Jitsi هنوز بدون JWT است (ورود آزاد)
+            return {ok: true, token: data.jitsi_token || null}
+        }
+
+        let detail = ''
+        try {
+            detail = (await res.json())?.detail || ''
+        } catch {
+            // پاسخ JSON نبود
+        }
+
+        return {
+            ok: false,
+            status: res.status,
+            message:
+                res.status === 409
+                    ? 'ظرفیت این جلسه بر اساس پلن میزبان تکمیل شده است.'
+                    : res.status === 401
+                        ? 'نشست شما منقضی شده است؛ لطفاً دوباره وارد شوید.'
+                        : detail || 'ورود به جلسه ممکن نشد.',
+        }
     } catch (error) {
         console.warn('[meeting-actions] Failed to check room capacity:', error)
-        return true
+        return {ok: true}
     }
 }
 
@@ -628,14 +678,10 @@ async function _checkRoomCapacity(roomName, externalId, displayName) {
 async function _notifyBackendLeave(roomName, externalId) {
     if (!roomName || !externalId) return
     try {
-        await fetch(`${API_BASE_URL}/rooms/${roomName}/leave/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ..._authHeaders(),
-            },
-            body: JSON.stringify({external_participant_id: externalId}),
-        })
+        await _postWithAuth(
+            `${API_BASE_URL}/rooms/${roomName}/leave/`,
+            JSON.stringify({external_participant_id: externalId})
+        )
     } catch (error) {
         console.warn('[meeting-actions] Failed to notify backend of leave:', error)
     }
@@ -738,6 +784,14 @@ export function sendMessage(text, replyTo = null) {
 /**
  * Mute a specific participant.
  */
+export const getCurrentExternalId = () => _currentExternalId
+export const markAsTeacher = (on = true) => jitsiController.setTeacherFlag(on)
+export const raiseHand = (raised) => jitsiController.setHandRaised(raised)
+export const muteParticipantMedia = (id, type) => jitsiController.muteParticipantMedia(id, type)
+export const muteAllParticipants = (type = 'audio') => jitsiController.muteAllParticipants(type)
+export const enableClassModeration = (types = ['audio', 'video']) => jitsiController.enableAVModeration(types)
+export const approveParticipant = (id, types) => jitsiController.approveParticipantMedia(id, types)
+
 export async function muteParticipantAudio(
     participantId
 ) {

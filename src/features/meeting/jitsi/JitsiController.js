@@ -247,6 +247,8 @@ export class JitsiController {
                    roomName,
                    displayName,
                    email = '',
+                   token = null,
+                   tokenProvider = null,
                }) {
         if (this._isDisposed) {
             throw new Error(
@@ -289,6 +291,10 @@ export class JitsiController {
 
         this._email =
             email?.trim() || ''
+
+        // JWT سرور Jitsi (null = ورود بدون توکن)
+        this._jwt = token || null
+        this._tokenProvider = tokenProvider || null
 
         this._isLeaving = false
 
@@ -1471,6 +1477,105 @@ export class JitsiController {
         }
     }
 
+    // ───────────────────── کلاس آموزشی ─────────────────────
+
+    /** علامت‌گذاری خودم به‌عنوان معلم (برای چیدمان کلاس؛ فقط نمایشی است) */
+    async setTeacherFlag(on) {
+        if (!this._conference) return false
+        try {
+            this._conference.setLocalParticipantProperty('isTeacher', on ? '1' : '0')
+            this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
+                participantId: this._conference.myUserId(),
+                isTeacher: Boolean(on),
+            })
+            return true
+        } catch (error) {
+            console.warn('[JitsiController] setTeacherFlag failed:', error)
+            return false
+        }
+    }
+
+    /** بلندکردن/پایین‌آوردن دست برای خودم */
+    async setHandRaised(raised) {
+        if (!this._conference) return false
+        try {
+            this._conference.setLocalParticipantProperty(
+                'raisedHand',
+                raised ? String(Date.now()) : '0'
+            )
+            this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
+                participantId: this._conference.myUserId(),
+                isHandRaised: Boolean(raised),
+            })
+            return true
+        } catch (error) {
+            console.warn('[JitsiController] setHandRaised failed:', error)
+            return false
+        }
+    }
+
+    /** قطع صدا یا تصویر یک شرکت‌کننده توسط مدیر ('audio' | 'video') */
+    async muteParticipantMedia(participantId, mediaType) {
+        if (!this._conference || !participantId) return false
+        if (participantId === this._conference.myUserId()) return false
+        try {
+            this._conference.muteParticipant(participantId, mediaType)
+            return true
+        } catch (error) {
+            console.warn('[JitsiController] muteParticipantMedia failed:', error)
+            return false
+        }
+    }
+
+    /**
+     * فعال‌کردن «تعدیل صدا و تصویر» (AV moderation) Jitsi؛ سرور جلوی باز کردن
+     * میکروفون/دوربین بدون تأیید مدیر را می‌گیرد.
+     * اگر سرور/نسخه پشتیبانی نکند false برمی‌گردد و کلاس بدون آن ادامه می‌یابد.
+     */
+    async enableAVModeration(mediaTypes = ['audio', 'video']) {
+        const conf = this._conference
+        if (!conf || typeof conf.enableAVModeration !== 'function') return false
+        try {
+            if (typeof conf.isAVModerationSupported === 'function' && !conf.isAVModerationSupported()) {
+                return false
+            }
+            mediaTypes.forEach((t) => conf.enableAVModeration(t, true))
+            return true
+        } catch (error) {
+            console.warn('[JitsiController] enableAVModeration failed:', error)
+            return false
+        }
+    }
+
+    /** تأیید صحبت/تصویر یک شرکت‌کننده توسط مدیر */
+    async approveParticipantMedia(participantId, mediaTypes = ['audio', 'video']) {
+        const conf = this._conference
+        if (!conf || !participantId || typeof conf.avModerationApprove !== 'function') return false
+        try {
+            mediaTypes.forEach((t) => conf.avModerationApprove(t, participantId))
+            return true
+        } catch (error) {
+            console.warn('[JitsiController] approveParticipantMedia failed:', error)
+            return false
+        }
+    }
+
+    /** قطع صدای همه‌ی غیر مدیرها */
+    async muteAllParticipants(mediaType = 'audio') {
+        if (!this._conference) return 0
+        let count = 0
+        for (const p of this._conference.getParticipants()) {
+            if (p.isModerator()) continue
+            try {
+                this._conference.muteParticipant(p.getId(), mediaType)
+                count += 1
+            } catch (error) {
+                console.warn('[JitsiController] muteAll failed for', p.getId(), error)
+            }
+        }
+        return count
+    }
+
     /**
      * Mute or unmute a specific participant.
      *
@@ -1692,7 +1797,7 @@ export class JitsiController {
                 const connection =
                     new JitsiMeetJS.JitsiConnection(
                         null,
-                        null,
+                        this._jwt || null,
                         CONNECTION_CONFIG
                     )
 
@@ -1939,6 +2044,15 @@ export class JitsiController {
             this._connection = null
             this._remoteVideoSources.clear()
             this._receiverKey = null
+
+            // توکن قبلی ممکن است منقضی شده باشد؛ اگر تمدید نشد از قبلی استفاده کن
+            if (this._tokenProvider) {
+                try {
+                    this._jwt = (await this._withTimeout(this._tokenProvider(), 4000)) || this._jwt
+                } catch (err) {
+                    console.warn('[JitsiController] JWT refresh failed:', err)
+                }
+            }
 
             await this._connect()
             await this._joinConference({
@@ -2224,6 +2338,35 @@ export class JitsiController {
                         }
 
                         this._emit(JITSI_EVENTS.PARTICIPANT_LEFT, {participantId: id})
+                    }
+                )
+
+                // =================================================================
+                // Participant property changed (بلندکردن دست)
+                // =================================================================
+
+                bind(
+                    JitsiMeetJS.events
+                        .conference
+                        .PARTICIPANT_PROPERTY_CHANGED,
+                    (participant, name, _old, value) => {
+                        // کلاس: مشخص‌کردن «معلم» برای چیدمان
+                        if (name === 'isTeacher') {
+                            this._emit(JITSI_EVENTS.PARTICIPANT_UPDATED, {
+                                participantId: participant.getId(),
+                                isTeacher: value === '1',
+                            })
+                            return
+                        }
+                        if (name !== 'raisedHand') return
+
+                        this._emit(
+                            JITSI_EVENTS.PARTICIPANT_UPDATED,
+                            {
+                                participantId: participant.getId(),
+                                isHandRaised: Number(value || 0) > 0,
+                            }
+                        )
                     }
                 )
 
