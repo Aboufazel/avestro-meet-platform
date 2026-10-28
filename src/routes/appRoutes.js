@@ -8,6 +8,7 @@ export const appRoutes = {
     indexPage: '/dashboard',
     createEvent: '/dashboard/create',
     editEvent: '/dashboard/edit/:slug',
+    settings: '/dashboard/settings',
   },
   event: {
     join: '/join/:slug',

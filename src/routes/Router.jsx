@@ -13,6 +13,7 @@ import LandingPage from '../pages/landing/LandingPage'
 import {AppMainPage} from "../components/layout/AppMainPage.jsx";
 import GuestRoute from '../components/shared/GuestRoute'
 import EditEventPage from '../pages/event/EditEventPage'
+import AccountSettingsPage from '../pages/settings/AccountSettingsPage'
 
 const router = createBrowserRouter([
     {
@@ -54,6 +55,10 @@ const router = createBrowserRouter([
             {
                 path: appRoutes.dashboard.editEvent,
                 element: <EditEventPage/>
+            },
+            {
+                path: appRoutes.dashboard.settings,
+                element: <AccountSettingsPage/>
             },
         ]
     },
