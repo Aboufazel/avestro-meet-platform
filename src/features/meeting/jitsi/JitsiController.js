@@ -147,6 +147,11 @@ export class JitsiController {
         // _receiverIntent    : آخرین درخواست UI (چه کسانی بزرگ/قابل‌دیدن‌اند)
         // _receiverKey       : برای جلوگیری از ارسال تکراری یک پیام به bridge
         this._remoteVideoSources = new Map()
+        // Participants whose stop message has arrived. Ignore delayed desktop
+        // TRACK_ADDED events until that participant explicitly starts sharing again.
+        this._screenShareSeqByParticipant = new Map() // participantId -> last accepted seq
+        this._authoritativelyStoppedScreenShares = new Map() // participantId -> stoppedAt (ms)
+        this._localScreenShareSeq = 0
         this._trackVideoTypeListeners = new Map()
         this._receiverIntent = null
         this._receiverKey = null
@@ -154,6 +159,8 @@ export class JitsiController {
         // =====================================================================
         // Screen sharing
         // =====================================================================
+
+        this._screenShareStatePublisher = null
 
         this._screenShare = {
             active: false,
@@ -193,7 +200,6 @@ export class JitsiController {
         this._localAudioRecoveryLastAt = 0
         this._localAudioRecoveryCooldownMs = 2500
         this._screenShareTransitioning = false
-        this._screenShareStatePublisher = null
 
         // =====================================================================
         // Initialize Jitsi core.
@@ -955,6 +961,30 @@ export class JitsiController {
         return this._applyReceiverConstraints()
     }
 
+    _restoreRemoteCameraTrack(changedTrack) {
+        try {
+            const participantId = changedTrack.getParticipantId?.()
+            const participant = participantId
+                ? this._conference?.getParticipantById?.(participantId)
+                : null
+
+            for (const other of participant?.getTracks?.() ?? []) {
+                if (
+                    other === changedTrack ||
+                    other.isLocal?.() ||
+                    other.getType?.() !== 'video' ||
+                    other.getVideoType?.() === 'desktop'
+                ) {
+                    continue
+                }
+
+                this._emit(JITSI_EVENTS.TRACK_ADDED, mapTrack(other))
+            }
+        } catch (error) {
+            console.warn('[JitsiController] Could not restore camera track:', error)
+        }
+    }
+
     _sourcesOfParticipant(participantId) {
         const result = []
 
@@ -1117,8 +1147,13 @@ export class JitsiController {
         }
 
         try {
+            // Only the camera source: without a source name this capped the
+            // screen share to camera resolution as well.
             this._conference
-                ?.setSenderVideoConstraint?.(LOCAL_VIDEO_CONFIG.maxHeight)
+                ?.setSenderVideoConstraint?.(
+                    LOCAL_VIDEO_CONFIG.maxHeight,
+                    track?.getSourceName?.()
+                )
                 ?.catch?.(() => {})
         } catch {
         }
@@ -1175,14 +1210,25 @@ export class JitsiController {
      * This is the ONLY place where desktop capture is requested.
      */
     setScreenShareStatePublisher(publisher) {
-        this._screenShareStatePublisher = typeof publisher === 'function' ? publisher : null
+        this._screenShareStatePublisher =
+            typeof publisher === 'function' ? publisher : null
     }
 
-    _publishAuthoritativeScreenShareState(isSharing) {
+    _nextScreenShareSeq() {
+        // Monotonic per sender, and comparable across reconnects (time based).
+        this._localScreenShareSeq = Math.max(Date.now(), this._localScreenShareSeq + 1)
+        return this._localScreenShareSeq
+    }
+
+    _publishAuthoritativeScreenShareState(isSharing, seq) {
         const participantId = this._conference?.myUserId?.()
-        if (!participantId || typeof this._screenShareStatePublisher !== 'function') return false
+        if (!participantId || typeof this._screenShareStatePublisher !== 'function') {
+            return false
+        }
+
         try {
-            this._screenShareStatePublisher(participantId, Boolean(isSharing))
+            // RoomPage wires this callback to the classroom WebSocket.
+            this._screenShareStatePublisher(participantId, Boolean(isSharing), seq)
             return true
         } catch (error) {
             console.warn('[JitsiController] WebSocket screen-share state publish failed:', error)
@@ -1190,12 +1236,40 @@ export class JitsiController {
         }
     }
 
-    applyAuthoritativeScreenShareState({ participantId, isSharing } = {}) {
-        if (!participantId) return
+    /**
+     * Single entry point for screen-share state messages (WebSocket and
+     * endpoint message). Late, duplicated or out-of-order messages are
+     * dropped, so an old "stop" can never wipe a newer share.
+     */
+    _acceptScreenShareState(participantId, isSharing, seq) {
+        if (!participantId) return false
+
+        const numericSeq = Number(seq) || 0
+        const lastSeq = this._screenShareSeqByParticipant.get(participantId) || 0
+
+        // seq === 0 means "legacy / unknown order" (e.g. cached replay).
+        // Never let it override anything we already know about.
+        if (numericSeq <= lastSeq && !(numericSeq === 0 && lastSeq === 0)) {
+            return false
+        }
+
+        if (numericSeq > 0) {
+            this._screenShareSeqByParticipant.set(participantId, numericSeq)
+        }
+
+        console.info('[ScreenShare] state', { participantId, isSharing, seq: numericSeq })
+
+        if (isSharing) {
+            this._authoritativelyStoppedScreenShares.delete(participantId)
+        } else {
+            this._authoritativelyStoppedScreenShares.set(participantId, Date.now())
+        }
+
         this._emit(JITSI_EVENTS.SCREEN_SHARE_STATE_RECEIVED, {
             participantId,
             isSharing: Boolean(isSharing),
         })
+
         if (!isSharing) {
             for (const [sourceName, source] of this._remoteVideoSources) {
                 if (source?.participantId === participantId && source?.videoType === 'desktop') {
@@ -1205,9 +1279,34 @@ export class JitsiController {
             this._receiverKey = null
             this._applyReceiverConstraints()
         }
+
+        return true
+    }
+
+    /**
+     * A remote desktop source that shows up right after an authoritative
+     * "stop" is a leftover of the old share. Only that short window is
+     * suppressed; a genuinely new share is never blocked forever (the
+     * start message may have been lost).
+     */
+    _isStaleDesktopSource(participantId) {
+        const stoppedAt = this._authoritativelyStoppedScreenShares.get(participantId)
+        if (!stoppedAt) return false
+        if (Date.now() - stoppedAt < 1500) return true
+        this._authoritativelyStoppedScreenShares.delete(participantId)
+        return false
+    }
+
+    applyAuthoritativeScreenShareState({ participantId, isSharing, seq } = {}) {
+        this._acceptScreenShareState(participantId, isSharing, seq)
     }
 
     _broadcastScreenShareState(isSharing) {
+        const seq = this._nextScreenShareSeq()
+
+        // The classroom WebSocket is the authoritative state source.
+        this._publishAuthoritativeScreenShareState(isSharing, seq)
+
         const conference = this._conference
         if (!conference || typeof conference.sendEndpointMessage !== 'function') {
             return false
@@ -1218,6 +1317,7 @@ export class JitsiController {
             const result = conference.sendEndpointMessage('', {
                 type: 'avestro-screen-share-state-v1',
                 isSharing: Boolean(isSharing),
+                seq,
                 sentAt: Date.now(),
             })
             result?.catch?.((error) => {
@@ -1281,7 +1381,6 @@ export class JitsiController {
             this._emit(JITSI_EVENTS.TRACK_ADDED, mappedDesktop)
             this._emit(JITSI_EVENTS.SCREEN_SHARE_STARTED, mappedDesktop)
             this._broadcastScreenShareState(true)
-            this._publishAuthoritativeScreenShareState(true)
             return true
         } catch (error) {
             if (desktopTrack) {
@@ -1330,16 +1429,9 @@ export class JitsiController {
         const mappedDesktop = desktopTrack ? mapTrack(desktopTrack) : null
         let removeError = null
 
-        // Publish control state and clear local UI before waiting for Jitsi's
-        // media negotiation/track removal. WebSocket synchronizes the UI;
-        // the actual video continues to travel over Jitsi.
-        this._screenShare = {
-            ...this._screenShare,
-            active: false,
-        }
+        // Tell remote clients immediately. Do not wait for removeTrack(), which
+        // can resolve before all endpoints have processed the source removal.
         this._broadcastScreenShareState(false)
-        this._publishAuthoritativeScreenShareState(false)
-        this._emit(JITSI_EVENTS.SCREEN_SHARE_STOPPED)
 
         try {
             if (desktopTrack) {
@@ -1358,18 +1450,29 @@ export class JitsiController {
                 }
             }
 
-            return !removeError
-        } catch (error) {
-            const normalized = normalizeError(error, ERROR_CODES.SCREEN_SHARE_FAILED)
-            console.warn('[JitsiController] Screen share stop cleanup failed:', normalized)
-            this._emit(JITSI_EVENTS.SCREEN_SHARE_FAILED, normalized)
-            return false
-        } finally {
             this._screenShare = {
                 active: false,
                 desktopTrack: null,
                 wasCameraActiveBefore: false,
             }
+
+            this._emit(JITSI_EVENTS.SCREEN_SHARE_STOPPED)
+            return !removeError
+        } catch (error) {
+            const normalized = normalizeError(error, ERROR_CODES.SCREEN_SHARE_FAILED)
+            console.warn('[JitsiController] Screen share stop cleanup failed:', normalized)
+
+            // Always clear UI state so a failed cleanup cannot leave a stale
+            // sharing indicator on the teacher's own client.
+            this._screenShare = {
+                active: false,
+                desktopTrack: null,
+                wasCameraActiveBefore: false,
+            }
+            this._emit(JITSI_EVENTS.SCREEN_SHARE_STOPPED)
+            this._emit(JITSI_EVENTS.SCREEN_SHARE_FAILED, normalized)
+            return false
+        } finally {
             this._screenShareTransitioning = false
         }
     }
@@ -2226,8 +2329,11 @@ export class JitsiController {
                         const participantId = participant?.getId?.() || from || null
                         if (!participantId) return
 
-                        const isSharing = payload.isSharing === true
-                        this.applyAuthoritativeScreenShareState({ participantId, isSharing })
+                        this._acceptScreenShareState(
+                            participantId,
+                            payload.isSharing === true,
+                            payload.seq ?? payload.sentAt
+                        )
                     })
                 }
 
@@ -2566,6 +2672,14 @@ export class JitsiController {
                                 })
                                 this._emit(JITSI_EVENTS.TRACK_ADDED, mappedTrack)
                                 entry.lastType = mappedTrack.type
+
+                                // While its type was still unknown, this track was
+                                // stored under `${id}-video` and may have overwritten
+                                // the participant's real camera track. Re-publish the
+                                // camera so it is back in the store after the share ends.
+                                if (mappedTrack.type === 'desktop') {
+                                    this._restoreRemoteCameraTrack(track)
+                                }
                             }
 
                             if (sourceName) {
@@ -2701,11 +2815,28 @@ export class JitsiController {
                             return
                         }
 
+                        const participantId = track.getParticipantId()
+                        const videoType = track.getVideoType?.() || 'camera'
+
+                        // Firefox/Safari may report a desktop source after the
+                        // stop message was already received. Never let that stale
+                        // source take priority over the participant's camera.
+                        if (
+                            videoType === 'desktop' &&
+                            this._isStaleDesktopSource(participantId)
+                        ) {
+                            this._remoteVideoSources.delete(sourceName)
+                            this._receiverKey = null
+                            this._applyReceiverConstraints()
+                            return
+                        }
+
                         this._remoteVideoSources.set(sourceName, {
-                            participantId: track.getParticipantId(),
-                            videoType: track.getVideoType?.() || 'camera',
+                            participantId,
+                            videoType,
                         })
 
+                        this._receiverKey = null
                         this._applyReceiverConstraints()
                     }
                 )
@@ -2775,6 +2906,14 @@ export class JitsiController {
                             type !== 'audio' &&
                             type !== 'video'
                         ) {
+                            return
+                        }
+
+                        // A screen share is also a 'video' track. Its mute state
+                        // says nothing about the participant's CAMERA, so it must
+                        // never flip isVideoMuted (that left the presenter's
+                        // camera "off" after the share stopped).
+                        if (mapped.type === 'desktop') {
                             return
                         }
 
@@ -3131,6 +3270,10 @@ export class JitsiController {
                     track.getVideoType?.() !== 'desktop'
                 ) {
                     this._tuneLocalCamera(track)
+                }
+
+                if (track.getVideoType?.() === 'desktop') {
+                    return
                 }
 
                 if (!this._conference) {
@@ -3904,6 +4047,8 @@ export class JitsiController {
         this._disconnectWatchdogs.clear()
 
         this._qualityCache.clear()
+        this._authoritativelyStoppedScreenShares?.clear()
+        this._screenShareSeqByParticipant?.clear()
         this._resetReceiverState()
 
         this._screenShare = {

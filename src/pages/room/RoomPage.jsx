@@ -48,6 +48,8 @@ export default function RoomPage() {
   const canControlMedia = isHostRole && has('speak_permission', 'control')
   const canAttendance = isHostRole && has('attendance', 'control')
   const classLayout = kind === 'class'
+  // در کلاس فقط معلم/مدیر دکمه‌ی اشتراک صفحه را می‌بیند؛ رفتار سمینار تغییری نکرده
+  const canShowScreenShare = canScreenShare && (!classLayout || isHostRole)
   const isDesktop = useMediaQuery('(min-width: 768px)')
   const inlineChat = classLayout && !isDesktop // موبایلِ کلاس: گفتگو همیشه زیر صحنه است
   const [attendanceOpen, setAttendanceOpen] = useState(false)
@@ -77,6 +79,7 @@ export default function RoomPage() {
     access.setOnScreenShareState((state) => applyAuthoritativeScreenShareState({
       participantId: state.participant_id,
       isSharing: state.is_sharing,
+      seq: state.seq,
     }))
     return () => {
       setScreenShareStatePublisher(null)
@@ -133,7 +136,7 @@ export default function RoomPage() {
   }
 
   const handleToggleScreenShare = () => {
-    if (!isScreenSharing && !canScreenShare) {
+    if (!isScreenSharing && !canShowScreenShare) {
       toast.error('اشتراک‌گذاری صفحه در این اتاق مجاز نیست.')
       return
     }
@@ -212,7 +215,7 @@ export default function RoomPage() {
                 </div>
               )}
               {isReconnecting && <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 room-pop"><div className="flex items-center gap-2 rounded-full bg-[var(--room-surface)] border room-border px-4 py-2 text-xs shadow-xl"><span className="w-2 h-2 rounded-full bg-[var(--room-warning)] animate-pulse" /><span>اتصال ضعیف است؛ در حال برقراری مجدد...</span></div></div>}
-              <MeetingControls isAudioMuted={isAudioMuted} isVideoMuted={isVideoMuted} isScreenSharing={isScreenSharing} onToggleAudio={toggleAudio} onToggleVideo={toggleVideo} onToggleScreenShare={handleToggleScreenShare} onLeave={leave} canChat={canChat && !inlineChat} canParticipants={canParticipants && (!inlineChat || isHostRole)} canScreenShare={canScreenShare || isScreenSharing} showHand={canHand} isHandRaised={isHandRaised} onToggleHand={handleToggleHand} showMic={showMic} showCamera={showCamera} showAttendance={canAttendance} onOpenAttendance={() => setAttendanceOpen(true)} docked={inlineChat} showSettings={!inlineChat || isHostRole} />
+              <MeetingControls isAudioMuted={isAudioMuted} isVideoMuted={isVideoMuted} isScreenSharing={isScreenSharing} onToggleAudio={toggleAudio} onToggleVideo={toggleVideo} onToggleScreenShare={handleToggleScreenShare} onLeave={leave} canChat={canChat && !inlineChat} canParticipants={canParticipants && (!inlineChat || isHostRole)} canScreenShare={canShowScreenShare || isScreenSharing} showHand={canHand} isHandRaised={isHandRaised} onToggleHand={handleToggleHand} showMic={showMic} showCamera={showCamera} showAttendance={canAttendance} onOpenAttendance={() => setAttendanceOpen(true)} docked={inlineChat} showSettings={!inlineChat || isHostRole} />
             </main>
           </div>
         </div>

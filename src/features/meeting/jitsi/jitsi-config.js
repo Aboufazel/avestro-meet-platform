@@ -55,9 +55,24 @@ export function isLowEndDevice() {
  * مک/iOS/Safari: انکودر H264 سخت‌افزاری (VideoToolbox) دارد و VP8/VP9 نرم‌افزاری
  * اجرا می‌شود (CPU بالا و داغ شدن). برای این دستگاه‌ها H264 را اول می‌گذاریم.
  */
+export function isFirefoxBrowser() {
+  if (typeof navigator === 'undefined') return false
+  return /Firefox|FxiOS/i.test(navigator.userAgent || '')
+}
+
 export function isAppleDevice() {
   if (typeof navigator === 'undefined') return false
   return /Macintosh|iPhone|iPad|iPod/i.test(navigator.userAgent || '')
+}
+
+/**
+ * H264 اول فقط برای مرورگرهایی که واقعاً انکودر سخت‌افزاری Apple را دارند
+ * (Safari/Chrome روی مک و iOS). Firefox حتی روی مک از OpenH264 نرم‌افزاری
+ * استفاده می‌کند و H264 + اشتراک صفحه + دوربین هم‌زمان در آن سیاه/ناپایدار
+ * می‌شود؛ برای Firefox همیشه VP8 اول است.
+ */
+export function prefersH264() {
+  return isAppleDevice() && !isFirefoxBrowser()
 }
 
 const IS_MOBILE = isMobileDevice()
@@ -131,8 +146,8 @@ export const CONFERENCE_CONFIG = {
     // کدک نرم‌افزاری سنگین (AV1/VP9) روی دستگاه ضعیف = CPU بالا = گرما.
     // VP8 روی همه‌جا کار می‌کند و H264 معمولاً hardware-accelerated است.
     // VP9 نرم‌افزاری روی دسکتاپ مصرف CPU را بالا می‌برد؛ حذف شد.
-    codecPreferenceOrder: isAppleDevice() ? ['H264', 'VP8'] : ['VP8', 'H264'],
-    mobileCodecPreferenceOrder: isAppleDevice() ? ['H264', 'VP8'] : ['VP8', 'H264'],
+    codecPreferenceOrder: prefersH264() ? ['H264', 'VP8'] : ['VP8', 'H264'],
+    mobileCodecPreferenceOrder: prefersH264() ? ['H264', 'VP8'] : ['VP8', 'H264'],
   },
 
   p2p: { enabled: false },
@@ -188,4 +203,4 @@ export const RECONNECT_CONFIG = {
   maxDelayMs: 15000, // سقف فاصله بین تلاش‌ها
 }
 // فریم‌ریت اشتراک صفحه (برای createLocalTracks({devices:['desktop']}))
-export const DESKTOP_SHARING_FRAME_RATE = { min: 5, max: 15 }
+export const DESKTOP_SHARING_FRAME_RATE = { min: 1, max: 15 }

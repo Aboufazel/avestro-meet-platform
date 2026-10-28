@@ -94,10 +94,11 @@ export function useClassAccess(slug, { enabled = false } = {}) {
     revoke: useCallback((key) => send({ type: 'revoke', key }), [send]),
     lowerHand: useCallback((key) => send({ type: 'lower_hand', key }), [send]),
     whiteboardState,
-    publishScreenShareState: useCallback((participantId, isSharing) => send({
+    publishScreenShareState: useCallback((participantId, isSharing, seq) => send({
       type: 'screenshare_state',
       participant_id: participantId,
       is_sharing: Boolean(isSharing),
+      seq: Number(seq) || 0,
     }), [send]),
     setOnScreenShareState: useCallback((handler) => { onScreenShareStateRef.current = handler }, []),
     updateWhiteboardObjects: useCallback((objects) => send({ type: 'whiteboard_update', objects }), [send]),

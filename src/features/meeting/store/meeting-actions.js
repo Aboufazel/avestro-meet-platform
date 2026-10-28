@@ -513,9 +513,10 @@ export async function joinMeeting({roomName, displayName, email = ''}) {
             ({ participantId, isSharing }) => {
                 if (generation !== _joinGeneration || !participantId) return
                 const state = useMeetingStore.getState()
-                if (isSharing) {
-                    state._updateParticipant?.(participantId, { isScreenSharing: true })
-                } else {
+                // The badge/tile for a share is driven by the real desktop track
+                // (see _addTrack). A "start" message alone must never turn it on,
+                // otherwise a lost/late message leaves a badge with a black tile.
+                if (!isSharing) {
                     state._clearRemoteScreenShare(participantId)
                     state._bumpRenegotiationTick(participantId)
                 }
