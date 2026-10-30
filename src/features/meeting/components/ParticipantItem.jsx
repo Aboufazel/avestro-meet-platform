@@ -1,5 +1,6 @@
 import { memo } from 'react'
-import { Mic, MicOff, Video, VideoOff, Crown, Pin, Hand } from 'lucide-react'
+import { Mic, MicOff, Video, VideoOff, Crown, Pin, Hand, SignalHigh, SignalMedium, SignalLow } from 'lucide-react'
+import { getConnectionLevel, CONNECTION_LABEL } from '../utils/connection'
 import { muteParticipantMedia } from '../store/meeting-actions'
 import { useParticipants } from '../hooks/useParticipants'
 import { useMeetingStore } from '../store/meeting-store'
@@ -27,6 +28,9 @@ export const ParticipantItem = memo(function ParticipantItem({ participant, canC
   const pinnedParticipantId = useMeetingStore((s) => s.pinnedParticipantId)
   const initial = participant.displayName?.[0]?.toUpperCase() || '?'
   const isPinned = pinnedParticipantId === participant.id
+  const level = getConnectionLevel(participant.connectionQuality, participant.packetLoss)
+  const SignalIcon = { strong: SignalHigh, medium: SignalMedium, weak: SignalLow }[level]
+  const signalColor = { strong: 'text-green-400', medium: 'text-yellow-400', weak: 'text-red-400' }[level]
 
   return (
     <div className={`
@@ -78,6 +82,7 @@ export const ParticipantItem = memo(function ParticipantItem({ participant, canC
           ? <VideoOff className="w-3.5 h-3.5 text-white/35" />
           : <Video className="w-3.5 h-3.5 text-[var(--room-mint)]" />
         }
+        <SignalIcon className={`w-3.5 h-3.5 ${signalColor}`} aria-label={CONNECTION_LABEL[level]} />
       </div>
     </div>
   )

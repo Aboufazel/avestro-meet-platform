@@ -9,12 +9,14 @@ import {
     Mic,
     MicOff,
     MonitorUp,
+    Hand,
     SignalHigh,
     SignalMedium,
     SignalLow,
 } from 'lucide-react'
 
 import {TileActionsMenu} from './TileActionsMenu'
+import {getConnectionLevel, CONNECTION_LABEL} from '../utils/connection'
 
 import {useParticipant} from '../hooks/useParticipants'
 
@@ -26,17 +28,6 @@ import {
     selectIsMeetingMuted,
 } from '../store/meeting-selectors'
 
-/**
- * VideoTile — تنها کامپوننت نمایش تصویر یک شرکت‌کننده.
- *
- * دو variant دارد:
- *  - 'overlay' (پیش‌فرض): ساختار قبلی سمینار؛ نوار نام روی تصویر است. دست‌نخورده باقی می‌ماند
- *    تا رفتار اتاق‌های سمیناری تغییر نکند.
- *  - 'card': ساختار استاندارد کلاس؛ تصویر و نوار اطلاعات دو بخش «مستقل» هستند:
- *      ▸ vt-media : فضای تصویر با نسبت درست و object-fit متناسب با نوع محتوا
- *      ▸ vt-info  : نام + وضعیت میکروفون + کیفیت اتصال در یک ردیف زیر تصویر
- *    در این حالت هیچ آیکون یا نوار کنترلی روی تصویر قرار نمی‌گیرد.
- */
 export const VideoTile = memo(
     function VideoTile({
         participantId,
@@ -51,13 +42,12 @@ export const VideoTile = memo(
         playAudio = true,
         // در حالت تخته، صدای شرکت‌کننده باید بماند ولی ویدئوی زیر لایه دوباره رندر نشود.
         forceVideoOff = false,
-        // 'overlay' | 'card'
-        variant = 'overlay',
-        // برچسب نقش (مثلاً «مدرس») که در نوار اطلاعات کارت نمایش داده می‌شود
-        badge = null,
+        // undefined = تایل سمینار (بدون تغییر)
+        // 'card'    = کارت کلاس: بخش تصویر + نوار اطلاعات جدا در زیر آن (هیچ چیز روی تصویر نیست)
+        // 'stage'   = فقط تصویر/اشتراک صفحه که کل قاب را پر می‌کند (بدون نوار و آیکون)
+        variant,
+        isTeacherCard = false,
     }) {
-        const isCard = variant === 'card'
-
         const participant =
             useParticipant(
                 participantId
@@ -105,14 +95,31 @@ export const VideoTile = memo(
         // ---------------------------------------------------------------------
         // Visibility (lazy attach)
         //
-        // تایل فقط وقتی واقعاً در viewport (یا نزدیک آن) است attach می‌شود؛
-        // وقتی از دید خارج شود، خودش را detach می‌کند تا CPU/باتری هدر نرود.
-        // تایل بزرگ (isLarge) همیشه به‌عنوان visible در نظر گرفته می‌شود.
+        // چرا این بخش اضافه شد:
+        // قبلاً هر VideoTile به محض mount شدن، ویدیوی participant را
+        // attach می‌کرد — حتی تایل‌های کوچکی که در نوار افقی پایین
+        // (overflow-x-auto) هستند و عملاً دیده نمی‌شوند. یعنی مرورگر
+        // مجبور بود ویدیوهایی که کسی نگاهشان نمی‌کند را هم decode کند.
+        // این روی موبایل مصرف CPU/باتری را به‌شدت بالا می‌برد.
+        //
+        // با IntersectionObserver، تایل فقط وقتی واقعاً در viewport
+        // (یا نزدیک آن) است attach می‌شود؛ وقتی از دید خارج شود،
+        // خودش را detach می‌کند.
+        //
+        // تایل بزرگ (isLarge) همیشه به‌عنوان visible در نظر گرفته
+        // می‌شود چون معمولاً از ابتدا در دید است.
         // ---------------------------------------------------------------------
         const [isVisible, setIsVisible] = useState(isLarge)
         const [zoom, setZoom] = useState(100)
         const togglePinnedParticipant = useMeetingStore((s) => s.togglePinnedParticipant)
         const toggleFocusedParticipant = useMeetingStore((s) => s.toggleFocusedParticipant)
+
+        // isFrozen حذف شد — heuristic فریم‌شمار بیش‌ازحد حساس بود و با
+        // کوچیک‌ترین لگ چند فریمی (طبیعی روی نت موبایل) قفل می‌شد روی
+        // "ناپایدار" و دیگر true نمی‌شد false. حالا overlay فقط به سیگنال
+        // واقعی خود Jitsi (participant.isConnectionInterrupted) تکیه
+        // می‌کند که مبتنی بر وضعیت واقعی اتصال (PARTICIPANT_CONN_STATUS)
+        // است، نه گمانه‌زنی روی رندر فریم.
 
         useEffect(() => {
             if (isLarge) {
@@ -191,7 +198,7 @@ export const VideoTile = memo(
                     audioTrack.jitsiTrack.detach(
                         element
                     )
-                } catch { /* detach ناموفق نباید رندر را بشکند */ }
+                } catch {}
             }
         }, [
             audioTrack?.jitsiTrack,
@@ -239,7 +246,7 @@ export const VideoTile = memo(
                     activeTrack.jitsiTrack.detach(
                         element
                     )
-                } catch { /* detach ناموفق نباید رندر را بشکند */ }
+                } catch {}
             }
         }, [
             activeTrack?.jitsiTrack,
@@ -256,32 +263,6 @@ export const VideoTile = memo(
                 : []),
         ])
 
-        // ---------------------------------------------------------------------
-        // فقط تصویر دوربین خودمان (روی صفحه‌ی خودمان) مثل آینه نمایش داده می‌شود؛
-        // چیزی که برای بقیه ارسال می‌شود تغییری نمی‌کند. اشتراک صفحه و ویدیوی
-        // دیگران هرگز mirror نمی‌شود.
-        //
-        // توجه: این effect و محاسباتش «قبل از» early-return زیر هستند تا ترتیب
-        // هوک‌ها هرگز (حتی وقتی participant موقتاً وجود ندارد) عوض نشود.
-        // ---------------------------------------------------------------------
-
-        const isScreenShareBeforeMount =
-            !preferCamera && !!desktopTrack
-
-        const shouldMirrorVideo =
-            Boolean(participant?.isLocal && !isScreenShareBeforeMount)
-
-        useEffect(() => {
-            const element = videoRef.current
-            if (!element) return
-
-            element.style.transform =
-                shouldMirrorVideo || zoom !== 100
-                    ? `${shouldMirrorVideo ? 'scaleX(-1) ' : ''}scale(${zoom / 100})`
-                    : ''
-            element.style.transformOrigin = 'center center'
-        }, [shouldMirrorVideo, zoom, activeTrack?.jitsiTrack])
-
         if (!participant) {
             return null
         }
@@ -289,41 +270,6 @@ export const VideoTile = memo(
         // ---------------------------------------------------------------------
         // Connection
         // ---------------------------------------------------------------------
-
-        function getConnectionLevel(
-            quality,
-            packetLoss
-        ) {
-            // پکت‌لاس بالای ۱۰٪ یعنی مشکل واقعی —
-            // مستقل از اینکه quality (که با adaptive bitrate
-            // خودش را جمع‌وجور می‌کند) چه می‌گوید.
-            if (
-                packetLoss != null &&
-                packetLoss > 10
-            ) {
-                return 'weak'
-            }
-
-            if (
-                quality == null
-            ) {
-                return 'strong'
-            }
-
-            if (
-                quality >= 60
-            ) {
-                return 'strong'
-            }
-
-            if (
-                quality >= 30
-            ) {
-                return 'medium'
-            }
-
-            return 'weak'
-        }
 
         const connectionLevel =
             getConnectionLevel(
@@ -370,21 +316,87 @@ export const VideoTile = memo(
             participant.isAudioMuted
 
         const isScreenShare =
-            isScreenShareBeforeMount
+            !preferCamera && !!desktopTrack
 
-        // ---------------------------------------------------------------------
-        // اشتراک صفحه در variant «card» فقط در نوار اطلاعات اعلام می‌شود؛
-        // هیچ چیزی روی تصویر قرار نمی‌گیرد.
-        // ---------------------------------------------------------------------
-        const videoFitClass = isCard
-            ? (isScreenShare ? 'vt-video is-contain' : 'vt-video is-cover')
-            : 'w-full h-full object-contain bg-black !rounded-[18px]'
+        // فقط تصویر دوربین خودمان (روی صفحه‌ی خودمان) مثل آینه نمایش داده می‌شود؛
+        // چیزی که برای بقیه ارسال می‌شود تغییری نمی‌کند. اشتراک صفحه و ویدیوی
+        // دیگران هرگز mirror نمی‌شود.
+        const shouldMirrorVideo =
+            Boolean(participant?.isLocal && !isScreenShare)
+
+        useEffect(() => {
+            const element = videoRef.current
+            if (!element) return
+
+            element.style.transform =
+                shouldMirrorVideo || zoom !== 100
+                    ? `${shouldMirrorVideo ? 'scaleX(-1) ' : ''}scale(${zoom / 100})`
+                    : ''
+            element.style.transformOrigin = 'center center'
+        }, [shouldMirrorVideo, zoom, activeTrack?.jitsiTrack])
+
+        if (variant === 'card' || variant === 'stage') {
+            const speaking = participant.isActiveSpeaker && !isAudioMuted
+            const fit = isScreenShare ? 'contain' : 'cover'
+            const media = !isVideoOff ? (
+                <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted={participant.isLocal}
+                    className="vc-video"
+                    style={{ objectFit: fit }}
+                />
+            ) : (
+                <div className="vc-avatar-wrap">
+                    <div className="vc-avatar" aria-hidden="true">
+                        {participant.displayName?.[0]?.toUpperCase() || '?'}
+                    </div>
+                </div>
+            )
+
+            if (variant === 'stage') {
+                return (
+                    <div ref={containerRef} className="vc-stage">
+                        {media}
+                        <audio ref={audioRef} autoPlay />
+                    </div>
+                )
+            }
+
+            return (
+                <div
+                    ref={containerRef}
+                    className={`vc ${speaking ? 'is-speaking' : ''} ${isTeacherCard ? 'is-teacher' : ''}`}
+                >
+                    <div className="vc-media">{media}</div>
+                    <div className="vc-info">
+                        <span className="vc-name">
+                            {participant.displayName}
+                            {participant.isLocal && ' (شما)'}
+                        </span>
+                        {isTeacherCard && <span className="vc-role">مدرس</span>}
+                        <span className="vc-icons">
+                            {participant.isHandRaised && <Hand className="vc-ic vc-ic-hand" aria-label="دست بلند کرده" />}
+                            {isAudioMuted
+                                ? <MicOff className="vc-ic vc-ic-off" aria-label="میکروفون بسته است" />
+                                : <Mic className="vc-ic vc-ic-on" aria-label="میکروفون باز است" />}
+                            <ConnectionIcon
+                                className={`vc-ic ${connectionColor}`}
+                                aria-label={CONNECTION_LABEL[connectionLevel]}
+                            />
+                        </span>
+                    </div>
+                    <audio ref={audioRef} autoPlay />
+                </div>
+            )
+        }
 
         return (
             <div
                 ref={containerRef}
                 className={`
-                    ${isCard ? 'vt vt-card' : 'group relative room-tile bg-[var(--room-bg)] rounded-[18px] overflow-visible flex items-center justify-center border border-white/[.06]'}
+                    group relative room-tile bg-[var(--room-bg)] rounded-[18px] overflow-visible flex items-center justify-center border border-white/[.06]
 
                     ${
                         isPinned
@@ -394,16 +406,24 @@ export const VideoTile = memo(
                                 : ''
                     }
                     ${isFocused ? 'room-tile-focused' : ''}
-                    ${isCard && isLarge ? 'vt-large' : ''}
+
+                    ${
+                        isLarge
+                            ? 'w-full h-full'
+                            : 'w-full aspect-video'
+                    }
                 `}
             >
                 {/* --------------------------------------------------------- */}
-                {/* هشدار نت ضعیف خودِ کاربر — فقط در variant علاوه‌بر نوار     */}
-                {/* اطلاعات (card) که سیگنال قرمز همان‌جا دیده می‌شود، بنر     */}
-                {/* مستقل دارد.                                                */}
+                {/* هشدار نت ضعیف خودِ کاربر (لوکال)                            */}
+                {/*                                                             */}
+                {/* برخلاف overlay بالا (که برای فریز شدن تصویر طرف مقابل        */}
+                {/* است)، این یک بنر غیرمسدودکننده است: تصویر خودش را کامل      */}
+                {/* می‌بیند، فقط باخبر می‌شود که آپلودش ضعیف است و ممکن است      */}
+                {/* بقیه او را بد ببینند.                                        */}
                 {/* --------------------------------------------------------- */}
 
-                {!isCard && participant.isLocal && connectionLevel === 'weak' && (
+                {participant.isLocal && connectionLevel === 'weak' && (
                     <div className="absolute top-2 right-2 z-20 room-weak-network" role="status" aria-live="polite">
                         <div className="room-weak-wave" aria-hidden="true">
                             <i /><i /><i /><i /><i />
@@ -417,11 +437,16 @@ export const VideoTile = memo(
 
                 {/* --------------------------------------------------------- */}
                 {/* Temporary connection interruption                         */}
+                {/*                                                             */}
+                {/* فقط به participant.isConnectionInterrupted (سیگنال واقعی   */}
+                {/* Jitsi، از PARTICIPANT_CONN_STATUS_CHANGED) تکیه می‌کند —    */}
+                {/* یعنی وقتی هم صدا هم تصویر واقعاً از این شرکت‌کننده متوقف     */}
+                {/* شده، نه با هر لگ کوچک چند فریمی.                            */}
                 {/* --------------------------------------------------------- */}
 
                 {participant.isConnectionInterrupted &&
                     !isVideoOff && (
-                        <div className={`${isCard ? 'vt-media-note' : 'absolute inset-0 z-20 flex items-center justify-center bg-black/70'}`}>
+                        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/70">
                             <div className="flex flex-col items-center gap-2">
                                 <span className="w-3 h-3 rounded-full bg-yellow-400 animate-pulse" />
 
@@ -433,53 +458,53 @@ export const VideoTile = memo(
                     )}
 
                 {/* --------------------------------------------------------- */}
-                {/* Video + Audio (بخش تصویری کارت)                            */}
+                {/* Video                                                       */}
                 {/* --------------------------------------------------------- */}
 
-                <div className={isCard ? 'vt-media' : 'contents'}>
-                    {!isVideoOff ? (
-                        <video
-                            ref={videoRef}
-                            autoPlay
-                            playsInline
-                            // عنصر ویدئو همیشه muted است: صدا از عنصر <audio> جداگانه پخش
-                            // می‌شود. این کار سیاست autoplay مرورگرها را هم روی ویدئوی
-                            // دوربین دیگران قفل نمی‌کند (تایل سیاه نمی‌ماند).
-                            muted
-                            className={videoFitClass}
-                            style={{
-                                // transform فقط وقت لزوم (mirror خودم/zoom)؛ transform دائمی یک
-                                // لایه‌ی GPU جدا برای هر ویدیو می‌سازد.
-                                transform:
-                                    shouldMirrorVideo || zoom !== 100
-                                        ? `${shouldMirrorVideo ? 'scaleX(-1) ' : ''}scale(${zoom / 100})`
-                                        : undefined,
-                                transformOrigin: 'center center',
-                            }}
-                        />
-                    ) : (
-                        <VideoPlaceholder
-                            name={
-                                participant.displayName
-                            }
-                            isLarge={
-                                isLarge
-                            }
-                            compact={isCard}
-                        />
-                    )}
-
-                    <audio
-                        ref={audioRef}
+                {!isVideoOff ? (
+                    <video
+                        ref={videoRef}
                         autoPlay
+                        playsInline
+                        muted={
+                            participant.isLocal
+                        }
+                        className="w-full h-full object-contain bg-black !rounded-[18px]"
+                        style={{
+                            // transform فقط وقت لزوم (mirror خودم/zoom)؛ transform دائمی یک
+                            // لایه‌ی GPU جدا برای هر ویدیو می‌سازد.
+                            transform:
+                                shouldMirrorVideo || zoom !== 100
+                                    ? `${shouldMirrorVideo ? 'scaleX(-1) ' : ''}scale(${zoom / 100})`
+                                    : undefined,
+                            transformOrigin: 'center center',
+                        }}
                     />
-                </div>
+                ) : (
+                    <VideoPlaceholder
+                        name={
+                            participant.displayName
+                        }
+                        isLarge={
+                            isLarge
+                        }
+                    />
+                )}
 
                 {/* --------------------------------------------------------- */}
-                {/* Screen share chip (فقط variant قدیمی/سمینار)               */}
+                {/* Audio                                                       */}
                 {/* --------------------------------------------------------- */}
 
-                {!isCard && isScreenShare && (
+                <audio
+                    ref={audioRef}
+                    autoPlay
+                />
+
+                {/* --------------------------------------------------------- */}
+                {/* Screen share                                                */}
+                {/* --------------------------------------------------------- */}
+
+                {isScreenShare && (
                     <div className="absolute top-2 right-2 flex items-center gap-1 bg-[var(--room-surface-3)]/85 rounded-lg px-2 py-1">
                         <MonitorUp className="w-3 h-3 text-white/70" />
 
@@ -489,86 +514,53 @@ export const VideoTile = memo(
                     </div>
                 )}
 
-                {!isCard && (
-                    <TileActionsMenu
-                        name={participant.displayName}
-                        isPinned={isPinned}
-                        isFocused={isFocused}
-                        zoom={zoom}
-                        onTogglePin={() => togglePinnedParticipant(participant.id)}
-                        onToggleFocus={() => toggleFocusedParticipant(participant.id)}
-                        onZoomIn={() => setZoom((z) => Math.min(160, z + 10))}
-                        onZoomReset={() => setZoom(100)}
-                    />
-                )}
+                <TileActionsMenu
+                    name={participant.displayName}
+                    isPinned={isPinned}
+                    isFocused={isFocused}
+                    zoom={zoom}
+                    onTogglePin={() => togglePinnedParticipant(participant.id)}
+                    onToggleFocus={() => toggleFocusedParticipant(participant.id)}
+                    onZoomIn={() => setZoom((z) => Math.min(160, z + 10))}
+                    onZoomReset={() => setZoom(100)}
+                />
 
                 {/* --------------------------------------------------------- */}
-                {/* Bottom bar                                                 */}
+                {/* Bottom bar                                                  */}
                 {/* --------------------------------------------------------- */}
 
-                {!isCard ? (
-                    <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-3 py-2 bg-gradient-to-t from-black/70 to-transparent">
-                        <div className="min-w-0 flex items-center gap-2">
-                            {participant.isActiveSpeaker && !isAudioMuted && (
-                                <span className="room-speaking-wave" aria-label="در حال صحبت">
-                                    <i /><i /><i /><i /><i />
-                                </span>
-                            )}
-                            <span className="text-white text-xs font-medium">
-                            {participant.displayName}
-
-                            {participant.isLocal &&
-                                ' (شما)'}
+                <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-3 py-2 bg-gradient-to-t from-black/70 to-transparent">
+                    <div className="min-w-0 flex items-center gap-2">
+                        {participant.isActiveSpeaker && !isAudioMuted && (
+                            <span className="room-speaking-wave" aria-label="در حال صحبت">
+                                <i /><i /><i /><i /><i />
                             </span>
+                        )}
+                        <span className="text-white text-xs font-medium">
+                        {participant.displayName}
+
+                        {participant.isLocal &&
+                            ' (شما)'}
+                        </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                        <div className={`room-status-signal ${connectionLevel}`} title={connectionLevel === 'strong' ? 'اتصال خوب' : connectionLevel === 'medium' ? 'اتصال متوسط' : 'اتصال ضعیف'} aria-label={connectionLevel === 'strong' ? 'اتصال خوب' : connectionLevel === 'medium' ? 'اتصال متوسط' : 'اتصال ضعیف'}>
+                            <ConnectionIcon className={`w-[17px] h-[17px] ${connectionColor}`} />
+                            <span className="room-signal-dot" />
                         </div>
 
-                        <div className="flex items-center gap-1.5">
-                            <div className={`room-status-signal ${connectionLevel}`} title={connectionLevel === 'strong' ? 'اتصال خوب' : connectionLevel === 'medium' ? 'اتصال متوسط' : 'اتصال ضعیف'} aria-label={connectionLevel === 'strong' ? 'اتصال خوب' : connectionLevel === 'medium' ? 'اتصال متوسط' : 'اتصال ضعیف'}>
-                                <ConnectionIcon className={`w-[17px] h-[17px] ${connectionColor}`} />
-                                <span className="room-signal-dot" />
+                        {isAudioMuted ? (
+                            <div className="room-mic-status muted" title="میکروفون بسته است" aria-label="میکروفون بسته است">
+                                <MicOff className="w-3.5 h-3.5 text-white" />
                             </div>
-
-                            {isAudioMuted ? (
-                                <div className="room-mic-status muted" title="میکروفون بسته است" aria-label="میکروفون بسته است">
-                                    <MicOff className="w-3.5 h-3.5 text-white" />
-                                </div>
-                            ) : (
-                                <div className="room-mic-status live" title="میکروفون باز است" aria-label="میکروفون باز است">
-                                    <Mic className="w-3.5 h-3.5 text-white" />
-                                </div>
-                            )}
-                        </div>
+                        ) : (
+                            <div className="room-mic-status live" title="میکروفون باز است" aria-label="میکروفون باز است">
+                                <Mic className="w-3.5 h-3.5 text-white" />
+                            </div>
+                        )}
                     </div>
-                ) : (
-                    /* نوار اطلاعات — بخش دومِ مستقل کارت؛ هرگز روی تصویر نیست */
-                    <div className="vt-info">
-                        <div className="vt-info-main">
-                            {participant.isActiveSpeaker && !isAudioMuted && (
-                                <span className="room-speaking-wave vt-speaking" aria-label="در حال صحبت">
-                                    <i /><i /><i /><i /><i />
-                                </span>
-                            )}
-                            {badge && <span className="vt-badge">{badge}</span>}
-                            <span className="vt-name" title={participant.displayName}>
-                                {participant.displayName}
-                                {participant.isLocal ? ' (شما)' : ''}
-                            </span>
-                        </div>
-
-                        <div className="vt-info-status">
-                            {participant.isLocal && connectionLevel === 'weak' && (
-                                <span className="vt-weak-tag">نت ضعیف</span>
-                            )}
-                            {isScreenShare && <MonitorUp size={12} className="vt-share-icon" aria-label="اشتراک صفحه" />}
-                            <span className={`vt-signal ${connectionLevel}`} title={connectionLevel === 'strong' ? 'اتصال خوب' : connectionLevel === 'medium' ? 'اتصال متوسط' : 'اتصال ضعیف'}>
-                                <ConnectionIcon size={13} />
-                            </span>
-                            <span className={`vt-mic ${isAudioMuted ? 'is-muted' : 'is-live'}`} title={isAudioMuted ? 'میکروفون بسته است' : 'میکروفون باز است'}>
-                                {isAudioMuted ? <MicOff size={12} /> : <Mic size={12} />}
-                            </span>
-                        </div>
-                    </div>
-                )}
+                </div>
             </div>
         )
     }
@@ -577,21 +569,10 @@ export const VideoTile = memo(
 function VideoPlaceholder({
     name,
     isLarge,
-    compact = false,
 }) {
     const initial =
         name?.[0]?.toUpperCase() ||
         '?'
-
-    // در variant «card» نام در نوار اطلاعات پایین کارت است؛
-    // پس جای‌نگه‌دار فقط یک آواتار متناسب و وسط‌چین است.
-    if (compact) {
-        return (
-            <div className="vt-media-empty">
-                <div className="vt-avatar">{initial}</div>
-            </div>
-        )
-    }
 
     return (
         <div className="flex flex-col items-center justify-center gap-3 w-full h-full">

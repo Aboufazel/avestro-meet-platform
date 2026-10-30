@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useJitsi } from '../../features/meeting/hooks/useJitsi'
 import { VideoGrid } from '../../features/meeting/components/VideoGrid'
@@ -15,15 +15,16 @@ import { startRecording, stopRecording, startVoiceRec, stopVoiceRec, raiseHand, 
 import toast from 'react-hot-toast'
 import { useRoomFeatures } from '../../hooks/useRoomFeatures'
 import { useClassAccess } from '../../hooks/useClassAccess'
-import { useMediaQuery } from '../../features/meeting/hooks/useMediaQuery'
 import { ClassLayout } from '../../features/meeting/components/ClassLayout'
+import { ClassSheets } from '../../features/meeting/components/ClassSheets'
+import { HandRequestToasts } from '../../features/meeting/components/HandRequestToasts'
 import { useParticipants } from '../../features/meeting/hooks/useParticipants'
+import { useClassViewport } from '../../features/meeting/hooks/useClassViewport'
+import { useHandRequests } from '../../features/meeting/hooks/useHandRequests'
 import { ClassAccessContext } from '../../features/meeting/ClassAccessContext'
+import { ClassViewportContext } from '../../features/meeting/ClassViewportContext'
 import { PenTool } from 'lucide-react'
 import WhiteboardPanel from '../../features/whiteboard/WhiteboardPanel'
-import { useHandRaiseAlerts } from '../../features/meeting/hooks/useHandRaiseAlerts'
-import { MobileClassSheets, DockPeek } from '../../features/meeting/components/MobileClassSheets'
-import { HandRaiseAlert } from '../../features/meeting/components/HandRaiseAlert'
 
 export default function RoomPage() {
   const { slug: roomName } = useParams()
@@ -43,41 +44,43 @@ export default function RoomPage() {
   const canWhiteboard = has('whiteboard')
 
   // ───── کنترل صحبت/تصویر (لحظه‌ای از طریق WebSocket) ─────
+  // بر اساس فعال‌بودن ماژول است، نه نوع رویداد؛ پس هر امکان برای سمینار هم قابل روشن‌کردن است.
   const isHostRole = role === 'host'
   const moderated = has('speak_permission')
   const handFeature = has('raise_hand')
   const canControlMedia = isHostRole && has('speak_permission', 'control')
   const canAttendance = isHostRole && has('attendance', 'control')
   const classLayout = kind === 'class'
+  // در کلاس فقط معلم/مدیر دکمه‌ی اشتراک صفحه را می‌بیند؛ رفتار سمینار تغییری نکرده
   const canShowScreenShare = canScreenShare && (!classLayout || isHostRole)
-  const isDesktop = useMediaQuery('(min-width: 768px)')
+
+  // ابعاد محیط کلاس: در گوشی همیشه افقی (در حالت عمودی، کل محیط می‌چرخد)
+  const viewport = useClassViewport(classLayout)
+  const compactClass = classLayout && viewport.compact
+
   const [attendanceOpen, setAttendanceOpen] = useState(false)
   const [whiteboardOpen, setWhiteboardOpen] = useState(false)
   const [whiteboardObjects, setWhiteboardObjects] = useState([])
-  const [mobileSheet, setMobileSheet] = useState(null) // 'chat' | 'participants' | null — هرگز دو پنل با هم باز نیست
   const storeHand = useMeetingStore((s) => !!s.participants.get(s.localParticipantId)?.isHandRaised)
 
   const { error, isConnecting, isReconnecting, isAudioMuted, isVideoMuted, isScreenSharing, isConnected, leave, toggleAudio, toggleVideo, toggleScreenShare } = useJitsi(roomName)
   const { participants } = useParticipants()
+  const boardOpen = canWhiteboard && whiteboardOpen
+  // تخته و اشتراک صفحه هر دو چیدمان «محتوا» را فعال می‌کنند.
   const hasActiveScreenShare = isScreenSharing || participants.some((participant) => participant.isScreenSharing)
-  const classContentMode = classLayout && (whiteboardOpen || hasActiveScreenShare)
-  const mobileClass = classLayout && !isDesktop
-  // جهت واقعی گوشی: هر دو چیدمان (عمودی انباشته / افقی با ریل عمودی) کامل و کاربردی‌اند
-  const isPortrait = useMediaQuery('(orientation: portrait)')
-  const portraitClass = mobileClass && isPortrait
+  const classContentMode = classLayout && (boardOpen || hasActiveScreenShare)
 
-  // با فعال‌شدن تخته یا اشتراک صفحه، پنل‌ها پیش‌فرض بسته باشند
+  // ورود به کلاس در گوشی و شروع تخته/اشتراک صفحه: پنل‌ها بسته شروع شوند (نه بازشدن خودکار روی محتوا)
   useEffect(() => {
-    if (classContentMode) {
-      closeMeetingPanel()
-      // همگام‌سازی وضعیت پنل موبایل با تغییر حالت چیدمان (رفتار مورد انتظار اسپک)
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setMobileSheet(null)
-    }
-  }, [classContentMode, closeMeetingPanel])
+    if (compactClass) closeMeetingPanel()
+  }, [compactClass, closeMeetingPanel])
+  useEffect(() => {
+    if (classLayout && classContentMode) closeMeetingPanel()
+  }, [classLayout, classContentMode, closeMeetingPanel])
 
   const access = useClassAccess(roomName, { enabled: isConnected && (classLayout || moderated || handFeature || canWhiteboard) })
   const me = access.me
+  const handRequests = useHandRequests(access.roster, classLayout && isHostRole)
 
   useEffect(() => {
     if (!classLayout) {
@@ -104,50 +107,19 @@ export default function RoomPage() {
   const whiteboardSettings = settings('whiteboard')
   const studentsCanDraw = Boolean(whiteboardSettings.students_can_draw)
 
-  // ───── همگام‌سازی تخته با سرور، همگام‌سازی «لبه‌ای» (edge-triggered) ─────
-  // باگ قبلی: هر پیام whiteboard_state مقدار whiteboardOpen را با is_open سرور
-  // بازنویسی می‌کرد؛ echoهای کهنه (یا snapshot اتصال دوباره) تخته را خودکار
-  // باز می‌کردند — نتیجه: با زدن ضربدر، تخته بلافاصله دوباره باز می‌شد.
-  // راه‌حل: فقط «تغییر واقعی» is_open اعمال می‌شود؛ پیام تکراری/کهنه بی‌اثر است.
-  const seenIsOpenRef = useRef(null) // آخرین مقدار is_open که از سرور دیده/اعمال شده
-  const isHostRoleRef = useRef(isHostRole)
-  useEffect(() => { isHostRoleRef.current = isHostRole }, [isHostRole])
-
-  // دسترسی‌های پایدار هوک برای deps تمیزِ اثر همگام‌سازی
-  const { whiteboardState: accessWhiteboardState, setWhiteboardOpen: publishWhiteboardOpen } = access
-
   useEffect(() => {
-    const state = accessWhiteboardState
-    if (!state) return
-    // همگام‌سازی از سامانه‌ی خارجی (پیام‌های WebSocket سرور)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setWhiteboardObjects(state.objects || [])
-    const incoming = Boolean(state.is_open)
-    if (seenIsOpenRef.current === null) {
-      // اولین snapshot این نشست: کلاس همیشه با تخته‌ی بسته شروع می‌شود.
-      // میزبان سرور را هم به بسته همگام می‌کند تا برای همه از ابتدا بسته باشد؛
-      // دانش‌آموز از وضعیت واقعی سرور پیروی می‌کند (اگر مدرس تخته را باز کرده ببیند).
-      seenIsOpenRef.current = incoming
-      if (incoming && isHostRoleRef.current) {
-        publishWhiteboardOpen(false)
-        setWhiteboardOpen(false)
-      } else {
-        setWhiteboardOpen(incoming)
-      }
-      return
-    }
-    if (incoming === seenIsOpenRef.current) return // echo/snapshot تکراری — بی‌اثر
-    seenIsOpenRef.current = incoming
-    setWhiteboardOpen(incoming)
-  }, [accessWhiteboardState, publishWhiteboardOpen])
+    if (!access.whiteboardState) return
+    setWhiteboardObjects(access.whiteboardState.objects || [])
+    setWhiteboardOpen(Boolean(access.whiteboardState.is_open))
+  }, [access.whiteboardState])
 
   const openWhiteboard = () => {
     setWhiteboardOpen(true)
-    publishWhiteboardOpen(true)
+    access.setWhiteboardOpen(true)
   }
   const closeWhiteboard = () => {
     setWhiteboardOpen(false)
-    publishWhiteboardOpen(false)
+    access.setWhiteboardOpen(false)
   }
 
   // معلم خودش را برای چیدمان کلاس علامت می‌زند (فقط نمایشی)
@@ -201,48 +173,8 @@ export default function RoomPage() {
     catch { toast.error('کپی لینک انجام نشد.') }
   }
 
-  // ───── اعلان واقعی درخواست اجازه صحبت (فقط مدرس، از رستر لحظه‌ای) ─────
-  const { current: handAlert, queuedCount: handAlertQueued, pendingCount, dismiss: dismissHandAlert } = useHandRaiseAlerts({
-    enabled: Boolean(classLayout && isHostRole && access.connected),
-    roster: access.roster,
-  })
-  const openMobileSheet = useCallback((tab) => setMobileSheet((current) => (current === tab ? null : tab)), [])
-  const closeMobileSheet = useCallback(() => setMobileSheet(null), [])
-  const handleViewHandRequest = useCallback((alert) => {
-    dismissHandAlert(alert.id)
-    closeMeetingPanel()
-    setMobileSheet('participants')
-  }, [dismissHandAlert, closeMeetingPanel])
-  const handleDenyHandRequest = useCallback((alert) => {
-    access.lowerHand(alert.key)
-    dismissHandAlert(alert.id)
-  }, [access, dismissHandAlert])
-
-  // ───── جمع‌شدن خودکار داک در چیدمان عمودی وقتی کاربر مدتی تعامل نکرده (فقط حالت محتوا) ─────
-  // در چیدمان افقی ریل عمودی همیشه پیدا است و جمع نمی‌شود.
-  // dockShown در رندر مشتق می‌شود تا با تغییر حالت، نوار بدون تأخیر برگردد.
-  const dockAutoHide = Boolean(portraitClass && classContentMode && !mobileSheet)
-  const [dockIdleHidden, setDockIdleHidden] = useState(false)
-  const dockShown = !dockAutoHide || !dockIdleHidden
-  useEffect(() => {
-    if (!dockAutoHide) return undefined
-    let timer = window.setTimeout(() => setDockIdleHidden(true), 6000)
-    const show = () => {
-      setDockIdleHidden(false)
-      window.clearTimeout(timer)
-      timer = window.setTimeout(() => setDockIdleHidden(true), 6000)
-    }
-    document.addEventListener('pointerdown', show, true)
-    return () => {
-      window.clearTimeout(timer)
-      document.removeEventListener('pointerdown', show, true)
-    }
-  }, [dockAutoHide])
-
-  if (isConnecting && !isReconnecting) return <div className="fixed inset-0 room-shell text-white"><MeetingLoading /></div>
-  if (error && !isReconnecting) return <div className="fixed inset-0 room-shell text-white"><MeetingError error={error} onLeave={leave} /></div>
-
-  const whiteboardSlot = canWhiteboard && whiteboardOpen ? (
+  // تخته (فقط وقتی باز است). همگام‌سازی و مجوز نوشتن مثل قبل از props می‌آید.
+  const board = boardOpen ? (
     <WhiteboardPanel
       initialObjects={whiteboardObjects}
       onObjectsChange={(next) => {
@@ -259,86 +191,81 @@ export default function RoomPage() {
     />
   ) : null
 
+  const viewportValue = useMemo(() => viewport, [viewport])
+
+  if (isConnecting && !isReconnecting) return <div className="fixed inset-0 room-shell text-white"><MeetingLoading /></div>
+  if (error && !isReconnecting) return <div className="fixed inset-0 room-shell text-white"><MeetingError error={error} onLeave={leave} /></div>
+
+  const reconnectBanner = isReconnecting && (
+    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 room-pop"><div className="flex items-center gap-2 rounded-full bg-[var(--room-surface)] border room-border px-4 py-2 text-xs shadow-xl"><span className="w-2 h-2 rounded-full bg-[var(--room-warning)] animate-pulse" /><span>اتصال ضعیف است؛ در حال برقراری مجدد...</span></div></div>
+  )
+
+  const controlProps = {
+    isAudioMuted, isVideoMuted, isScreenSharing,
+    onToggleAudio: toggleAudio, onToggleVideo: toggleVideo, onToggleScreenShare: handleToggleScreenShare, onLeave: leave,
+    canChat, canParticipants, canScreenShare: canShowScreenShare || isScreenSharing,
+    showHand: canHand, isHandRaised, onToggleHand: handleToggleHand,
+    showMic, showCamera, showAttendance: canAttendance, onOpenAttendance: () => setAttendanceOpen(true),
+    handCount: handRequests.pending.length,
+  }
+
+  const classStage = classLayout && (
+    <>
+      <ClassLayout board={board} contentMode={classContentMode} onStopShare={toggleScreenShare} />
+      {isHostRole && (
+        <HandRequestToasts
+          notices={handRequests.notices}
+          onDismiss={handRequests.dismiss}
+          onDismissAll={handRequests.dismissAll}
+          onReject={access.lowerHand}
+        />
+      )}
+    </>
+  )
+
+  const shellClass = [
+    'room-shell fixed inset-0 overflow-hidden flex flex-col text-white',
+    classLayout ? 'is-class' : 'room-enter',
+    compactClass ? 'is-compact' : '',
+    classLayout && viewport.rotated ? 'is-rotated' : '',
+  ].filter(Boolean).join(' ')
+
   return (
+    <ClassViewportContext.Provider value={viewportValue}>
     <ClassAccessContext.Provider value={access}>
-    <div dir="rtl" className={`room-shell fixed inset-0 overflow-hidden flex flex-col text-white room-enter ${classContentMode ? 'room-class-content-mode' : ''}`}>
-      <RoomHeader compact={mobileClass} canRecord={canRecord} slug={roomName} isConnected={isConnected} onCopyLink={handleCopyLink} isMeetingMuted={isMeetingMuted} onToggleMeetingMute={toggleMeetingMute} isRecording={isRecording} recordingSeconds={recordingSeconds} onToggleRecording={handleToggleRecording} isVoiceRecording={isVoiceRecording} voiceRecordingSeconds={voiceRecordingSeconds} onToggleVoiceRecording={handleToggleVoiceRecording} />
+    <div dir="rtl" className={shellClass} style={classLayout ? viewport.shellStyle : undefined}>
+      <RoomHeader canRecord={canRecord} slug={roomName} isConnected={isConnected} onCopyLink={handleCopyLink} isMeetingMuted={isMeetingMuted} onToggleMeetingMute={toggleMeetingMute} isRecording={isRecording} recordingSeconds={recordingSeconds} onToggleRecording={handleToggleRecording} isVoiceRecording={isVoiceRecording} voiceRecordingSeconds={voiceRecordingSeconds} onToggleVoiceRecording={handleToggleVoiceRecording} />
 
       <div className="flex-1 min-h-0 relative">
-        <div className={`absolute inset-0 ${classLayout && !isDesktop ? 'p-0' : 'p-2 sm:p-3 lg:p-4'}`}>
-          <div className="h-full min-h-0 flex flex-row gap-2.5 lg:gap-3">
-            {(!classLayout || isDesktop) && <SidePanel canChat={canChat} canParticipants={canParticipants} canControl={canControlMedia} onOpenAttendance={canAttendance ? () => setAttendanceOpen(true) : undefined} />}
-            <main className={`relative flex-1 min-w-0 min-h-0 room-surface overflow-hidden ${classLayout && !isDesktop ? '' : 'rounded-[20px] border room-border room-panel-shadow'}`}>
-              <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_42%,rgba(77,125,255,.08),transparent_34%)]" />
-              {classLayout
-                ? <ClassLayout portrait={portraitClass} contentMode={classContentMode} whiteboardSlot={whiteboardSlot} onStopShare={toggleScreenShare} />
-                : <VideoGrid />}
-
-              {canWhiteboard && isHostRole && !whiteboardOpen && <button type="button" onClick={openWhiteboard} className="absolute top-3 right-3 z-30 flex items-center gap-2 rounded-xl border room-border bg-[var(--room-surface)]/95 px-3 py-2 text-xs text-white shadow-lg transition hover:bg-[var(--room-elevated)]" aria-label="بازکردن تخته تعاملی"><PenTool size={16} /><span>تخته تعاملی</span></button>}
-
-              {/* اعلان درخواست اجازه صحبت — حتی وقتی پنل‌ها بسته‌اند دیده می‌شود */}
-              {classLayout && isHostRole && (
-                <div className="cl-hand-alert-anchor">
-                  <HandRaiseAlert
-                    alert={handAlert}
-                    remaining={Math.max(0, handAlertQueued - 1)}
-                    onView={handleViewHandRequest}
-                    onDeny={handleDenyHandRequest}
-                  />
-                </div>
-              )}
-
-              {isReconnecting && <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 room-pop"><div className="flex items-center gap-2 rounded-full bg-[var(--room-surface)] border room-border px-4 py-2 text-xs shadow-xl"><span className="w-2 h-2 rounded-full bg-[var(--room-warning)] animate-pulse" /><span>اتصال ضعیف است؛ در حال برقراری مجدد...</span></div></div>}
-
-              <MeetingControls
-                isAudioMuted={isAudioMuted}
-                isVideoMuted={isVideoMuted}
-                isScreenSharing={isScreenSharing}
-                onToggleAudio={toggleAudio}
-                onToggleVideo={toggleVideo}
-                onToggleScreenShare={handleToggleScreenShare}
-                onLeave={leave}
-                canChat={canChat}
-                canParticipants={canParticipants}
-                canScreenShare={canShowScreenShare || isScreenSharing}
-                showHand={canHand}
-                isHandRaised={isHandRaised}
-                onToggleHand={handleToggleHand}
-                showMic={showMic}
-                showCamera={showCamera}
-                showAttendance={canAttendance}
-                onOpenAttendance={() => setAttendanceOpen(true)}
-                docked={mobileClass}
-                rail={mobileClass && !isPortrait}
-                dockVisible={portraitClass ? dockShown : true}
-                copyAction={{ label: 'کپی لینک کلاس', onClick: handleCopyLink }}
-                chatOpen={mobileSheet === 'chat'}
-                onToggleChat={() => openMobileSheet('chat')}
-                participantsOpen={mobileSheet === 'participants'}
-                onToggleParticipants={() => openMobileSheet('participants')}
-                participantsCount={participants.length}
-                pendingRequests={pendingCount}
-                whiteboardAction={canWhiteboard && isHostRole ? { label: whiteboardOpen ? 'بستن تخته تعاملی' : 'بازکردن تخته تعاملی', onClick: whiteboardOpen ? closeWhiteboard : openWhiteboard } : null}
-                showSettings
-              />
+        {compactClass ? (
+          // گوشیِ کلاس: ریل کنترل کنار صحنه؛ چت و شرکت‌کنندگان شیت پایین‌اند و روی ریل نمی‌افتند.
+          <div className="absolute inset-0 cl-body">
+            <MeetingControls {...controlProps} rail showSettings showBoard={canWhiteboard && isHostRole} boardOpen={boardOpen} onToggleBoard={boardOpen ? closeWhiteboard : openWhiteboard} />
+            <main className="cl-main">
+              {classStage}
+              <ClassSheets canChat={canChat} canParticipants={canParticipants} canControl={canControlMedia} onOpenAttendance={canAttendance ? () => setAttendanceOpen(true) : undefined} />
+              {reconnectBanner}
             </main>
           </div>
-        </div>
-
-        {/* پنل‌های موبایل کلاس: Bottom Sheet مشترک گفتگو و شرکت‌کنندگان */}
-        {mobileClass && (
-          <MobileClassSheets
-            openTab={mobileSheet}
-            onClose={closeMobileSheet}
-            canControl={canControlMedia}
-            onOpenAttendance={canAttendance ? () => setAttendanceOpen(true) : undefined}
-          />
+        ) : (
+          <div className="absolute inset-0 p-2 sm:p-3 lg:p-4">
+            <div className="h-full min-h-0 flex flex-row gap-2.5 lg:gap-3">
+              <SidePanel canChat={canChat} canParticipants={canParticipants} canControl={canControlMedia} onOpenAttendance={canAttendance ? () => setAttendanceOpen(true) : undefined} />
+              <main className="relative flex-1 min-w-0 min-h-0 room-surface overflow-hidden rounded-[20px] border room-border room-panel-shadow">
+                <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_42%,rgba(77,125,255,.08),transparent_34%)]" />
+                {classLayout ? classStage : <VideoGrid />}
+                {classLayout && canWhiteboard && isHostRole && !boardOpen && <button type="button" onClick={openWhiteboard} className="absolute top-3 right-3 z-30 flex items-center gap-2 rounded-xl border room-border bg-[var(--room-surface)]/95 px-3 py-2 text-xs text-white shadow-lg transition hover:bg-[var(--room-elevated)]" aria-label="بازکردن تخته تعاملی"><PenTool size={16} /><span>تخته تعاملی</span></button>}
+                {reconnectBanner}
+                <MeetingControls {...controlProps} />
+              </main>
+            </div>
+          </div>
         )}
-        {portraitClass && dockAutoHide && !dockShown && <DockPeek onShow={() => setDockIdleHidden(false)} />}
         <SettingsModal />
         {canAttendance && <AttendanceModal slug={roomName} open={attendanceOpen} onClose={() => setAttendanceOpen(false)} />}
       </div>
     </div>
     </ClassAccessContext.Provider>
+    </ClassViewportContext.Provider>
   )
 }

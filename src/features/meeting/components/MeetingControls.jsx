@@ -1,20 +1,9 @@
 import { memo, useState } from 'react'
-import { Copy, MessageSquare, Mic, MicOff, MonitorUp, PhoneOff, Settings, Users, Video, VideoOff, MoreHorizontal, Hand, UserCheck, PenTool, X } from 'lucide-react'
+import { MessageSquare, Mic, MicOff, MonitorUp, PhoneOff, Settings, Users, Video, VideoOff, MoreHorizontal, Hand, UserCheck, PenTool } from 'lucide-react'
 import { selectActivePanelTab, selectIsPanelOpen, selectUnreadCount } from '../store/meeting-selectors'
 import { useMeetingStore } from '../store/meeting-store'
 
-/**
- * نوار کنترل جلسه.
- *
- * حالت docked (موبایلِ کلاس):
- *  • rail=false → نوار باریک افقی پایین (چیدمان عمودی) با dvh و safe-area
- *  • rail=true  → ریل عمودی دکمه‌ها روی لبه (چیدمان افقی — مطابق طرح مرجع)
- *  • دکمه‌های اصلی (میکروفون، دوربین، گفتگو، شرکت‌کنندگان، خروج) همیشه در دسترس‌اند
- *  • امکانات کم‌کاربردتر (اشتراک صفحه، حضور و غیاب، تخته، کپی لینک، تنظیمات) در منوی «بیشتر»
- *  • بج گفتگو = پیام‌های خوانده‌نشده؛ بج شرکت‌کنندگان = درخواست‌های در انتظار
- *  • با فعال‌بودن تخته/اشتراک می‌تواند خودکار جمع شود و با لمس صفحه برگردد
- */
-export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isVideoMuted, isScreenSharing, onToggleAudio, onToggleVideo, onToggleScreenShare, onLeave, canChat = true, canParticipants = true, canScreenShare = true, showHand = false, isHandRaised = false, onToggleHand, showMic = true, showCamera = true, showAttendance = false, onOpenAttendance, docked = false, rail = false, showSettings = true, chatOpen = false, onToggleChat, participantsOpen = false, onToggleParticipants, participantsCount = 0, pendingRequests = 0, dockVisible = true, whiteboardAction = null, copyAction = null }) {
+export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isVideoMuted, isScreenSharing, onToggleAudio, onToggleVideo, onToggleScreenShare, onLeave, canChat = true, canParticipants = true, canScreenShare = true, showHand = false, isHandRaised = false, onToggleHand, showMic = true, showCamera = true, showAttendance = false, onOpenAttendance, rail = false, showSettings = true, handCount = 0, showBoard = false, boardOpen = false, onToggleBoard }) {
   const unreadCount = useMeetingStore(selectUnreadCount)
   const activeTab = useMeetingStore(selectActivePanelTab)
   const isPanelOpen = useMeetingStore(selectIsPanelOpen)
@@ -23,69 +12,41 @@ export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isV
 
   const [moreOpen, setMoreOpen] = useState(false)
 
-  if (docked && rail) {
-    // چیدمان افقی موبایل: ریل عمودی دکمه‌ها روی لبه‌ی شروع (راست در RTL)
+  if (rail) {
+    // گوشیِ کلاس: ریل عمودی کنار صحنه. روی محتوا قرار نمی‌گیرد و با ارتفاع نمایش هماهنگ است.
+    // دکمه‌های اصلی همیشه پیدا هستند؛ بقیه داخل «بیشتر».
+    const chatActive = isPanelOpen && activeTab === 'chat'
+    const peopleActive = isPanelOpen && activeTab === 'participants'
     const moreItems = [
       canScreenShare && { key: 'share', label: isScreenSharing ? 'توقف اشتراک صفحه' : 'اشتراک‌گذاری صفحه', icon: <MonitorUp size={19} />, onClick: onToggleScreenShare },
-      whiteboardAction && { key: 'whiteboard', label: whiteboardAction.label, icon: <PenTool size={19} />, onClick: whiteboardAction.onClick },
       showAttendance && { key: 'attendance', label: 'حضور و غیاب', icon: <UserCheck size={19} />, onClick: onOpenAttendance },
-      copyAction && { key: 'copy', label: copyAction.label, icon: <Copy size={19} />, onClick: copyAction.onClick },
       showSettings && { key: 'settings', label: 'تنظیمات', icon: <Settings size={19} />, onClick: openSettings },
     ].filter(Boolean)
     const runMore = (fn) => () => { setMoreOpen(false); fn?.() }
-    const participantsBadge = pendingRequests > 0 ? pendingRequests : participantsCount
 
-    return <>
-      {moreOpen && <button type="button" aria-label="بستن" className="cl-more-backdrop" onClick={() => setMoreOpen(false)} />}
-      {moreOpen && <div className="cl-more-menu is-rail" role="menu">
-        {moreItems.map((it) => <button key={it.key} type="button" role="menuitem" className="cl-more-item" onClick={runMore(it.onClick)}>{it.icon}<span>{it.label}</span></button>)}
-      </div>}
-      <div className={`cl-actions ${dockVisible ? '' : 'is-hidden'}`} role="toolbar" aria-label="کنترل‌های کلاس">
-        {showHand && <button type="button" onClick={onToggleHand} className={`cl-actions-hand ${isHandRaised ? 'is-raised' : ''}`} aria-label={isHandRaised ? 'پایین‌آوردن دست' : 'بلندکردن دست'} title={isHandRaised ? 'پایین‌آوردن دست' : 'بلندکردن دست'}>
-          <Hand size={19} />
-        </button>}
-        {showMic && <ControlButton active={!isAudioMuted} off={isAudioMuted} onClick={onToggleAudio} label="میکروفون" icon={isAudioMuted ? <MicOff size={18} /> : <Mic size={18} />} />}
-        {showCamera && <ControlButton active={!isVideoMuted} off={isVideoMuted} onClick={onToggleVideo} label="دوربین" icon={isVideoMuted ? <VideoOff size={18} /> : <Video size={18} />} />}
-        {canChat && <ControlButton active={chatOpen} onClick={onToggleChat} label="گفتگو" icon={<MessageSquare size={18} />} badge={chatOpen ? 0 : unreadCount} />}
-        {canParticipants && <ControlButton active={participantsOpen} onClick={onToggleParticipants} label="شرکت‌کنندگان" icon={<Users size={18} />} badge={participantsOpen ? 0 : participantsBadge} badgeTone={pendingRequests > 0 ? 'warn' : 'default'} />}
-        {moreItems.length > 0 && <ControlButton active={moreOpen} onClick={() => setMoreOpen((v) => !v)} label="بیشتر" icon={moreOpen ? <X size={18} /> : <MoreHorizontal size={18} />} />}
-        <ControlButton danger onClick={onLeave} label="خروج" icon={<PhoneOff size={18} />} />
-      </div>
-    </>
-  }
-
-  if (docked) {
-    // چیدمان عمودی موبایل: دکمه‌های اصلی همیشه پیدا هستند؛
-    // بقیه (اشتراک صفحه، حضور و غیاب، تخته، کپی لینک، تنظیمات) داخل «بیشتر» می‌روند.
-    const moreItems = [
-      canScreenShare && { key: 'share', label: isScreenSharing ? 'توقف اشتراک صفحه' : 'اشتراک‌گذاری صفحه', icon: <MonitorUp size={19} />, onClick: onToggleScreenShare },
-      whiteboardAction && { key: 'whiteboard', label: whiteboardAction.label, icon: <PenTool size={19} />, onClick: whiteboardAction.onClick },
-      showAttendance && { key: 'attendance', label: 'حضور و غیاب', icon: <UserCheck size={19} />, onClick: onOpenAttendance },
-      copyAction && { key: 'copy', label: copyAction.label, icon: <Copy size={19} />, onClick: copyAction.onClick },
-      showSettings && { key: 'settings', label: 'تنظیمات', icon: <Settings size={19} />, onClick: openSettings },
-    ].filter(Boolean)
-    const runMore = (fn) => () => { setMoreOpen(false); fn?.() }
-    const participantsBadge = pendingRequests > 0 ? pendingRequests : participantsCount
-
-    return <>
-      {moreOpen && <button type="button" aria-label="بستن" className="cl-more-backdrop" onClick={() => setMoreOpen(false)} />}
-      {moreOpen && <div className="cl-more-menu" role="menu">
-        {moreItems.map((it) => <button key={it.key} type="button" role="menuitem" className="cl-more-item" onClick={runMore(it.onClick)}>{it.icon}<span>{it.label}</span></button>)}
-      </div>}
-      <div className={`cl-dock ${dockVisible ? '' : 'is-hidden'}`}>
-        <div className="cl-dock-inner">
-          {showHand && <button type="button" onClick={onToggleHand} className={`cl-hand ${isHandRaised ? 'is-raised' : ''}`} aria-label={isHandRaised ? 'پایین‌آوردن دست' : 'بلندکردن دست'}>
-            <Hand size={18} /><span>{isHandRaised ? 'پایین دست' : 'بلندکردن دست'}</span>
-          </button>}
-          {showMic && <ControlButton active={!isAudioMuted} off={isAudioMuted} onClick={onToggleAudio} label="میکروفون" icon={isAudioMuted ? <MicOff size={18} /> : <Mic size={18} />} />}
-          {showCamera && <ControlButton active={!isVideoMuted} off={isVideoMuted} onClick={onToggleVideo} label="دوربین" icon={isVideoMuted ? <VideoOff size={18} /> : <Video size={18} />} />}
-          {canChat && <ControlButton active={chatOpen} onClick={onToggleChat} label="گفتگو" icon={<MessageSquare size={18} />} badge={chatOpen ? 0 : unreadCount} />}
-          {canParticipants && <ControlButton active={participantsOpen} onClick={onToggleParticipants} label="شرکت‌کنندگان" icon={<Users size={18} />} badge={participantsOpen ? 0 : participantsBadge} badgeTone={pendingRequests > 0 ? 'warn' : 'default'} />}
-          {moreItems.length > 0 && <ControlButton active={moreOpen} onClick={() => setMoreOpen((v) => !v)} label="بیشتر" icon={moreOpen ? <X size={18} /> : <MoreHorizontal size={18} />} />}
-          <ControlButton danger onClick={onLeave} label="خروج" icon={<PhoneOff size={18} />} />
+    return (
+      <div className="cl-rail-wrap">
+        {moreOpen && <button type="button" aria-label="بستن منو" className="cl-more-backdrop" onClick={() => setMoreOpen(false)} />}
+        {moreOpen && (
+          <div className="cl-more-menu" role="menu">
+            {moreItems.map((it) => (
+              <button key={it.key} type="button" role="menuitem" className="cl-more-item" onClick={runMore(it.onClick)}>{it.icon}<span>{it.label}</span></button>
+            ))}
+          </div>
+        )}
+        <div className="cl-rail" role="toolbar" aria-label="کنترل‌های کلاس">
+          {showMic && <RailButton state={isAudioMuted ? 'off' : 'on'} onClick={onToggleAudio} label={isAudioMuted ? 'روشن‌کردن میکروفون' : 'خاموش‌کردن میکروفون'} icon={isAudioMuted ? <MicOff size={19} /> : <Mic size={19} />} />}
+          {showCamera && <RailButton state={isVideoMuted ? 'off' : 'on'} onClick={onToggleVideo} label={isVideoMuted ? 'روشن‌کردن دوربین' : 'خاموش‌کردن دوربین'} icon={isVideoMuted ? <VideoOff size={19} /> : <Video size={19} />} />}
+          {showHand && <RailButton state={isHandRaised ? 'warn' : 'idle'} onClick={onToggleHand} label={isHandRaised ? 'پایین‌آوردن دست' : 'درخواست اجازه صحبت'} pressed={isHandRaised} icon={<Hand size={19} />} />}
+          {showBoard && <RailButton state={boardOpen ? 'active' : 'idle'} onClick={onToggleBoard} label={boardOpen ? 'بستن تخته' : 'بازکردن تخته'} pressed={boardOpen} icon={<PenTool size={19} />} />}
+          {canChat && <RailButton state={chatActive ? 'active' : 'idle'} onClick={() => togglePanel('chat')} label="گفتگو" pressed={chatActive} badge={chatActive ? 0 : unreadCount} icon={<MessageSquare size={19} />} />}
+          {canParticipants && <RailButton state={peopleActive ? 'active' : 'idle'} onClick={() => togglePanel('participants')} label={handCount > 0 ? `شرکت‌کنندگان؛ ${handCount} درخواست صحبت` : 'شرکت‌کنندگان'} pressed={peopleActive} badge={handCount} badgeKind="hand" icon={<Users size={19} />} />}
+          {moreItems.length > 0 && <RailButton state={moreOpen ? 'active' : 'idle'} onClick={() => setMoreOpen((v) => !v)} label="بیشتر" pressed={moreOpen} icon={<MoreHorizontal size={19} />} />}
+          <span className="cl-rail-spacer" />
+          <RailButton state="danger" onClick={onLeave} label="خروج از کلاس" icon={<PhoneOff size={19} />} />
         </div>
       </div>
-    </>
+    )
   }
 
   return <div className={`fixed lg:absolute ${isPanelOpen ? 'md:bottom-5' : 'md:bottom-5'} bottom-[calc(env(safe-area-inset-bottom)+14px)] left-1/2 -translate-x-1/2 z-[60] w-max max-w-[calc(100%-20px)] transition-all duration-400 ease-out`}>
@@ -93,7 +54,7 @@ export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isV
       {showHand && <ControlButton active={isHandRaised} onClick={onToggleHand} label={isHandRaised ? 'پایین‌آوردن دست' : 'بلندکردن دست'} icon={<Hand size={17} />} extra="" />}
       <ControlButton onClick={openSettings} label="تنظیمات" icon={<Settings size={17} />} extra="" />
       {canChat && <ControlButton active={isPanelOpen && activeTab === 'chat'} onClick={() => togglePanel('chat')} label="گفتگو" icon={<MessageSquare size={17} />} badge={unreadCount} />}
-      {canParticipants && <ControlButton active={isPanelOpen && activeTab === 'participants'} onClick={() => togglePanel('participants')} label="شرکت‌کنندگان" icon={<Users size={17} />} />}
+      {canParticipants && <ControlButton active={isPanelOpen && activeTab === 'participants'} onClick={() => togglePanel('participants')} label="شرکت‌کنندگان" icon={<Users size={17} />} badge={handCount} />}
       {showAttendance && <button type="button" onClick={onOpenAttendance} aria-label="حضور و غیاب" title="حضور و غیاب"
         className="room-control h-10 sm:h-11 px-3 sm:px-4 rounded-xl sm:rounded-2xl flex items-center gap-2 bg-[var(--room-blue)] text-white text-xs font-medium shadow-[0_8px_22px_rgba(77,125,255,.35)] hover:brightness-110">
         <UserCheck size={17} /><span className="hidden sm:inline">حضور و غیاب</span>
@@ -107,12 +68,21 @@ export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isV
   </div>
 })
 
-function ControlButton({ icon, active = false, danger = false, off = false, primary = false, onClick, label, extra = '', badge = 0, badgeTone = 'default' }) {
+function ControlButton({ icon, active = false, danger = false, off = false, primary = false, onClick, label, extra = '', badge = 0 }) {
   let classes = `room-control relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl flex items-center justify-center ${extra}`
   if (primary) classes += ' bg-[var(--room-blue)] text-white'
   else if (danger) classes += ' bg-[var(--room-danger)] hover:brightness-110 text-white shadow-[0_10px_24px_rgba(255,80,104,.28)]'
   else if (off) classes += ' bg-[var(--room-danger)]/10 text-[var(--room-danger)] ring-1 ring-[var(--room-danger)]/30'
   else if (active) classes += ' bg-[var(--room-mint-soft)] text-[var(--room-mint)] ring-1 ring-[var(--room-mint)]/25'
   else classes += ' bg-white/[.045] text-white/55 hover:bg-white/[.085] hover:text-white'
-  return <button type="button" onClick={onClick} aria-label={label} title={label} className={classes}>{icon}{off && <span className="absolute inset-0 flex items-center justify-center pointer-events-none"><span className="w-8 h-8 rounded-xl ring-1 ring-[var(--room-danger)]/35" /></span>}{badge > 0 && <span className={`cl-btn-badge ${badgeTone === 'warn' ? 'is-warn' : ''}`}>{badge > 99 ? '99+' : badge}</span>}</button>
+  return <button type="button" onClick={onClick} aria-label={label} title={label} className={classes}>{icon}{off && <span className="absolute inset-0 flex items-center justify-center pointer-events-none"><span className="w-8 h-8 rounded-xl ring-1 ring-[var(--room-danger)]/35" /></span>}{badge > 0 && <span className="absolute -top-1 -left-1 min-w-4 h-4 rounded-full bg-[var(--room-danger)] text-white text-[9px] flex items-center justify-center px-1">{badge}</span>}</button>
+}
+
+function RailButton({ icon, state = 'idle', onClick, label, pressed, badge = 0, badgeKind = '' }) {
+  return (
+    <button type="button" onClick={onClick} aria-label={label} title={label} aria-pressed={pressed} className={`rail-btn is-${state}`}>
+      {icon}
+      {badge > 0 && <span className={`rail-badge ${badgeKind === 'hand' ? 'is-hand' : ''}`}>{badge}</span>}
+    </button>
+  )
 }

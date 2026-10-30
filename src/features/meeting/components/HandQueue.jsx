@@ -26,13 +26,13 @@ export const HandQueue = memo(function HandQueue() {
       <Section title="دست‌بلندکرده‌ها" count={raised.length} accent>
         {raised.length === 0 && <Empty text="کسی دست بلند نکرده" />}
         {raised.map((p, i) => (
-          <Row key={p.key} name={p.name} badge={i + 1}>
+          <Row key={p.key} name={p.name} badge={i + 1} isNew={isRecent(p.hand_at)}>
             <button type="button" onClick={() => access.grant(p.key, true, true)}
-              className="text-[11px] px-2.5 py-1 rounded-lg bg-[var(--room-mint-soft)] text-[var(--room-mint)] hover:brightness-125">
+              className="text-[12px] px-3 py-1.5 rounded-lg bg-[var(--room-mint-soft)] text-[var(--room-mint)] hover:brightness-125">
               اجازه بده
             </button>
             <button type="button" title="پایین‌آوردن دست" onClick={() => access.lowerHand(p.key)}
-              className="p-1 rounded-md text-white/45 hover:bg-white/10"><X size={14} /></button>
+              aria-label="رد درخواست" className="p-1.5 rounded-md text-white/55 hover:bg-white/10"><X size={16} /></button>
           </Row>
         ))}
       </Section>
@@ -83,11 +83,15 @@ function Section({ title, count, accent = false, children }) {
   )
 }
 
-function Row({ name, badge, children }) {
+const NEW_WINDOW_MS = 30000
+const isRecent = (iso) => Date.now() - new Date(iso).getTime() < NEW_WINDOW_MS
+
+function Row({ name, badge, isNew = false, children }) {
   return (
-    <div className="flex items-center gap-2 rounded-xl bg-white/[.04] px-2.5 py-1.5">
+    <div className={`flex items-center gap-2 rounded-xl px-2.5 py-1.5 ${isNew ? 'bg-[var(--room-warning)]/10 ring-1 ring-[var(--room-warning)]/40' : 'bg-white/[.04]'}`}>
       {badge != null && <span className="w-5 h-5 rounded-full bg-[var(--room-warning)]/15 text-[var(--room-warning)] text-[10px] flex items-center justify-center shrink-0">{badge}</span>}
       <span className="flex-1 min-w-0 truncate text-xs text-white/85">{name}</span>
+      {isNew && <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--room-warning)] text-[#2a1c00] font-semibold">جدید</span>}
       <div className="flex items-center gap-1 shrink-0">{children}</div>
     </div>
   )
