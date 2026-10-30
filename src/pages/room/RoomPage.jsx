@@ -25,6 +25,7 @@ import { useForcedLandscape } from '../../features/meeting/hooks/useForcedLandsc
 import { useHandRaiseAlerts } from '../../features/meeting/hooks/useHandRaiseAlerts'
 import { MobileClassSheets, DockPeek } from '../../features/meeting/components/MobileClassSheets'
 import { HandRaiseAlert } from '../../features/meeting/components/HandRaiseAlert'
+import { RotateDeviceGate } from '../../features/meeting/components/RotateDeviceGate'
 
 export default function RoomPage() {
   const { slug: roomName } = useParams()
@@ -198,6 +199,23 @@ export default function RoomPage() {
     try { window.sessionStorage.setItem('avestro-rotate-hint', '1') } catch { /* حافظه در دسترس نیست */ }
   }
 
+  // ───── گیت اجباری ورود کلاس آنلاین: «گوشی را افقی قرار بده» (فقط کلاس، نه سمینار) ─────
+  const isTouchDevice = useMediaQuery('(hover: none) and (pointer: coarse)')
+  // تنها کلید عبور از گیت: چرخاندن واقعی گوشی. اگر گوشی از ابتدا افقی باشد یا
+  // کاربر آن را بچرخاند، گیت برای همیشه در این نشست باز می‌شود؛ هیچ راه دیگری نیست.
+  const [rotateGatePassed, setRotateGatePassed] = useState(() => {
+    try { return window.matchMedia('(orientation: landscape)').matches } catch { return false }
+  })
+  useEffect(() => {
+    const mql = window.matchMedia('(orientation: landscape)')
+    const onChange = (event) => { if (event.matches) setRotateGatePassed(true) }
+    mql.addEventListener?.('change', onChange)
+    return () => mql.removeEventListener?.('change', onChange)
+  }, [])
+
+  // فقط کلاس آنلاین: موبایل لمسی + گوشی عمودی + هنوز نچرخیده → تا نچرخد چیزی نمایش داده نمی‌شود
+  const showRotateGate = classLayout && forcedLandscape && isTouchDevice && !rotateGatePassed
+
   // ───── جمع‌شدن خودکار نوار کنترل وقتی کاربر مدتی تعامل نکرده (فقط حالت محتوا) ─────
   // dockShown در رندر مشتق می‌شود تا با تغییر حالت، نوار بدون تأخیر برگردد.
   const dockAutoHide = Boolean(mobileClass && classContentMode && !mobileSheet)
@@ -218,7 +236,9 @@ export default function RoomPage() {
     }
   }, [dockAutoHide])
 
-  if (isConnecting && !isReconnecting) return <div className="fixed inset-0 room-shell text-white"><MeetingLoading /></div>
+  const rotateGate = showRotateGate ? <RotateDeviceGate /> : null
+
+  if (isConnecting && !isReconnecting) return <div className="fixed inset-0 room-shell text-white"><MeetingLoading />{rotateGate}</div>
   if (error && !isReconnecting) return <div className="fixed inset-0 room-shell text-white"><MeetingError error={error} onLeave={leave} /></div>
 
   const whiteboardSlot = canWhiteboard && whiteboardOpen ? (
@@ -240,6 +260,8 @@ export default function RoomPage() {
 
   return (
     <ClassAccessContext.Provider value={access}>
+    {/* گیت ورود کلاس — بیرون از room-shell تا تحت چرخش مجازی قرار نگیرد */}
+    {rotateGate}
     <div dir="rtl" {...forcedLandscapeAttrs} className={`room-shell fixed inset-0 overflow-hidden flex flex-col text-white room-enter ${classContentMode ? 'room-class-content-mode' : ''}`}>
       <RoomHeader canRecord={canRecord} slug={roomName} isConnected={isConnected} onCopyLink={handleCopyLink} isMeetingMuted={isMeetingMuted} onToggleMeetingMute={toggleMeetingMute} isRecording={isRecording} recordingSeconds={recordingSeconds} onToggleRecording={handleToggleRecording} isVoiceRecording={isVoiceRecording} voiceRecordingSeconds={voiceRecordingSeconds} onToggleVoiceRecording={handleToggleVoiceRecording} />
 

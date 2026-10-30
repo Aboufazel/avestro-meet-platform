@@ -576,3 +576,175 @@
   .cl-sheet, .cl-hand-alert, .cl-rotate-hint-icon { animation: none !important; }
   .cl-dock { transition: none !important; }
 }
+
+/* ─────────────────────────────────────────────────────────
+   گیت ورود کلاس آنلاین — درخواست چرخاندن گوشی (فقط کلاس، نه سمینار)
+   ───────────────────────────────────────────────────────── */
+.rg-root {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% -8%, rgba(77, 125, 255, .17), transparent 44%),
+    radial-gradient(circle at 50% 112%, rgba(69, 216, 176, .11), transparent 46%),
+    linear-gradient(160deg, #0d1523, #070d18 72%);
+  animation: rg-fade-in .45s cubic-bezier(.22, 1, .36, 1) both;
+}
+@keyframes rg-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.rg-glow {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(72px);
+  pointer-events: none;
+}
+.rg-glow-blue {
+  width: 300px; height: 300px;
+  top: -96px; right: -84px;
+  background: rgba(77, 125, 255, .20);
+  animation: rg-float 7s ease-in-out infinite;
+}
+.rg-glow-mint {
+  width: 260px; height: 260px;
+  bottom: -88px; left: -76px;
+  background: rgba(69, 216, 176, .13);
+  animation: rg-float 9s ease-in-out infinite reverse;
+}
+@keyframes rg-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(18px); } }
+
+.rg-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 340px;
+  animation: rg-rise .6s cubic-bezier(.22, 1, .36, 1) both;
+}
+@keyframes rg-rise { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+
+.rg-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(69, 216, 176, .12);
+  border: 1px solid rgba(69, 216, 176, .30);
+  color: #7fe3c3;
+  font-size: 11.5px;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+.rg-pill-dot { width: 6px; height: 6px; border-radius: 50%; background: #45d8b0; animation: rg-blink 1.8s ease-in-out infinite; }
+@keyframes rg-blink { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+.rg-stage {
+  position: relative;
+  width: 148px;
+  height: 148px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+.rg-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px dashed rgba(157, 183, 255, .28);
+  animation: rg-spin 16s linear infinite;
+}
+@keyframes rg-spin { to { transform: rotate(360deg); } }
+.rg-halo {
+  position: absolute;
+  inset: 16px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(77, 125, 255, .18), transparent 68%);
+  animation: rg-halo-pulse 2.8s ease-in-out infinite;
+}
+@keyframes rg-halo-pulse { 0%, 100% { transform: scale(1); opacity: .8; } 50% { transform: scale(1.12); opacity: 1; } }
+
+/* گوشی: از حالت عمودی به افقی می‌چرخد تا کاربر همان حرکت را تکرار کند */
+.rg-phone {
+  position: relative;
+  width: 52px;
+  height: 92px;
+  border-radius: 13px;
+  border: 2.5px solid rgba(190, 208, 255, .85);
+  background: linear-gradient(165deg, rgba(77, 125, 255, .32), rgba(77, 125, 255, .10));
+  box-shadow: 0 0 34px rgba(77, 125, 255, .35), inset 0 0 14px rgba(255, 255, 255, .06);
+  animation: rg-rotate 3.4s cubic-bezier(.65, 0, .35, 1) infinite;
+}
+.rg-phone::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 3.5px;
+  border-radius: 999px;
+  background: rgba(190, 208, 255, .75);
+}
+.rg-phone-line {
+  position: absolute;
+  right: 9px;
+  bottom: 22px;
+  left: 9px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(190, 208, 255, .40);
+}
+.rg-phone-line-short { right: 24px; bottom: 13px; }
+@keyframes rg-rotate {
+  0%, 16% { transform: rotate(0deg); }
+  46%, 64% { transform: rotate(-90deg); }
+  94%, 100% { transform: rotate(0deg); }
+}
+
+.rg-rotate-badge {
+  position: absolute;
+  right: 4px;
+  bottom: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(77, 125, 255, .22);
+  border: 1px solid rgba(77, 125, 255, .45);
+  color: #9db7ff;
+  animation: rg-badge-pulse 2.6s ease-in-out infinite;
+}
+@keyframes rg-badge-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(77, 125, 255, .35); }
+  50% { box-shadow: 0 0 0 8px rgba(77, 125, 255, 0); }
+}
+
+.rg-title {
+  margin: 0 0 10px;
+  font-size: 21px;
+  font-weight: 800;
+  color: #f5f8ff;
+  letter-spacing: -.2px;
+}
+.rg-text {
+  margin: 0 0 26px;
+  max-width: 280px;
+  font-size: 13px;
+  line-height: 2.1;
+  color: rgba(245, 248, 255, .60);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rg-root { animation: none; }
+  .rg-card { animation: none; }
+  .rg-ring, .rg-halo, .rg-phone, .rg-rotate-badge, .rg-pill-dot, .rg-glow-blue, .rg-glow-mint { animation: none !important; }
+}
