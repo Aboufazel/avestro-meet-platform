@@ -1,398 +1,578 @@
-/* چیدمان کلاس — موبایل‌اول. رنگ‌ها از متغیرهای تم اتاق (--room-*) می‌آید. */
+/* =========================================================
+   چیدمان کلاس — Avestro Meet
+   یک فایل واحد برای: کارت ویدئوی استاندارد (vt)، حالت ویدئو (grid)،
+   حالت محتوا (rail)، نوار کنترل باریک (dock)، Bottom Sheet ها،
+   اعلان درخواست صحبت، راهنمای چرخش و چرخش مجازی Landscape.
+   رنگ‌ها از متغیرهای تم اتاق (--room-*) می‌آیند.
+   ========================================================= */
 
-:root { --dock-h: calc(64px + env(safe-area-inset-bottom)); }
+:root { --dock-h: calc(54px + env(safe-area-inset-bottom)); }
 
+/* ─────────────────────────────────────────────────────────
+   کارت ویدئوی استاندارد (VideoTile variant="card")
+   دو بخش مستقل: vt-media (تصویر) + vt-info (نوار اطلاعات زیر تصویر)
+   هیچ آیکون، نام یا کنترلی روی تصویر قرار نمی‌گیرد.
+   ───────────────────────────────────────────────────────── */
+.vt { position: relative; }
+.vt-card {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #05080e;
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 14px;
+  overflow: hidden;
+  container-type: size;
+}
+.vt-media {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: #000;
+}
+.vt-video { display: block; width: 100%; height: 100%; background: #000; }
+.vt-video.is-cover { object-fit: cover; }
+.vt-video.is-contain { object-fit: contain; }
+.vt-media-note {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, .7);
+}
+.vt-media-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.vt-avatar {
+  width: clamp(30px, 26cqi, 88px);
+  height: clamp(30px, 26cqi, 88px);
+  border-radius: 50%;
+  background: var(--room-surface-3, #172438);
+  color: #fff;
+  font-weight: 700;
+  font-size: clamp(13px, 9cqi, 34px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.vt-info {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 9px;
+  background: var(--room-surface-2, #131f31);
+  border-top: 1px solid rgba(255, 255, 255, .07);
+}
+.vt-info-main { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; }
+.vt-badge {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(77, 125, 255, .16);
+  color: #9db7ff;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.vt-name {
+  min-width: 0;
+  font-size: 11px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vt-info-status { display: flex; align-items: center; gap: 6px; flex: none; }
+.vt-signal { display: flex; align-items: center; }
+.vt-signal.strong { color: #4ade80; }
+.vt-signal.medium { color: #facc15; }
+.vt-signal.weak { color: #f87171; }
+.vt-mic {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.vt-mic.is-live { background: rgba(84, 217, 176, .15); color: var(--room-mint, #54d9b0); }
+.vt-mic.is-muted { background: rgba(255, 80, 104, .14); color: var(--room-danger, #ff5068); }
+.vt-weak-tag {
+  flex: none;
+  padding: 1px 5px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 80, 104, .35);
+  color: var(--room-danger, #ff5068);
+  font-size: 9px;
+  white-space: nowrap;
+}
+.vt-share-icon { color: #9db7ff; flex: none; }
+.vt-speaking { transform: scale(.8); }
+
+/* ─────────────────────────────────────────────────────────
+   ریشه‌ی چیدمان کلاس
+   ───────────────────────────────────────────────────────── */
 .cl-root {
   height: 100%;
   min-height: 0;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px 8px calc(100px + env(safe-area-inset-bottom));
+  gap: 10px;
+  padding: 10px;
 }
 
-/* ── صحنه ── */
-.cl-stage {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  border-radius: 16px;
-  overflow: hidden;
-  background: #05080e;
-  border: 1px solid var(--room-border);
-}
-.cl-stage > .cl-fill { position: absolute; inset: 0; }
-
-.cl-pip {
-  position: absolute;
-  left: 8px;
-  bottom: 8px;
-  z-index: 10;
-  width: 176px;
-  height: 112px;
-  border-radius: 12px;
-  overflow: hidden;
-  background: #000;
-  border: 2px solid var(--room-blue);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
-}
-
-.cl-expand {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 11;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  background: rgba(8, 15, 27, .72);
-  border: 1px solid var(--room-border-strong);
-  backdrop-filter: blur(6px);
-}
-
-/* اشتراک صفحه‌ی خودِ معلم: پیش‌نمایش بزرگ + نوار وضعیت پایین */
-.cl-share { position: absolute; inset: 0; display: flex; flex-direction: column; }
-.cl-share-preview { position: relative; flex: 1; min-height: 0; background: #000; }
-.cl-share-bar {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 44px;
-  padding: 0 12px;
-  background: var(--room-surface);
-  border-top: 1px solid var(--room-border);
-}
-.cl-share-title { flex: 1; min-width: 0; font-size: 12px; color: var(--room-text-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cl-share-stop {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 12;
-  flex: none;
-  height: 34px;
-  padding: 0 16px;
-  border: 1px solid rgba(255,255,255,.18);
-  border-radius: 10px;
-  box-shadow: 0 4px 14px rgba(0,0,0,.35);
-  font-size: 12px;
-  font-weight: 600;
-  color: #fff;
-  background: var(--room-danger);
-}
-
-/* ── نوار «صدا/تصویر دارند» ── */
-.cl-strip { display: flex; gap: 8px; flex-shrink: 0; overflow-x: auto; }
-.cl-tile {
-  position: relative;
-  flex: 0 0 auto;
-  width: 140px;
-  height: 96px;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid var(--room-border);
-  background: #0a111d;
-}
-.cl-more {
-  flex: 0 0 auto;
-  min-width: 72px;
-  height: 96px;
-  padding: 0 12px;
-  border-radius: 12px;
-  border: 1px solid var(--room-border);
-  background: rgba(255, 255, 255, .04);
-  color: var(--room-text-soft);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-/* ── گفتگوی زیر صحنه (فقط موبایل) ── */
-.cl-chat {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  border-radius: 16px;
-  border: 1px solid var(--room-border);
-  background: var(--room-surface);
-}
-
-/* ── نوار کنترل چسبیده به پایین (موبایل) ── */
-.cl-dock {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 60;
-  background: var(--room-surface);
-  border-top: 1px solid var(--room-border);
-  padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
-}
-.cl-dock-inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  max-width: 520px;
-  margin: 0 auto;
-}
-.cl-hand {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  height: 48px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #2a1c00;
-  background: var(--room-warning);
-}
-.cl-hand.is-raised { background: rgba(245, 184, 75, .16); color: var(--room-warning); box-shadow: inset 0 0 0 1px rgba(245, 184, 75, .5); }
-
-/* ───────────── موبایل ───────────── */
-@media (max-width: 767px) {
-  .cl-root { padding: 0 0 var(--dock-h); gap: 0; }
-  /* صحنه تمام فضای باقی‌مانده را می‌گیرد؛ چت پیش‌فرض بسته است */
-  .cl-stage {
-    flex: 1;
-    min-height: 190px;
-    border-radius: 0;
-    border-width: 0 0 1px;
-  }
-  .cl-expand { display: none; }
-  .cl-pip { width: 112px; height: 72px; left: 6px; bottom: 6px; }
-  .cl-strip { padding: 8px; border-bottom: 1px solid var(--room-border); }
-  .cl-tile { width: 88px; height: 64px; border-radius: 10px; }
-  .cl-more { height: 64px; min-width: 64px; }
-}
-
-/* ── پیش‌نمایش آخرین پیام ── */
-.cl-preview {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  height: 40px;
-  padding: 0 12px;
-  text-align: right;
-  font-size: 12px;
-  color: var(--room-text-soft);
-  background: var(--room-surface);
-  border-top: 1px solid var(--room-border);
-}
-.cl-preview-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cl-preview-text b { color: #fff; font-weight: 500; }
-.cl-preview-badge {
-  min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 11px; color: #fff; background: var(--room-danger);
-}
-
-/* ── چت کشویی ── */
-.cl-sheet-backdrop { position: fixed; inset: 0; z-index: 54; background: rgba(0, 0, 0, .4); border: 0; }
-.cl-sheet {
-  position: fixed;
-  left: 0;
-  right: 0;
-  z-index: 55;
-  height: 62dvh;
-  display: flex;
-  flex-direction: column;
-  border-radius: 18px 18px 0 0;
-  overflow: hidden;
-  background: var(--room-surface);
-  border: 1px solid var(--room-border);
-  border-bottom: 0;
-  box-shadow: 0 -12px 40px rgba(0, 0, 0, .45);
-  animation: cl-sheet-up .2s ease-out;
-}
-@keyframes cl-sheet-up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
-.cl-sheet-handle { position: relative; flex: none; height: 32px; display: flex; align-items: center; justify-content: center; touch-action: none; cursor: grab; }
-.cl-sheet-grip { width: 40px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .25); }
-.cl-sheet-close { position: absolute; left: 8px; top: 2px; width: 32px; height: 28px; display: flex; align-items: center; justify-content: center; color: var(--room-text-soft); }
-.cl-sheet-body { flex: 1; min-height: 0; }
-
-/* ── منوی «بیشتر» ── */
-.cl-more-backdrop { position: fixed; inset: 0; z-index: 58; background: transparent; border: 0; }
-.cl-more-menu {
-  position: fixed;
-  z-index: 59;
-  left: 10px;
-  bottom: calc(var(--dock-h) + 6px);
-  min-width: 210px;
-  padding: 6px;
-  border-radius: 16px;
-  background: var(--room-surface);
-  border: 1px solid var(--room-border-strong, var(--room-border));
-  box-shadow: 0 16px 44px rgba(0, 0, 0, .5);
-}
-.cl-more-item { width: 100%; height: 46px; padding: 0 12px; display: flex; align-items: center; gap: 12px; border-radius: 12px; font-size: 13px; color: #fff; text-align: right; }
-.cl-more-item:active { background: rgba(255, 255, 255, .08); }
-
-/* ───────────── دسکتاپ / تبلت: نوار می‌شود ستون کنار صحنه ───────────── */
-@media (min-width: 768px) {
-  .cl-root { flex-direction: row; }
-  .cl-strip { flex-direction: column; width: 176px; overflow-x: hidden; overflow-y: auto; }
-  .cl-tile { width: 100%; height: 118px; }
-  .cl-more { width: 100%; height: 64px; }
-}
-
-/* ── PiP تصویر معلم (جابه‌جاشدنی، کوچک/بزرگ) ── */
-.pip-bounds { position: absolute; inset: 0; z-index: 50; pointer-events: none; }
-.has-dock > .pip-bounds { bottom: var(--dock-h, 64px); }
-.dpip {
-  position: absolute;
-  pointer-events: auto;
-  touch-action: none;
-  width: 112px;
-  aspect-ratio: 16 / 10;
-  border-radius: 12px;
-  overflow: hidden;
-  background: #000;
-  border: 2px solid var(--room-blue);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
-  transition: width .18s ease, left .18s ease, right .18s ease, top .18s ease, bottom .18s ease;
-}
-.dpip.is-big { width: min(62vw, 240px); }
-.dpip.is-dragging { opacity: .9; box-shadow: 0 14px 38px rgba(0, 0, 0, .6); }
-.dpip-video { position: absolute; inset: 0; }
-.dpip-video > div { width: 100%; height: 100%; border-radius: 0 !important; }
-.dpip-btn {
-  position: absolute; top: 4px; right: 4px; z-index: 2;
-  width: 26px; height: 26px; border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  color: #fff; background: rgba(8, 15, 27, .7);
-}
-@media (min-width: 768px) {
-  .dpip { width: 176px; }
-  .dpip.is-big { width: 300px; }
-}
-
-
-/* ── حالت عادی کلاس: گرید بزرگ مشابه سمینار ── */
-.cl-root.is-grid-mode {
-  padding: 10px 10px calc(96px + env(safe-area-inset-bottom));
-}
+/* ── حالت ۱: نمایش ویدئو (گرید سمیناری با کارت‌های بزرگ) ── */
+.cl-root.is-grid-mode { flex-direction: column; }
 .cl-grid {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
-  grid-auto-rows: minmax(150px, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr));
+  grid-auto-rows: auto;
   align-content: center;
+  align-content: safe center;
   gap: 12px;
   overflow: auto;
   overscroll-behavior: contain;
 }
 .cl-grid-tile {
   position: relative;
-  min-width: 0;
-  min-height: 150px;
+  width: 100%;
   aspect-ratio: 16 / 9;
+  min-height: 130px;
   overflow: hidden;
   border: 1px solid var(--room-border);
   border-radius: 16px;
   background: #05080e;
 }
-.cl-grid-tile > div { width: 100%; height: 100%; }
+.cl-grid-tile > .vt { border-radius: 15px; }
 
-/* ── حالت محتوای آموزشی: صحنه بزرگ + نوار عمودی تصاویر ── */
-.cl-root.is-content-mode {
-  flex-direction: row;
-  align-items: stretch;
-  gap: 10px;
-  padding: 10px;
-}
-.cl-root.is-content-mode .cl-stage {
+/* ── حالت ۲: محتوای آموزشی (تخته/اشتراک) + ریل مدرس و شرکت‌کنندگان ── */
+.cl-root.is-content-mode { flex-direction: row; }
+.cl-content {
+  position: relative;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--room-border);
+  background: #05080e;
 }
-.cl-root.is-content-mode .cl-strip {
-  flex: 0 0 clamp(120px, 20vw, 190px);
-  width: clamp(120px, 20vw, 190px);
-  min-height: 0;
-  max-height: 100%;
-  flex-direction: column;
-  overflow-x: hidden;
-  overflow-y: auto;
-  padding: 0;
-  border: 0;
-  overscroll-behavior: contain;
-}
-.cl-root.is-content-mode .cl-tile {
-  width: 100%;
-  height: auto;
-  aspect-ratio: 16 / 9;
-}
-.cl-root.is-content-mode .cl-more {
-  width: 100%;
-  min-width: 0;
-  height: 52px;
-  flex-direction: row;
+.cl-content-fill { position: absolute; inset: 0; }
+.cl-content-fill > * { width: 100%; height: 100%; }
+.cl-content-fill .wb-root { border-radius: 14px; }
+.cl-content-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, .35);
+  font-size: 13px;
 }
 
+.cl-rail {
+  flex: 0 0 clamp(150px, 19vw, 224px);
+  width: clamp(150px, 19vw, 224px);
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cl-rail-teacher {
+  flex: 0 0 auto;
+  aspect-ratio: 16 / 10;
+  min-height: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--room-border);
+  background: #05080e;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .28);
+}
+.cl-rail-teacher .vt-card { border: 0; border-radius: 0; }
+.cl-rail-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.cl-rail-item {
+  position: relative;
+  flex: 0 0 auto;
+  aspect-ratio: 16 / 10;
+  min-height: 74px;
+  border-radius: 11px;
+  overflow: hidden;
+  border: 1px solid var(--room-border);
+  background: #05080e;
+}
+.cl-rail-item .vt-card { border: 0; border-radius: 0; }
+.cl-rail-empty {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 12px;
+  border: 1px dashed var(--room-border-strong, rgba(255, 255, 255, .12));
+  color: rgba(255, 255, 255, .35);
+  font-size: 11px;
+}
+
+/* اشتراک صفحه‌ی خودِ معلم: پیش‌نمایش بزرگ + نوار وضعیت پایین (بدون پوشاندن محتوا) */
+.cl-share { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.cl-share-preview { position: relative; flex: 1 1 auto; min-height: 0; }
+.cl-share-preview .vt-card { border: 0; border-radius: 0; }
+.cl-share-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 12px;
+  background: var(--room-surface, #101a2a);
+  border-top: 1px solid var(--room-border);
+}
+.cl-share-title { flex: 1 1 auto; min-width: 0; font-size: 12px; color: var(--room-text-soft, #aab4c5); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-share-stop {
+  position: absolute;
+  top: 12px;
+  inset-inline-end: 12px;
+  z-index: 12;
+  flex: none;
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .35);
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--room-danger, #ff5068);
+}
+
+/* ─────────────────────────────────────────────────────────
+   نوار کنترل باریک پایین (موبایل کلاس)
+   ───────────────────────────────────────────────────────── */
+.cl-dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: center;
+  padding: 7px 10px calc(7px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, rgba(4, 8, 15, .97), rgba(4, 8, 15, .9));
+  border-top: 1px solid var(--room-border);
+  transition: transform .3s cubic-bezier(.22, 1, .36, 1), opacity .3s ease;
+}
+.cl-dock.is-hidden { transform: translateY(calc(100% + 16px)); opacity: 0; pointer-events: none; }
+.cl-dock-inner { display: flex; align-items: center; gap: 5px; width: 100%; max-width: 560px; }
+.cl-dock .room-control { width: 40px; height: 40px; min-width: 40px; border-radius: 12px; }
+.cl-hand {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  height: 40px;
+  padding: 0 8px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #2a1c00;
+  background: var(--room-warning, #f5b84b);
+}
+.cl-hand.is-raised { background: rgba(245, 184, 75, .16); color: var(--room-warning); box-shadow: inset 0 0 0 1px rgba(245, 184, 75, .5); }
+.cl-btn-badge {
+  position: absolute;
+  top: -4px;
+  inset-inline-start: -4px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--room-blue, #4d7dff);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.cl-btn-badge.is-warn { background: var(--room-warning, #f5b84b); color: #2a1c00; }
+.cl-dock-peek {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  width: 56px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, .75);
+  background: rgba(10, 16, 28, .9);
+  border: 1px solid var(--room-border-strong, rgba(255, 255, 255, .12));
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+}
+
+/* ── منوی «بیشتر» نوار کنترل ── */
+.cl-more-backdrop { position: fixed; inset: 0; z-index: 58; background: transparent; border: 0; }
+.cl-more-menu {
+  position: fixed;
+  z-index: 61;
+  inset-inline-start: 10px;
+  bottom: calc(var(--dock-h) + 6px);
+  min-width: 216px;
+  padding: 6px;
+  border-radius: 16px;
+  background: var(--room-surface, #101a2a);
+  border: 1px solid var(--room-border-strong, rgba(255, 255, 255, .12));
+  box-shadow: 0 16px 44px rgba(0, 0, 0, .5);
+}
+.cl-more-item { width: 100%; height: 46px; padding: 0 12px; display: flex; align-items: center; gap: 12px; border-radius: 12px; font-size: 13px; color: #fff; text-align: start; }
+.cl-more-item:active { background: rgba(255, 255, 255, .08); }
+
+/* ─────────────────────────────────────────────────────────
+   Bottom Sheet گفتگو و شرکت‌کنندگان (موبایل کلاس)
+   ───────────────────────────────────────────────────────── */
+.cl-sheet-backdrop { position: fixed; inset: 0; z-index: 70; background: rgba(2, 6, 14, .55); border: 0; animation: room-backdrop .25s ease both; }
+.cl-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 72;
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--room-surface, #101a2a);
+  border: 1px solid var(--room-border-strong, rgba(255, 255, 255, .12));
+  box-shadow: 0 -12px 44px rgba(0, 0, 0, .5);
+  animation: cl-sheet-up .22s cubic-bezier(.22, 1, .36, 1);
+}
+@keyframes cl-sheet-up { from { transform: translateY(28px); opacity: 0; } to { transform: none; opacity: 1; } }
+.cl-sheet-handle {
+  position: relative;
+  flex: none;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  cursor: grab;
+  border-bottom: 1px solid var(--room-border);
+}
+.cl-sheet-grip { position: absolute; top: 7px; left: 50%; transform: translateX(-50%); width: 44px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .22); }
+.cl-sheet-title { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; font-weight: 700; color: #fff; }
+.cl-sheet-close {
+  position: absolute;
+  inset-inline-end: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  color: var(--room-text-soft, #aab4c5);
+  background: rgba(255, 255, 255, .05);
+}
+.cl-sheet-close:hover { color: #fff; background: rgba(255, 255, 255, .1); }
+.cl-sheet-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.cl-sheet-body > * { flex: 1 1 auto; min-height: 0; }
+
+/* ─────────────────────────────────────────────────────────
+   اعلان «درخواست اجازه صحبت» (مدرس)
+   ───────────────────────────────────────────────────────── */
+.cl-hand-alert-anchor {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 64;
+  width: min(94%, 430px);
+  pointer-events: none;
+}
+.cl-hand-alert {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(9, 15, 27, .94);
+  border: 1px solid rgba(245, 184, 75, .45);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, .45);
+  backdrop-filter: blur(8px);
+  animation: cl-alert-in .26s cubic-bezier(.22, 1, .36, 1);
+}
+@keyframes cl-alert-in { from { transform: translateY(-10px); opacity: 0; } to { transform: none; opacity: 1; } }
+.cl-hand-alert-icon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: rgba(245, 184, 75, .16);
+  color: var(--room-warning, #f5b84b);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cl-hand-alert-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.cl-hand-alert-body strong { font-size: 12px; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-hand-alert-body > span { font-size: 10.5px; color: rgba(255, 255, 255, .55); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-hand-alert-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.cl-hand-alert-view {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 9px;
+  background: var(--room-warning, #f5b84b);
+  color: #2a1c00;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.cl-hand-alert-view:hover { filter: brightness(1.08); }
+.cl-hand-alert-deny {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .07);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.cl-hand-alert-deny:hover { background: rgba(255, 255, 255, .12); }
+
+/* ─────────────────────────────────────────────────────────
+   راهنمای چرخاندن گوشی
+   ───────────────────────────────────────────────────────── */
+.cl-rotate-hint {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: linear-gradient(90deg, rgba(77, 125, 255, .2), rgba(77, 125, 255, .05));
+  border-bottom: 1px solid rgba(77, 125, 255, .35);
+  z-index: 65;
+}
+.cl-rotate-hint-icon {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: rgba(77, 125, 255, .18);
+  color: #9db7ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: cl-rotate-wiggle 2.6s ease-in-out infinite;
+}
+@keyframes cl-rotate-wiggle { 0%, 100% { transform: rotate(0); } 35% { transform: rotate(-14deg); } 70% { transform: rotate(80deg); } }
+.cl-rotate-hint-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.cl-rotate-hint-text strong { font-size: 12.5px; color: #fff; }
+.cl-rotate-hint-text span { font-size: 10.5px; color: rgba(255, 255, 255, .62); }
+.cl-rotate-hint-fs {
+  flex: none;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 9px;
+  background: var(--room-blue, #4d7dff);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.cl-rotate-hint-fs:hover { filter: brightness(1.1); }
+.cl-rotate-hint-close {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, .5);
+}
+.cl-rotate-hint-close:hover { color: #fff; background: rgba(255, 255, 255, .08); }
+
+/* ─────────────────────────────────────────────────────────
+   موبایل — ابعاد فشرده‌تر؛ چرخش مجازی Landscape
+   ───────────────────────────────────────────────────────── */
 @media (max-width: 767px) {
-  .cl-root.is-grid-mode {
-    padding: 8px 8px calc(78px + env(safe-area-inset-bottom));
-    gap: 8px;
-  }
-  .cl-grid {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
-    grid-auto-rows: minmax(120px, auto);
-    gap: 9px;
-    align-content: start;
-  }
-  .cl-grid-tile {
-    min-height: 120px;
-    border-radius: 13px;
-  }
-  .cl-root.is-content-mode {
-    flex-direction: row;
-    padding: 7px;
-    gap: 7px;
-  }
-  .cl-root.is-content-mode .cl-stage {
-    flex: 1 1 0;
-    min-width: 0;
+  .cl-root { gap: 6px; padding: 6px; padding-bottom: calc(var(--dock-h) + 6px); }
+
+  .cl-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 185px), 1fr)); gap: 8px; }
+  .cl-grid-tile { min-height: 104px; border-radius: 13px; }
+
+  .cl-root.is-content-mode { gap: 6px; }
+  .cl-content { border-radius: 12px; }
+  .cl-content-fill .wb-root { border-radius: 12px; }
+  .cl-rail { flex-basis: clamp(104px, 24vw, 148px); width: clamp(104px, 24vw, 148px); gap: 6px; }
+  .cl-rail-teacher { border-radius: 11px; }
+  .cl-rail-list { gap: 6px; }
+  .cl-rail-item { min-height: 0; border-radius: 9px; }
+
+  /* چرخش مجازی: حتی با گوشی عمودی، محیط کلاس افقی دیده می‌شود.
+     ابعاد از visualViewport می‌آید (کیبورد و تغییر جهت را پوشش می‌دهد).
+     min-height قاعده‌ی عمومی موبایل باید خنثی شود وگرنه محیط چرخیده کش می‌آید. */
+  .room-shell[data-fl="1"] {
+    inset: auto;
+    top: 0;
+    left: calc(100vw + var(--fl-top, 0px));
+    width: var(--fl-h, 100dvh);
+    height: var(--fl-w, 100vw);
     min-height: 0;
-    border-radius: 12px;
-    border: 1px solid var(--room-border);
+    min-width: 0;
+    transform: rotate(90deg);
+    transform-origin: top left;
   }
-  .cl-root.is-content-mode .cl-strip {
-    flex: 0 0 clamp(104px, 23vw, 160px);
-    width: clamp(104px, 23vw, 160px);
-    gap: 7px;
-  }
-  .cl-root.is-content-mode .cl-tile {
-    flex: 0 0 auto;
-    width: 100%;
-    height: auto;
-    aspect-ratio: 16 / 9;
-    border-radius: 9px;
-  }
-  .cl-root.is-content-mode .cl-more {
-    flex: 0 0 42px;
-    height: 42px;
-    font-size: 10px;
-  }
-  .cl-root.is-content-mode .cl-pip {
-    width: clamp(100px, 18vw, 140px);
-    height: auto;
-    aspect-ratio: 16 / 9;
-  }
+  /* در حالت چرخیده، لبه‌ی راستِ محیط = لبه‌ی فیزیکی پایین گوشی (home indicator) */
+  .room-shell[data-fl="1"] .cl-dock { padding: 7px calc(10px + env(safe-area-inset-bottom)) 7px 10px; }
+  .room-shell[data-fl="1"] { --dock-h: 54px; }
+}
+
+/* دسکتاپ/تبلت: ریل کمی پهن‌تر و فهرست اسکرول‌پذیر */
+@media (min-width: 768px) {
+  .cl-rail-item { min-height: 84px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cl-sheet, .cl-hand-alert, .cl-rotate-hint-icon { animation: none !important; }
+  .cl-dock { transition: none !important; }
 }
