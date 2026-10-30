@@ -1,18 +1,20 @@
 import { memo, useState } from 'react'
-import { MessageSquare, Mic, MicOff, MonitorUp, PhoneOff, Settings, Users, Video, VideoOff, MoreHorizontal, Hand, UserCheck, PenTool, X } from 'lucide-react'
+import { Copy, MessageSquare, Mic, MicOff, MonitorUp, PhoneOff, Settings, Users, Video, VideoOff, MoreHorizontal, Hand, UserCheck, PenTool, X } from 'lucide-react'
 import { selectActivePanelTab, selectIsPanelOpen, selectUnreadCount } from '../store/meeting-selectors'
 import { useMeetingStore } from '../store/meeting-store'
 
 /**
  * نوار کنترل جلسه.
  *
- * حالت docked (موبایلِ کلاس): نوار باریک ثابت پایین با dvh و safe-area.
+ * حالت docked (موبایلِ کلاس):
+ *  • rail=false → نوار باریک افقی پایین (چیدمان عمودی) با dvh و safe-area
+ *  • rail=true  → ریل عمودی دکمه‌ها روی لبه (چیدمان افقی — مطابق طرح مرجع)
  *  • دکمه‌های اصلی (میکروفون، دوربین، گفتگو، شرکت‌کنندگان، خروج) همیشه در دسترس‌اند
- *  • امکانات کم‌کاربردتر (اشتراک صفحه، حضور و غیاب، تخته، تنظیمات) در منوی «بیشتر»
+ *  • امکانات کم‌کاربردتر (اشتراک صفحه، حضور و غیاب، تخته، کپی لینک، تنظیمات) در منوی «بیشتر»
  *  • بج گفتگو = پیام‌های خوانده‌نشده؛ بج شرکت‌کنندگان = درخواست‌های در انتظار
  *  • با فعال‌بودن تخته/اشتراک می‌تواند خودکار جمع شود و با لمس صفحه برگردد
  */
-export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isVideoMuted, isScreenSharing, onToggleAudio, onToggleVideo, onToggleScreenShare, onLeave, canChat = true, canParticipants = true, canScreenShare = true, showHand = false, isHandRaised = false, onToggleHand, showMic = true, showCamera = true, showAttendance = false, onOpenAttendance, docked = false, showSettings = true, chatOpen = false, onToggleChat, participantsOpen = false, onToggleParticipants, participantsCount = 0, pendingRequests = 0, dockVisible = true, whiteboardAction = null }) {
+export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isVideoMuted, isScreenSharing, onToggleAudio, onToggleVideo, onToggleScreenShare, onLeave, canChat = true, canParticipants = true, canScreenShare = true, showHand = false, isHandRaised = false, onToggleHand, showMic = true, showCamera = true, showAttendance = false, onOpenAttendance, docked = false, rail = false, showSettings = true, chatOpen = false, onToggleChat, participantsOpen = false, onToggleParticipants, participantsCount = 0, pendingRequests = 0, dockVisible = true, whiteboardAction = null, copyAction = null }) {
   const unreadCount = useMeetingStore(selectUnreadCount)
   const activeTab = useMeetingStore(selectActivePanelTab)
   const isPanelOpen = useMeetingStore(selectIsPanelOpen)
@@ -21,13 +23,45 @@ export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isV
 
   const [moreOpen, setMoreOpen] = useState(false)
 
-  if (docked) {
-    // موبایلِ کلاس: دکمه‌های اصلی همیشه پیدا هستند؛
-    // بقیه (اشتراک صفحه، حضور و غیاب، تخته، تنظیمات) داخل «بیشتر» می‌روند.
+  if (docked && rail) {
+    // چیدمان افقی موبایل: ریل عمودی دکمه‌ها روی لبه‌ی شروع (راست در RTL)
     const moreItems = [
       canScreenShare && { key: 'share', label: isScreenSharing ? 'توقف اشتراک صفحه' : 'اشتراک‌گذاری صفحه', icon: <MonitorUp size={19} />, onClick: onToggleScreenShare },
       whiteboardAction && { key: 'whiteboard', label: whiteboardAction.label, icon: <PenTool size={19} />, onClick: whiteboardAction.onClick },
       showAttendance && { key: 'attendance', label: 'حضور و غیاب', icon: <UserCheck size={19} />, onClick: onOpenAttendance },
+      copyAction && { key: 'copy', label: copyAction.label, icon: <Copy size={19} />, onClick: copyAction.onClick },
+      showSettings && { key: 'settings', label: 'تنظیمات', icon: <Settings size={19} />, onClick: openSettings },
+    ].filter(Boolean)
+    const runMore = (fn) => () => { setMoreOpen(false); fn?.() }
+    const participantsBadge = pendingRequests > 0 ? pendingRequests : participantsCount
+
+    return <>
+      {moreOpen && <button type="button" aria-label="بستن" className="cl-more-backdrop" onClick={() => setMoreOpen(false)} />}
+      {moreOpen && <div className="cl-more-menu is-rail" role="menu">
+        {moreItems.map((it) => <button key={it.key} type="button" role="menuitem" className="cl-more-item" onClick={runMore(it.onClick)}>{it.icon}<span>{it.label}</span></button>)}
+      </div>}
+      <div className={`cl-actions ${dockVisible ? '' : 'is-hidden'}`} role="toolbar" aria-label="کنترل‌های کلاس">
+        {showHand && <button type="button" onClick={onToggleHand} className={`cl-actions-hand ${isHandRaised ? 'is-raised' : ''}`} aria-label={isHandRaised ? 'پایین‌آوردن دست' : 'بلندکردن دست'} title={isHandRaised ? 'پایین‌آوردن دست' : 'بلندکردن دست'}>
+          <Hand size={19} />
+        </button>}
+        {showMic && <ControlButton active={!isAudioMuted} off={isAudioMuted} onClick={onToggleAudio} label="میکروفون" icon={isAudioMuted ? <MicOff size={18} /> : <Mic size={18} />} />}
+        {showCamera && <ControlButton active={!isVideoMuted} off={isVideoMuted} onClick={onToggleVideo} label="دوربین" icon={isVideoMuted ? <VideoOff size={18} /> : <Video size={18} />} />}
+        {canChat && <ControlButton active={chatOpen} onClick={onToggleChat} label="گفتگو" icon={<MessageSquare size={18} />} badge={chatOpen ? 0 : unreadCount} />}
+        {canParticipants && <ControlButton active={participantsOpen} onClick={onToggleParticipants} label="شرکت‌کنندگان" icon={<Users size={18} />} badge={participantsOpen ? 0 : participantsBadge} badgeTone={pendingRequests > 0 ? 'warn' : 'default'} />}
+        {moreItems.length > 0 && <ControlButton active={moreOpen} onClick={() => setMoreOpen((v) => !v)} label="بیشتر" icon={moreOpen ? <X size={18} /> : <MoreHorizontal size={18} />} />}
+        <ControlButton danger onClick={onLeave} label="خروج" icon={<PhoneOff size={18} />} />
+      </div>
+    </>
+  }
+
+  if (docked) {
+    // چیدمان عمودی موبایل: دکمه‌های اصلی همیشه پیدا هستند؛
+    // بقیه (اشتراک صفحه، حضور و غیاب، تخته، کپی لینک، تنظیمات) داخل «بیشتر» می‌روند.
+    const moreItems = [
+      canScreenShare && { key: 'share', label: isScreenSharing ? 'توقف اشتراک صفحه' : 'اشتراک‌گذاری صفحه', icon: <MonitorUp size={19} />, onClick: onToggleScreenShare },
+      whiteboardAction && { key: 'whiteboard', label: whiteboardAction.label, icon: <PenTool size={19} />, onClick: whiteboardAction.onClick },
+      showAttendance && { key: 'attendance', label: 'حضور و غیاب', icon: <UserCheck size={19} />, onClick: onOpenAttendance },
+      copyAction && { key: 'copy', label: copyAction.label, icon: <Copy size={19} />, onClick: copyAction.onClick },
       showSettings && { key: 'settings', label: 'تنظیمات', icon: <Settings size={19} />, onClick: openSettings },
     ].filter(Boolean)
     const runMore = (fn) => () => { setMoreOpen(false); fn?.() }

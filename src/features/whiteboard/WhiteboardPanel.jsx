@@ -222,6 +222,9 @@ export default function WhiteboardPanel({ onClose, initialObjects = [], onObject
       </header>
 
       <div className="wb-toolbar" role="toolbar" aria-label="ابزارهای تخته" ref={toolbarRef}>
+        {isHost && onClose && (
+          <button type="button" className="wb-icon-action wb-tb-close" onClick={onClose} title="بستن تخته برای کلاس" aria-label="بستن تخته"><X size={16} /></button>
+        )}
         {!readOnly && (
           <>
             <div className="wb-tool-group">

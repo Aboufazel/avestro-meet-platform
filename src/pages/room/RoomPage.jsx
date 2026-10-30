@@ -19,9 +19,8 @@ import { useMediaQuery } from '../../features/meeting/hooks/useMediaQuery'
 import { ClassLayout } from '../../features/meeting/components/ClassLayout'
 import { useParticipants } from '../../features/meeting/hooks/useParticipants'
 import { ClassAccessContext } from '../../features/meeting/ClassAccessContext'
-import { PenTool, RotateCw, X } from 'lucide-react'
+import { PenTool } from 'lucide-react'
 import WhiteboardPanel from '../../features/whiteboard/WhiteboardPanel'
-import { useForcedLandscape } from '../../features/meeting/hooks/useForcedLandscape'
 import { useHandRaiseAlerts } from '../../features/meeting/hooks/useHandRaiseAlerts'
 import { MobileClassSheets, DockPeek } from '../../features/meeting/components/MobileClassSheets'
 import { HandRaiseAlert } from '../../features/meeting/components/HandRaiseAlert'
@@ -64,9 +63,9 @@ export default function RoomPage() {
   const hasActiveScreenShare = isScreenSharing || participants.some((participant) => participant.isScreenSharing)
   const classContentMode = classLayout && (whiteboardOpen || hasActiveScreenShare)
   const mobileClass = classLayout && !isDesktop
-
-  // ───── چرخش کنترل‌شده‌ی محیط کلاس در موبایل (Landscape مجازی) ─────
-  const { active: forcedLandscape, attrs: forcedLandscapeAttrs, requestNativeLandscape } = useForcedLandscape({ enabled: classLayout })
+  // جهت واقعی گوشی: هر دو چیدمان (عمودی انباشته / افقی با ریل عمودی) کامل و کاربردی‌اند
+  const isPortrait = useMediaQuery('(orientation: portrait)')
+  const portraitClass = mobileClass && isPortrait
 
   // با فعال‌شدن تخته یا اشتراک صفحه، پنل‌ها پیش‌فرض بسته باشند
   useEffect(() => {
@@ -189,20 +188,9 @@ export default function RoomPage() {
     dismissHandAlert(alert.id)
   }, [access, dismissHandAlert])
 
-  // ───── راهنمای چرخاندن گوشی ─────
-  const [rotateHintDismissed, setRotateHintDismissed] = useState(() => {
-    try { return window.sessionStorage.getItem('avestro-rotate-hint') === '1' } catch { return false }
-  })
-  const showRotateHint = forcedLandscape && !rotateHintDismissed
-  const dismissRotateHint = () => {
-    setRotateHintDismissed(true)
-    try { window.sessionStorage.setItem('avestro-rotate-hint', '1') } catch { /* حافظه در دسترس نیست */ }
-  }
-
-  // ───── گیت اجباری ورود کلاس آنلاین: «گوشی را افقی قرار بده» (فقط کلاس، نه سمینار) ─────
+  // ───── گیت ورود کلاس آنلاین: «گوشی را افقی قرار بده» (فقط کلاس، نه سمینار) ─────
   const isTouchDevice = useMediaQuery('(hover: none) and (pointer: coarse)')
-  // تنها کلید عبور از گیت: چرخاندن واقعی گوشی. اگر گوشی از ابتدا افقی باشد یا
-  // کاربر آن را بچرخاند، گیت برای همیشه در این نشست باز می‌شود؛ هیچ راه دیگری نیست.
+  // به‌محض افقی‌شدن گوشی (یا اگر از ابتدا افقی باشد) گیت باز می‌شود
   const [rotateGatePassed, setRotateGatePassed] = useState(() => {
     try { return window.matchMedia('(orientation: landscape)').matches } catch { return false }
   })
@@ -213,12 +201,15 @@ export default function RoomPage() {
     return () => mql.removeEventListener?.('change', onChange)
   }, [])
 
-  // فقط کلاس آنلاین: موبایل لمسی + گوشی عمودی + هنوز نچرخیده → تا نچرخد چیزی نمایش داده نمی‌شود
-  const showRotateGate = classLayout && forcedLandscape && isTouchDevice && !rotateGatePassed
+  // فقط کلاس آنلاین: موبایل لمسی + گوشی عمودی + هنوز نچرخیده
+  // استثنا: «ادامه با حالت عمودی» — چون چیدمان عمودی هم کامل و کاربردی است
+  const showRotateGate = classLayout && portraitClass && isTouchDevice && !rotateGatePassed
+  const passRotateGate = useCallback(() => setRotateGatePassed(true), [])
 
-  // ───── جمع‌شدن خودکار نوار کنترل وقتی کاربر مدتی تعامل نکرده (فقط حالت محتوا) ─────
+  // ───── جمع‌شدن خودکار داک در چیدمان عمودی وقتی کاربر مدتی تعامل نکرده (فقط حالت محتوا) ─────
+  // در چیدمان افقی ریل عمودی همیشه پیدا است و جمع نمی‌شود.
   // dockShown در رندر مشتق می‌شود تا با تغییر حالت، نوار بدون تأخیر برگردد.
-  const dockAutoHide = Boolean(mobileClass && classContentMode && !mobileSheet)
+  const dockAutoHide = Boolean(portraitClass && classContentMode && !mobileSheet)
   const [dockIdleHidden, setDockIdleHidden] = useState(false)
   const dockShown = !dockAutoHide || !dockIdleHidden
   useEffect(() => {
@@ -236,7 +227,7 @@ export default function RoomPage() {
     }
   }, [dockAutoHide])
 
-  const rotateGate = showRotateGate ? <RotateDeviceGate /> : null
+  const rotateGate = showRotateGate ? <RotateDeviceGate onContinue={passRotateGate} /> : null
 
   if (isConnecting && !isReconnecting) return <div className="fixed inset-0 room-shell text-white"><MeetingLoading />{rotateGate}</div>
   if (error && !isReconnecting) return <div className="fixed inset-0 room-shell text-white"><MeetingError error={error} onLeave={leave} /></div>
@@ -260,23 +251,10 @@ export default function RoomPage() {
 
   return (
     <ClassAccessContext.Provider value={access}>
-    {/* گیت ورود کلاس — بیرون از room-shell تا تحت چرخش مجازی قرار نگیرد */}
+    {/* گیت ورود کلاس */}
     {rotateGate}
-    <div dir="rtl" {...forcedLandscapeAttrs} className={`room-shell fixed inset-0 overflow-hidden flex flex-col text-white room-enter ${classContentMode ? 'room-class-content-mode' : ''}`}>
-      <RoomHeader canRecord={canRecord} slug={roomName} isConnected={isConnected} onCopyLink={handleCopyLink} isMeetingMuted={isMeetingMuted} onToggleMeetingMute={toggleMeetingMute} isRecording={isRecording} recordingSeconds={recordingSeconds} onToggleRecording={handleToggleRecording} isVoiceRecording={isVoiceRecording} voiceRecordingSeconds={voiceRecordingSeconds} onToggleVoiceRecording={handleToggleVoiceRecording} />
-
-      {/* راهنمای چرخاندن گوشی — وقتی محیط کلاس افقی شده ولی گوشی هنوز عمودی است */}
-      {showRotateHint && (
-        <div className="cl-rotate-hint" role="status" aria-live="polite">
-          <span className="cl-rotate-hint-icon"><RotateCw size={18} /></span>
-          <div className="cl-rotate-hint-text">
-            <strong>محیط کلاس افقی شده است</strong>
-            <span>برای تجربه‌ی بهتر، گوشی را هم بچرخانید</span>
-          </div>
-          <button type="button" className="cl-rotate-hint-fs" onClick={requestNativeLandscape}>حالت تمام‌صفحه</button>
-          <button type="button" className="cl-rotate-hint-close" onClick={dismissRotateHint} aria-label="بستن راهنما"><X size={15} /></button>
-        </div>
-      )}
+    <div dir="rtl" className={`room-shell fixed inset-0 overflow-hidden flex flex-col text-white room-enter ${classContentMode ? 'room-class-content-mode' : ''}`}>
+      <RoomHeader compact={mobileClass} canRecord={canRecord} slug={roomName} isConnected={isConnected} onCopyLink={handleCopyLink} isMeetingMuted={isMeetingMuted} onToggleMeetingMute={toggleMeetingMute} isRecording={isRecording} recordingSeconds={recordingSeconds} onToggleRecording={handleToggleRecording} isVoiceRecording={isVoiceRecording} voiceRecordingSeconds={voiceRecordingSeconds} onToggleVoiceRecording={handleToggleVoiceRecording} />
 
       <div className="flex-1 min-h-0 relative">
         <div className={`absolute inset-0 ${classLayout && !isDesktop ? 'p-0' : 'p-2 sm:p-3 lg:p-4'}`}>
@@ -285,7 +263,7 @@ export default function RoomPage() {
             <main className={`relative flex-1 min-w-0 min-h-0 room-surface overflow-hidden ${classLayout && !isDesktop ? '' : 'rounded-[20px] border room-border room-panel-shadow'}`}>
               <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_42%,rgba(77,125,255,.08),transparent_34%)]" />
               {classLayout
-                ? <ClassLayout contentMode={classContentMode} whiteboardSlot={whiteboardSlot} onStopShare={toggleScreenShare} />
+                ? <ClassLayout portrait={portraitClass} contentMode={classContentMode} whiteboardSlot={whiteboardSlot} onStopShare={toggleScreenShare} />
                 : <VideoGrid />}
 
               {canWhiteboard && isHostRole && !whiteboardOpen && <button type="button" onClick={openWhiteboard} className="absolute top-3 right-3 z-30 flex items-center gap-2 rounded-xl border room-border bg-[var(--room-surface)]/95 px-3 py-2 text-xs text-white shadow-lg transition hover:bg-[var(--room-elevated)]" aria-label="بازکردن تخته تعاملی"><PenTool size={16} /><span>تخته تعاملی</span></button>}
@@ -323,7 +301,9 @@ export default function RoomPage() {
                 showAttendance={canAttendance}
                 onOpenAttendance={() => setAttendanceOpen(true)}
                 docked={mobileClass}
-                dockVisible={dockShown}
+                rail={mobileClass && !isPortrait}
+                dockVisible={portraitClass ? dockShown : true}
+                copyAction={{ label: 'کپی لینک کلاس', onClick: handleCopyLink }}
                 chatOpen={mobileSheet === 'chat'}
                 onToggleChat={() => openMobileSheet('chat')}
                 participantsOpen={mobileSheet === 'participants'}
@@ -346,7 +326,7 @@ export default function RoomPage() {
             onOpenAttendance={canAttendance ? () => setAttendanceOpen(true) : undefined}
           />
         )}
-        {dockAutoHide && !dockShown && <DockPeek onShow={() => setDockIdleHidden(false)} />}
+        {portraitClass && dockAutoHide && !dockShown && <DockPeek onShow={() => setDockIdleHidden(false)} />}
         <SettingsModal />
         {canAttendance && <AttendanceModal slug={roomName} open={attendanceOpen} onClose={() => setAttendanceOpen(false)} />}
       </div>
