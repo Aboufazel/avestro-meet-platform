@@ -91,3 +91,13 @@
   .wb-confirm-modal p{font-size:10px;margin-bottom:14px}
   .wb-modal-actions button{min-height:35px;font-size:10px}
 }
+
+/* تداخل نوار ثبت متن با پنجره‌ی شناور مدرس (cl-pip) در چیدمان عمودی موبایل:
+   هر دو پایینِ بوم بودند و pip (z-index:40) روی نوار (z-index:30) می‌افتاد.
+   راه‌حل: در حالت is-stacked نوار به بالای بوم می‌رود — هم از پنجره‌ی مدرس و
+   داک پایین دور است، هم با بازشدن کیبورد موبایل همچنان دیده می‌شود. */
+.cl-root.is-stacked .wb-text-bar {
+  top: 8px;
+  bottom: auto;
+  z-index: 45; /* بالاتر از z-index پنجره‌ی مدرس (۴۰) */
+}

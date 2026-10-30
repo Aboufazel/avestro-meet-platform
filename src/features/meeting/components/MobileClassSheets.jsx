@@ -28,7 +28,12 @@ export function MobileClassSheets({ openTab, onClose, canControl = false, onOpen
     return () => useMeetingStore.setState({ isChatOpen: false })
   }, [openTab])
 
+  // باگ قبلی: pointerdown روی دکمه‌ی ✕ هم به handle می‌رسید و setPointerCapture
+  // والد، رویداد click را به خودِ handle بازنشانی می‌کرد؛ نتیجه: onClick دکمه
+  // هرگز اجرا نمی‌شد و پنل فقط با کشیدن به پایین بسته می‌شد.
+  // راه‌حل: pointerdownی که از دکمه‌ها شروع می‌شود اصلاً به منطق درگ نمی‌رسد.
   const onDown = useCallback((e) => {
+    if (e.target.closest?.('button')) return // دکمه‌ها (مثل ✕) نباید درگ را فعال کنند
     startY.current = e.clientY
     e.currentTarget.setPointerCapture?.(e.pointerId)
   }, [])
@@ -62,7 +67,7 @@ export function MobileClassSheets({ openTab, onClose, canControl = false, onOpen
           <span className="cl-sheet-title">
             {openTab === 'chat' ? 'گفت‌وگو' : 'شرکت‌کنندگان'}
           </span>
-          <button type="button" className="cl-sheet-close" onClick={onClose} aria-label="بستن">✕</button>
+          <button type="button" className="cl-sheet-close" onClick={onClose} onPointerDown={(e) => e.stopPropagation()} aria-label="بستن">✕</button>
         </div>
         <div className="cl-sheet-body">
           {openTab === 'chat'
