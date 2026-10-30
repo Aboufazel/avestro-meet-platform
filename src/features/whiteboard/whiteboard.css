@@ -16,3 +16,32 @@
 @keyframes wb-fade-in{from{opacity:0}to{opacity:1}}@keyframes wb-modal-in{from{opacity:0;transform:translateY(5px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
 @media(max-width:520px){.wb-confirm-modal{width:min(100%,310px);padding:20px 16px 15px;border-radius:16px}.wb-confirm-icon{width:38px;height:38px;margin-bottom:10px}.wb-confirm-modal h2{font-size:13px}.wb-confirm-modal p{font-size:10px;margin-bottom:14px}.wb-modal-actions button{min-height:35px;font-size:10px}}
 
+
+/* تجربه‌ی تخته روی موبایل: نوار ابزار یک‌ردیفه و بوم در اولویت فضا */
+.wb-text-backdrop{position:absolute;inset:0;z-index:90;display:grid;place-items:center;padding:14px;background:rgba(15,23,42,.38);backdrop-filter:blur(3px)}
+.wb-text-dialog{width:min(100%,360px);padding:16px;border:1px solid #e3e9f2;border-radius:16px;background:#fff;box-shadow:0 18px 48px rgba(15,23,42,.22)}
+.wb-text-dialog-heading{display:flex;align-items:center;gap:8px;margin-bottom:12px;color:#263653;font-size:13px}
+.wb-text-dialog-heading svg{color:#4269d9}
+.wb-text-dialog input{width:100%;height:42px;padding:0 12px;border:1px solid #dce4ef;border-radius:10px;outline:none;color:#172033;background:#fbfcfe;font:inherit;font-size:13px}
+.wb-text-dialog input:focus{border-color:#7895ef;box-shadow:0 0 0 3px rgba(82,120,237,.12)}
+.wb-text-dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.wb-text-dialog-actions button{min-height:36px;padding:0 13px;border:1px solid #e1e7ef;border-radius:9px;background:#fff;color:#58677e;font:inherit;font-size:11px;font-weight:700}
+.wb-text-dialog-actions button[type=submit]{border-color:#4269d9;background:#4269d9;color:#fff}
+.wb-text-dialog-actions button:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:760px){
+  .wb-root{border:0;box-shadow:none}
+  .wb-header{height:38px;min-height:38px;padding:0 8px;gap:6px}
+  .wb-heading{gap:6px}.wb-heading-icon{width:25px;height:25px;border-radius:8px}.wb-heading-icon svg{width:14px;height:14px}.wb-heading strong{font-size:11px}.wb-heading small{display:none}
+  .wb-header-actions{gap:5px}.wb-close{height:27px;padding:0 7px;border-radius:8px;font-size:9px}.wb-close svg{width:13px;height:13px}
+  .wb-toolbar{flex:none;flex-wrap:nowrap;gap:6px;height:42px;max-height:42px;min-height:42px;padding:4px 7px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;white-space:nowrap}
+  .wb-toolbar::-webkit-scrollbar{display:none}.wb-tool-group{flex:none;flex-wrap:nowrap;gap:2px}.wb-tool{flex:none;width:34px;height:32px;justify-content:center;padding:0;border-radius:8px}.wb-tool span{display:none}.wb-tool svg{width:17px;height:17px}
+  .wb-tool-divider{height:24px}.wb-colors{flex:none;gap:6px}.wb-color{width:16px;height:16px}.wb-width-control{flex:none;gap:4px;font-size:9px}.wb-width-control input{width:48px}
+  .wb-icon-action{flex:none;width:29px;height:29px}.wb-workspace{flex:1 1 0;min-height:0;padding:4px}.wb-canvas-wrap{min-height:0;border-radius:8px}.wb-canvas-status,.wb-footer{display:none}.wb-zoom-controls{left:6px;bottom:6px;padding:3px;border-radius:9px}.wb-zoom-controls button{width:25px;height:24px;font-size:16px}.wb-zoom-controls span{min-width:34px;font-size:9px}.wb-empty-hint{gap:5px;width:70%}.wb-empty-hint span{width:30px;height:30px}.wb-empty-hint strong{font-size:11px}.wb-empty-hint small{font-size:9px;line-height:1.6}
+  .wb-text-dialog{width:min(100%,320px);padding:13px;border-radius:13px}.wb-text-dialog input{height:39px;font-size:12px}
+}
+/* در نمایش افقیِ شبیه‌سازی‌شده، حتی در گوشی عمودی نیز ارتفاع واقعی تخته حفظ شود. */
+@media(max-width:760px) and (orientation:portrait){
+  .room-shell.room-class-content-mode .wb-header{height:34px;min-height:34px}
+  .room-shell.room-class-content-mode .wb-toolbar{height:38px;min-height:38px;max-height:38px}
+  .room-shell.room-class-content-mode .wb-workspace{padding:3px}
+}

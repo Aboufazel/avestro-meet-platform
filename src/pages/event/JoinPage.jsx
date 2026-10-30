@@ -13,6 +13,10 @@ import { useRoom } from '../../hooks/useRooms'
 import { appRoutes } from '../../routes/appRoutes'
 
 const guestSchema = yup.object({ guest_name: yup.string().required('نام الزامی است').min(2, 'حداقل ۲ کاراکتر') })
+const classGuestSchema = yup.object({
+  guest_first_name: yup.string().trim().required('نام الزامی است').min(2, 'نام باید حداقل ۲ کاراکتر باشد'),
+  guest_last_name: yup.string().trim().required('نام خانوادگی الزامی است').min(2, 'نام خانوادگی باید حداقل ۲ کاراکتر باشد'),
+})
 const statusConfig = {
   live: { label: 'در جریان', dot: 'bg-[#54d9b0]', tone: 'text-[#239c79]', bg: 'bg-[#e8faf4]' },
   scheduled: { label: 'زمان‌بندی شده', dot: 'bg-[#4f7cff]', tone: 'text-[#4f7cff]', bg: 'bg-[#edf2ff]' },
@@ -25,10 +29,20 @@ export default function JoinPage() {
   const { token, user } = useAuthStore()
   const [mode, setMode] = useState(token ? 'select' : 'guest')
   const { data: room, isLoading, isError } = useRoom(slug)
-  const { register, handleSubmit, formState: { errors } } = useForm({ resolver: yupResolver(guestSchema) })
+  const isEducationalClass = room?.kind === 'class'
+  const { register, handleSubmit, formState: { errors } } = useForm({
+    resolver: yupResolver(isEducationalClass ? classGuestSchema : guestSchema),
+    shouldUnregister: true,
+  })
 
   const handleJoinAsUser = () => navigate(`/room/${slug}`)
-  const handleJoinAsGuest = (data) => { sessionStorage.setItem('guest_name', data.guest_name); navigate(`/room/${slug}`) }
+  const handleJoinAsGuest = (data) => {
+    const guestName = isEducationalClass
+      ? `${data.guest_first_name.trim()} ${data.guest_last_name.trim()}`
+      : data.guest_name.trim()
+    sessionStorage.setItem('guest_name', guestName)
+    navigate(`/room/${slug}`)
+  }
 
   if (isLoading) return <div className="min-h-screen bg-[#f4f7fb] flex items-center justify-center"><div className="w-12 h-12 rounded-2xl bg-white border border-[#e5eaf2] shadow-lg flex items-center justify-center"><Loader2 className="w-5 h-5 text-[#4f7cff] animate-spin" /></div></div>
 
@@ -96,7 +110,17 @@ export default function JoinPage() {
               <div>
                 <button onClick={() => setMode(token ? 'select' : 'guest')} className="text-xs text-[#8d98aa] hover:text-[#4f7cff] inline-flex items-center gap-1 mb-6"><ArrowRight className="w-3.5 h-3.5" /> بازگشت</button>
                 <h2 className="text-lg sm:text-xl font-bold">ورود به عنوان مهمان</h2><p className="text-xs text-[#8d98aa] mt-2 mb-4 sm:mb-6">نامی که سایر شرکت‌کنندگان در جلسه می‌بینند.</p>
-                <form onSubmit={handleSubmit(handleJoinAsGuest)} className="flex flex-col gap-4"><Input label="نام شما" placeholder="مثلاً عباس" error={errors.guest_name?.message} {...register('guest_name')} className="meet-auth-input" /><Button type="submit" fullWidth size="lg" className="!bg-gradient-to-l !from-[#4f7cff] !to-[#6a8fff] !text-white !border-0 !rounded-xl">ورود به جلسه</Button></form>
+                <form onSubmit={handleSubmit(handleJoinAsGuest)} className="flex flex-col gap-4">
+                  {isEducationalClass ? (
+                    <>
+                      <Input label="نام" placeholder="مثلاً عباس" error={errors.guest_first_name?.message} {...register('guest_first_name')} className="meet-auth-input" />
+                      <Input label="نام خانوادگی" placeholder="مثلاً محمدی" error={errors.guest_last_name?.message} {...register('guest_last_name')} className="meet-auth-input" />
+                    </>
+                  ) : (
+                    <Input label="نام شما" placeholder="مثلاً عباس" error={errors.guest_name?.message} {...register('guest_name')} className="meet-auth-input" />
+                  )}
+                  <Button type="submit" fullWidth size="lg" className="!bg-gradient-to-l !from-[#4f7cff] !to-[#6a8fff] !text-white !border-0 !rounded-xl">ورود به جلسه</Button>
+                </form>
               </div>
             )}
           </section>

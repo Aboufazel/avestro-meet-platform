@@ -17,6 +17,7 @@ import { useRoomFeatures } from '../../hooks/useRoomFeatures'
 import { useClassAccess } from '../../hooks/useClassAccess'
 import { useMediaQuery } from '../../features/meeting/hooks/useMediaQuery'
 import { ClassLayout } from '../../features/meeting/components/ClassLayout'
+import { DraggablePip } from '../../features/meeting/components/DraggablePip'
 import { VideoTile } from '../../features/meeting/components/VideoTile'
 import { useParticipants } from '../../features/meeting/hooks/useParticipants'
 import { ClassAccessContext } from '../../features/meeting/ClassAccessContext'
@@ -32,6 +33,8 @@ export default function RoomPage() {
   const voiceRecordingSeconds = useMeetingStore(selectVoiceRecordingSeconds)
   const isRecording = useMeetingStore(selectIsRecording)
   const recordingSeconds = useMeetingStore(selectRecordingSeconds)
+  const closeMeetingPanel = useMeetingStore((s) => s.closePanel)
+  const toggleMeetingPanel = useMeetingStore((s) => s.togglePanel)
 
   const { can, has, settings, role, kind } = useRoomFeatures(roomName)
   const canChat = can('chat')
@@ -51,8 +54,8 @@ export default function RoomPage() {
   // در کلاس فقط معلم/مدیر دکمه‌ی اشتراک صفحه را می‌بیند؛ رفتار سمینار تغییری نکرده
   const canShowScreenShare = canScreenShare && (!classLayout || isHostRole)
   const isDesktop = useMediaQuery('(min-width: 768px)')
-  const inlineChat = classLayout && !isDesktop // موبایلِ کلاس: گفتگو همیشه زیر صحنه است
   const [attendanceOpen, setAttendanceOpen] = useState(false)
+  const [chatSheetOpen, setChatSheetOpen] = useState(false) // گفتگوی کشویی موبایلِ کلاس؛ پیش‌فرض بسته
   const [whiteboardOpen, setWhiteboardOpen] = useState(false)
   const [whiteboardObjects, setWhiteboardObjects] = useState([])
   const [teacherVideoExpanded, setTeacherVideoExpanded] = useState(false)
@@ -61,6 +64,14 @@ export default function RoomPage() {
   const { error, isConnecting, isReconnecting, isAudioMuted, isVideoMuted, isScreenSharing, isConnected, leave, toggleAudio, toggleVideo, toggleScreenShare } = useJitsi(roomName)
   const { participants } = useParticipants()
   const teacherParticipant = participants.find((participant) => participant.isTeacher) || null
+  const hasActiveScreenShare = isScreenSharing || participants.some((participant) => participant.isScreenSharing)
+  const classContentMode = classLayout && (whiteboardOpen || hasActiveScreenShare)
+  const inlineChat = classLayout && !isDesktop && !classContentMode
+  const mobileClassContentMode = classContentMode && !isDesktop
+
+  useEffect(() => {
+    if (mobileClassContentMode) closeMeetingPanel()
+  }, [mobileClassContentMode, closeMeetingPanel])
 
   const access = useClassAccess(roomName, { enabled: isConnected && (classLayout || moderated || handFeature || canWhiteboard) })
   const me = access.me
@@ -156,12 +167,12 @@ export default function RoomPage() {
     catch { toast.error('کپی لینک انجام نشد.') }
   }
 
-  if (isConnecting && !isReconnecting) return <div className="w-screen h-screen room-shell text-white"><MeetingLoading /></div>
-  if (error && !isReconnecting) return <div className="w-screen h-screen room-shell text-white"><MeetingError error={error} onLeave={leave} /></div>
+  if (isConnecting && !isReconnecting) return <div className="fixed inset-0 room-shell text-white"><MeetingLoading /></div>
+  if (error && !isReconnecting) return <div className="fixed inset-0 room-shell text-white"><MeetingError error={error} onLeave={leave} /></div>
 
   return (
     <ClassAccessContext.Provider value={access}>
-    <div dir="rtl" className="room-shell w-screen h-screen overflow-hidden flex flex-col text-white room-enter">
+    <div dir="rtl" className={`room-shell fixed inset-0 overflow-hidden flex flex-col text-white room-enter ${classContentMode ? 'room-class-content-mode' : ''}`}>
       <RoomHeader canRecord={canRecord} slug={roomName} isConnected={isConnected} onCopyLink={handleCopyLink} isMeetingMuted={isMeetingMuted} onToggleMeetingMute={toggleMeetingMute} isRecording={isRecording} recordingSeconds={recordingSeconds} onToggleRecording={handleToggleRecording} isVoiceRecording={isVoiceRecording} voiceRecordingSeconds={voiceRecordingSeconds} onToggleVoiceRecording={handleToggleVoiceRecording} />
 
       <div className="flex-1 min-h-0 relative">
@@ -170,10 +181,10 @@ export default function RoomPage() {
             <SidePanel canChat={canChat && !inlineChat} canParticipants={canParticipants} canControl={canControlMedia} onOpenAttendance={canAttendance ? () => setAttendanceOpen(true) : undefined} />
             <main className={`relative flex-1 min-w-0 min-h-0 room-surface overflow-hidden ${inlineChat ? '' : 'rounded-[20px] border room-border room-panel-shadow'}`}>
               <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_42%,rgba(77,125,255,.08),transparent_34%)]" />
-              {classLayout ? <ClassLayout showChat={canChat} onStopShare={toggleScreenShare} suppressVideo={whiteboardOpen} /> : <VideoGrid />}
+              {classLayout ? <ClassLayout showChat={canChat} contentMode={classContentMode} onStopShare={toggleScreenShare} suppressVideo={whiteboardOpen} chatOpen={chatSheetOpen} onOpenChat={() => setChatSheetOpen(true)} onCloseChat={() => setChatSheetOpen(false)} /> : <VideoGrid />}
               {canWhiteboard && isHostRole && !whiteboardOpen && <button type="button" onClick={openWhiteboard} className="absolute top-3 right-3 z-30 flex items-center gap-2 rounded-xl border room-border bg-[var(--room-surface)]/95 px-3 py-2 text-xs text-white shadow-lg transition hover:bg-[var(--room-elevated)]" aria-label="بازکردن تخته تعاملی"><PenTool size={16} /><span>تخته تعاملی</span></button>}
               {canWhiteboard && whiteboardOpen && (
-                <div className={`classroom-whiteboard-layout ${teacherVideoExpanded ? 'teacher-video-expanded' : ''}`}>
+                <div className={`classroom-whiteboard-layout ${inlineChat ? 'has-dock' : ''} ${classContentMode ? 'is-landscape-content' : ''} ${teacherVideoExpanded ? 'teacher-video-expanded' : ''}`}>
                   <WhiteboardPanel
                     initialObjects={whiteboardObjects}
                     onObjectsChange={(next) => {
@@ -188,34 +199,50 @@ export default function RoomPage() {
                     readOnly={!isHostRole && !studentsCanDraw}
                     isHost={isHostRole}
                   />
-                  {teacherParticipant && (
-                    <aside className="classroom-teacher-panel" aria-label="تصویر زنده مدرس">
-                      <div className="classroom-teacher-heading">
-                        <span className="classroom-teacher-live-dot" />
-                        <span>مدرس</span>
-                        <button
-                          type="button"
-                          className="classroom-teacher-expand"
-                          onClick={() => setTeacherVideoExpanded((expanded) => !expanded)}
-                          aria-label={teacherVideoExpanded ? 'کوچک‌کردن تصویر مدرس' : 'بزرگ‌کردن تصویر مدرس'}
-                          title={teacherVideoExpanded ? 'کوچک‌کردن تصویر مدرس' : 'بزرگ‌کردن تصویر مدرس'}
-                        >
-                          {teacherVideoExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-                        </button>
-                      </div>
-                      <div className="classroom-teacher-video">
-                        <VideoTile participantId={teacherParticipant.id} preferCamera isLarge videoEnabled playAudio={false} />
-                      </div>
-                      <div className="classroom-teacher-caption">
-                        <Video size={14} />
-                        <span>{teacherParticipant.hasVideo ? 'تصویر زنده مدرس' : 'دوربین مدرس خاموش است'}</span>
+                  {teacherParticipant && inlineChat && (
+                    <DraggablePip initialCorner="br" label="تصویر زنده مدرس">
+                      <VideoTile participantId={teacherParticipant.id} preferCamera isLarge videoEnabled playAudio={false} />
+                    </DraggablePip>
+                  )}
+                  {!inlineChat && (
+                    <aside className="classroom-content-sidebar" aria-label="تصاویر مدرس و شرکت‌کنندگان">
+                      {teacherParticipant && (
+                        <section className="classroom-teacher-panel" aria-label="تصویر زنده مدرس">
+                          <div className="classroom-teacher-heading">
+                            <span className="classroom-teacher-live-dot" />
+                            <span>مدرس</span>
+                            <button
+                              type="button"
+                              className="classroom-teacher-expand"
+                              onClick={() => setTeacherVideoExpanded((expanded) => !expanded)}
+                              aria-label={teacherVideoExpanded ? 'کوچک‌کردن تصویر مدرس' : 'بزرگ‌کردن تصویر مدرس'}
+                              title={teacherVideoExpanded ? 'کوچک‌کردن تصویر مدرس' : 'بزرگ‌کردن تصویر مدرس'}
+                            >
+                              {teacherVideoExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                            </button>
+                          </div>
+                          <div className="classroom-teacher-video">
+                            <VideoTile participantId={teacherParticipant.id} preferCamera isLarge videoEnabled playAudio={false} />
+                          </div>
+                          <div className="classroom-teacher-caption">
+                            <Video size={14} />
+                            <span>{teacherParticipant.hasVideo ? 'تصویر زنده مدرس' : 'دوربین مدرس خاموش است'}</span>
+                          </div>
+                        </section>
+                      )}
+                      <div className="classroom-participant-list" aria-label="سایر شرکت‌کنندگان">
+                        {participants.filter((participant) => participant.id !== teacherParticipant?.id).map((participant) => (
+                          <div className="classroom-participant-tile" key={participant.id}>
+                            <VideoTile participantId={participant.id} videoEnabled={participant.isLocal || Boolean(participant.hasVideo || participant.isScreenSharing)} />
+                          </div>
+                        ))}
                       </div>
                     </aside>
                   )}
                 </div>
               )}
               {isReconnecting && <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 room-pop"><div className="flex items-center gap-2 rounded-full bg-[var(--room-surface)] border room-border px-4 py-2 text-xs shadow-xl"><span className="w-2 h-2 rounded-full bg-[var(--room-warning)] animate-pulse" /><span>اتصال ضعیف است؛ در حال برقراری مجدد...</span></div></div>}
-              <MeetingControls isAudioMuted={isAudioMuted} isVideoMuted={isVideoMuted} isScreenSharing={isScreenSharing} onToggleAudio={toggleAudio} onToggleVideo={toggleVideo} onToggleScreenShare={handleToggleScreenShare} onLeave={leave} canChat={canChat && !inlineChat} canParticipants={canParticipants && (!inlineChat || isHostRole)} canScreenShare={canShowScreenShare || isScreenSharing} showHand={canHand} isHandRaised={isHandRaised} onToggleHand={handleToggleHand} showMic={showMic} showCamera={showCamera} showAttendance={canAttendance} onOpenAttendance={() => setAttendanceOpen(true)} docked={inlineChat} showSettings={!inlineChat || isHostRole} />
+              <MeetingControls isAudioMuted={isAudioMuted} isVideoMuted={isVideoMuted} isScreenSharing={isScreenSharing} onToggleAudio={toggleAudio} onToggleVideo={toggleVideo} onToggleScreenShare={handleToggleScreenShare} onLeave={leave} canChat={canChat && !inlineChat && !mobileClassContentMode} canParticipants={canParticipants && (!inlineChat || isHostRole)} canScreenShare={canShowScreenShare || isScreenSharing} showHand={canHand} isHandRaised={isHandRaised} onToggleHand={handleToggleHand} showMic={showMic} showCamera={showCamera} showAttendance={canAttendance} onOpenAttendance={() => setAttendanceOpen(true)} docked={inlineChat || mobileClassContentMode} dockChat={(inlineChat || mobileClassContentMode) && canChat} chatOpen={chatSheetOpen} onToggleChat={() => toggleMeetingPanel('chat')} showSettings={!inlineChat || isHostRole} />
             </main>
           </div>
         </div>

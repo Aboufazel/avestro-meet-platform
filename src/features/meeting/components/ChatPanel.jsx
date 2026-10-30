@@ -43,6 +43,12 @@ export const ChatPanel = memo(function ChatPanel({ compact = false }) {
         )
     }, [messages, search, localParticipantId])
 
+    // با هر بازشدن پنل (مثلاً کشوی موبایل) از آخرین پیام شروع کن
+    useEffect(() => {
+        const el = scrollRef.current
+        if (el) el.scrollTop = el.scrollHeight
+    }, [])
+
     useEffect(() => {
         const element = scrollRef.current
         if (!element) return

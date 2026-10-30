@@ -15,6 +15,9 @@ export default function WhiteboardPanel({ onClose, initialObjects = [], onObject
   const svgRef = useRef(null)
   const [objects, setObjects] = useState(initialObjects)
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
+  const [textEntry, setTextEntry] = useState(false)
+  const [textValue, setTextValue] = useState('')
+  const [textPosition, setTextPosition] = useState(null)
   const [isClearing, setIsClearing] = useState(false)
   useEffect(() => { setObjects(initialObjects || []) }, [initialObjects])
 
@@ -71,8 +74,9 @@ export default function WhiteboardPanel({ onClose, initialObjects = [], onObject
       return
     }
     if (tool === 'text') {
-      const value = window.prompt('متن موردنظر را وارد کنید:')
-      if (value?.trim()) commit({ id: makeId(), type: 'text', x: point.x, y: point.y, text: value.trim(), color, fontSize: Math.max(18, strokeWidth * 7) })
+      setTextPosition(point)
+      setTextValue('')
+      setTextEntry(true)
       return
     }
     if (tool === 'eraser') {
@@ -124,6 +128,16 @@ export default function WhiteboardPanel({ onClose, initialObjects = [], onObject
     }
     setDraft(null)
     setGesture(null)
+  }
+
+  const submitText = (event) => {
+    event.preventDefault()
+    const value = textValue.trim()
+    if (!value || !textPosition) return
+    commit({ id: makeId(), type: 'text', x: textPosition.x, y: textPosition.y, text: value, color, fontSize: Math.max(18, strokeWidth * 7) })
+    setTextEntry(false)
+    setTextPosition(null)
+    setTextValue('')
   }
 
   const zoomBy = (factor) => setZoom((current) => Math.min(3, Math.max(0.35, Number((current * factor).toFixed(2)))))
@@ -192,6 +206,16 @@ export default function WhiteboardPanel({ onClose, initialObjects = [], onObject
         </div>
       </div>
       <footer className="wb-footer"><span><Check size={14} /> {readOnly ? 'تخته معلم به‌صورت زنده نمایش داده می‌شود.' : 'تغییرات تخته برای حاضران کلاس همگام می‌شود.'}</span><span>برای حرکت بوم: ابزار دست · برای زوم: Ctrl/⌘ + چرخ ماوس</span></footer>
+      {textEntry && <div className="wb-text-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setTextEntry(false) }}>
+        <form className="wb-text-dialog" role="dialog" aria-modal="true" aria-labelledby="wb-text-title" dir="rtl" onSubmit={submitText}>
+          <div className="wb-text-dialog-heading"><Type size={17} /><strong id="wb-text-title">افزودن متن به تخته</strong></div>
+          <input autoFocus value={textValue} onChange={(event) => setTextValue(event.target.value)} placeholder="متن درس را بنویسید..." aria-label="متن روی تخته" />
+          <div className="wb-text-dialog-actions">
+            <button type="button" onClick={() => setTextEntry(false)}>انصراف</button>
+            <button type="submit" disabled={!textValue.trim()}>افزودن به تخته</button>
+          </div>
+        </form>
+      </div>}
       {clearConfirmOpen && <div className="wb-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setClearConfirmOpen(false) }}>
         <section className="wb-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="wb-clear-title" dir="rtl">
           <div className="wb-confirm-icon"><AlertTriangle size={23} /></div>

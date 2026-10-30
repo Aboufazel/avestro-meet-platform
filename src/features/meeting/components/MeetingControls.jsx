@@ -1,31 +1,46 @@
-import { memo } from 'react'
+import { memo, useState } from 'react'
 import { MessageSquare, Mic, MicOff, MonitorUp, PhoneOff, Settings, Users, Video, VideoOff, MoreHorizontal, Hand, UserCheck } from 'lucide-react'
 import { selectActivePanelTab, selectIsPanelOpen, selectUnreadCount } from '../store/meeting-selectors'
 import { useMeetingStore } from '../store/meeting-store'
 
-export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isVideoMuted, isScreenSharing, onToggleAudio, onToggleVideo, onToggleScreenShare, onLeave, canChat = true, canParticipants = true, canScreenShare = true, showHand = false, isHandRaised = false, onToggleHand, showMic = true, showCamera = true, showAttendance = false, onOpenAttendance, docked = false, showSettings = true }) {
+export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isVideoMuted, isScreenSharing, onToggleAudio, onToggleVideo, onToggleScreenShare, onLeave, canChat = true, canParticipants = true, canScreenShare = true, showHand = false, isHandRaised = false, onToggleHand, showMic = true, showCamera = true, showAttendance = false, onOpenAttendance, docked = false, showSettings = true, dockChat = false, chatOpen = false, onToggleChat }) {
   const unreadCount = useMeetingStore(selectUnreadCount)
   const activeTab = useMeetingStore(selectActivePanelTab)
   const isPanelOpen = useMeetingStore(selectIsPanelOpen)
   const openSettings = useMeetingStore((s) => s.openSettings)
   const togglePanel = useMeetingStore((s) => s.togglePanel)
 
+  const [moreOpen, setMoreOpen] = useState(false)
+
   if (docked) {
-    // موبایلِ کلاس: نوار کامل و چسبیده به پایین؛ دکمه‌ی بزرگ «بلندکردن دست» برای دانش‌آموز
-    return <div className="cl-dock">
-      <div className="cl-dock-inner">
-        {showHand && <button type="button" onClick={onToggleHand} className={`cl-hand ${isHandRaised ? 'is-raised' : ''}`}>
-          <Hand size={18} />{isHandRaised ? 'پایین‌آوردن دست' : 'بلندکردن دست'}
-        </button>}
-        {showCamera && <ControlButton active={!isVideoMuted} off={isVideoMuted} onClick={onToggleVideo} label="دوربین" icon={isVideoMuted ? <VideoOff size={18} /> : <Video size={18} />} />}
-        {showMic && <ControlButton active={!isAudioMuted} off={isAudioMuted} onClick={onToggleAudio} label="میکروفون" icon={isAudioMuted ? <MicOff size={18} /> : <Mic size={18} />} />}
-        {canScreenShare && <ControlButton active={isScreenSharing} onClick={onToggleScreenShare} label="اشتراک‌گذاری" icon={<MonitorUp size={18} />} />}
-        {showAttendance && <ControlButton onClick={onOpenAttendance} label="حضور و غیاب" icon={<UserCheck size={18} />} primary />}
-        {canParticipants && <ControlButton active={isPanelOpen && activeTab === 'participants'} onClick={() => togglePanel('participants')} label="شرکت‌کنندگان" icon={<Users size={18} />} />}
-        {showSettings && <ControlButton onClick={openSettings} label="تنظیمات" icon={<Settings size={18} />} />}
-        <ControlButton danger onClick={onLeave} label="خروج" icon={<PhoneOff size={18} />} />
+    // موبایلِ کلاس: نوار پایین ثابت (با dvh و safe-area). دکمه‌های اصلی همیشه پیدا هستند؛
+    // بقیه (اشتراک صفحه، حضور و غیاب، شرکت‌کنندگان، تنظیمات) داخل «بیشتر» می‌روند.
+    const moreItems = [
+      canScreenShare && { key: 'share', label: isScreenSharing ? 'توقف اشتراک صفحه' : 'اشتراک‌گذاری صفحه', icon: <MonitorUp size={20} />, onClick: onToggleScreenShare },
+      showAttendance && { key: 'attendance', label: 'حضور و غیاب', icon: <UserCheck size={20} />, onClick: onOpenAttendance },
+      canParticipants && { key: 'participants', label: 'شرکت‌کنندگان', icon: <Users size={20} />, onClick: () => togglePanel('participants') },
+      showSettings && { key: 'settings', label: 'تنظیمات', icon: <Settings size={20} />, onClick: openSettings },
+    ].filter(Boolean)
+    const runMore = (fn) => () => { setMoreOpen(false); fn?.() }
+
+    return <>
+      {moreOpen && <button type="button" aria-label="بستن" className="cl-more-backdrop" onClick={() => setMoreOpen(false)} />}
+      {moreOpen && <div className="cl-more-menu" role="menu">
+        {moreItems.map((it) => <button key={it.key} type="button" role="menuitem" className="cl-more-item" onClick={runMore(it.onClick)}>{it.icon}<span>{it.label}</span></button>)}
+      </div>}
+      <div className="cl-dock">
+        <div className="cl-dock-inner">
+          {showHand && <button type="button" onClick={onToggleHand} className={`cl-hand ${isHandRaised ? 'is-raised' : ''}`}>
+            <Hand size={20} /><span>{isHandRaised ? 'پایین‌آوردن دست' : 'بلندکردن دست'}</span>
+          </button>}
+          {showMic && <ControlButton active={!isAudioMuted} off={isAudioMuted} onClick={onToggleAudio} label="میکروفون" icon={isAudioMuted ? <MicOff size={19} /> : <Mic size={19} />} />}
+          {showCamera && <ControlButton active={!isVideoMuted} off={isVideoMuted} onClick={onToggleVideo} label="دوربین" icon={isVideoMuted ? <VideoOff size={19} /> : <Video size={19} />} />}
+          {dockChat && <ControlButton active={chatOpen} onClick={onToggleChat} label="گفتگو" icon={<MessageSquare size={19} />} badge={chatOpen ? 0 : unreadCount} />}
+          {moreItems.length > 0 && <ControlButton active={moreOpen} onClick={() => setMoreOpen((v) => !v)} label="بیشتر" icon={<MoreHorizontal size={19} />} />}
+          <ControlButton danger onClick={onLeave} label="خروج" icon={<PhoneOff size={19} />} />
+        </div>
       </div>
-    </div>
+    </>
   }
 
   return <div className={`fixed lg:absolute ${isPanelOpen ? 'md:bottom-5' : 'md:bottom-5'} bottom-[calc(env(safe-area-inset-bottom)+14px)] left-1/2 -translate-x-1/2 z-[60] w-max max-w-[calc(100%-20px)] transition-all duration-400 ease-out`}>

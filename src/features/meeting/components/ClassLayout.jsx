@@ -6,7 +6,8 @@ import { useMeetingStore } from '../store/meeting-store'
 import { jitsiController } from '../jitsi/JitsiController'
 import { PERF } from '../jitsi/jitsi-config'
 import { VideoTile } from './VideoTile'
-import { ChatPanel } from './ChatPanel'
+import { DraggablePip } from './DraggablePip'
+import { ChatPreview, MobileChatSheet } from './MobileChatSheet'
 import './class-layout.css'
 
 const hasLiveVideo = (p) => p.isScreenSharing || (p.hasVideo !== undefined ? p.hasVideo : !p.isVideoMuted)
@@ -21,7 +22,7 @@ const hasLiveVideo = (p) => p.isScreenSharing || (p.hasVideo !== undefined ? p.h
  *
  * صدا: صدای هر نفر از تایل خودش پخش می‌شود، پس هر کس میکروفونش روشن است یک تایل mount دارد.
  */
-export const ClassLayout = memo(function ClassLayout({ showChat = true, onStopShare, suppressVideo = false }) {
+export const ClassLayout = memo(function ClassLayout({ showChat = true, onStopShare, suppressVideo = false, chatOpen = false, onOpenChat, onCloseChat, contentMode = false }) {
   const { participants, count } = useParticipants()
   const isDesktop = useMediaQuery('(min-width: 768px)')
   const [expanded, setExpanded] = useState(false)
@@ -37,7 +38,7 @@ export const ClassLayout = memo(function ClassLayout({ showChat = true, onStopSh
     const speaker = byId(activeSpeakerId)
 
     const stageP =
-      byId(pinnedId) || byId(focusedId) || sharer || teacher ||
+      (contentMode ? sharer || teacher : null) || byId(pinnedId) || byId(focusedId) || sharer || teacher ||
       (speaker && !speaker.isLocal ? speaker : null) ||
       participants.find((p) => !p.isLocal) || participants[0] || null
 
@@ -50,16 +51,17 @@ export const ClassLayout = memo(function ClassLayout({ showChat = true, onStopSh
         ? teacher
         : null
 
-    const needsTile = (p) => !p.isLocal && (!p.isAudioMuted || hasLiveVideo(p))
+    // در حالت محتوای آموزشی همه‌ی افراد در نوار کناری می‌مانند؛
+    // حتی اگر دوربین/میکروفون خاموش باشد، تایل آواتارشان قابل مشاهده است.
     const stripList = participants.filter(
-      (p) => needsTile(p) && p.id !== stageP?.id && p.id !== pipP?.id
+      (p) => p.id !== stageP?.id && p.id !== pipP?.id
     )
     const tileIds = new Set([stageP?.id, pipP?.id, ...stripList.map((p) => p.id)])
     const hidden = participants.filter((p) => !p.isLocal && !tileIds.has(p.id)).length
 
     // بودجه‌ی ویدیو (مثل VideoGrid)
     const ordered = []
-    const push = (p) => { if (p && hasLiveVideo(p) && !ordered.includes(p.id)) ordered.push(p.id) }
+    const push = (p) => { if (p && !p.isLocal && hasLiveVideo(p) && !ordered.includes(p.id)) ordered.push(p.id) }
     push(stageP); push(pipP); stripList.forEach(push)
 
     return {
@@ -70,7 +72,7 @@ export const ClassLayout = memo(function ClassLayout({ showChat = true, onStopSh
       allowed: new Set(ordered.slice(0, PERF.maxRemoteVideos)),
       onStageIds: stageP && !stageP.isLocal ? [stageP.id] : [],
     }
-  }, [participants, activeSpeakerId, pinnedId, focusedId])
+  }, [participants, activeSpeakerId, pinnedId, focusedId, contentMode])
 
   const paused = typeof document !== 'undefined' && document.hidden && !isRecording
   useEffect(() => {
@@ -85,11 +87,34 @@ export const ClassLayout = memo(function ClassLayout({ showChat = true, onStopSh
   }
 
   const stageIsOwnShare = Boolean(stage?.isLocal && stage?.isScreenSharing)
-  const mobileChat = !isDesktop && showChat
+  const mobileChat = !isDesktop && showChat && !contentMode
+
+  if (!contentMode) {
+    return (
+      <div className="cl-root is-grid-mode">
+        <div className="cl-grid" aria-label="تصاویر شرکت‌کنندگان کلاس">
+          {participants.map((participant) => (
+            <div className="cl-grid-tile" key={participant.id}>
+              <VideoTile
+                participantId={participant.id}
+                isLarge
+                videoEnabled={participant.isLocal || allowed.has(participant.id)}
+                forceVideoOff={suppressVideo}
+                isPinned={participant.id === pinnedId}
+                isFocused={participant.id === focusedId}
+              />
+            </div>
+          ))}
+        </div>
+        {mobileChat && !chatOpen && <ChatPreview onOpen={onOpenChat} />}
+        {mobileChat && <MobileChatSheet open={chatOpen} onClose={onCloseChat} />}
+      </div>
+    )
+  }
 
   return (
-    <div className="cl-root">
-      <section aria-label="صحنه‌ی کلاس" className={`cl-stage ${expanded ? 'is-expanded' : ''}`}>
+    <div className="cl-root is-content-mode">
+      <section aria-label="محتوای آموزشی و تصویر اصلی کلاس" className={`cl-stage ${expanded ? 'is-expanded' : ''}`}>
         {stage && !stageIsOwnShare && (
           <div className="cl-fill">
             <VideoTile
@@ -117,9 +142,9 @@ export const ClassLayout = memo(function ClassLayout({ showChat = true, onStopSh
         )}
 
         {pip && (
-          <div className="cl-pip">
+          <DraggablePip initialCorner="bl" label="دوربین معلم">
             <VideoTile participantId={pip.id} preferCamera playAudio videoEnabled={pip.isLocal || allowed.has(pip.id)} forceVideoOff={suppressVideo} />
-          </div>
+          </DraggablePip>
         )}
 
         <button type="button" className="cl-expand" onClick={() => setExpanded((v) => !v)}
@@ -132,7 +157,7 @@ export const ClassLayout = memo(function ClassLayout({ showChat = true, onStopSh
         <div className="cl-strip">
           {strip.map((p) => (
             <div key={p.id} className="cl-tile">
-              <VideoTile participantId={p.id} videoEnabled={allowed.has(p.id)} forceVideoOff={suppressVideo} />
+              <VideoTile participantId={p.id} videoEnabled={p.isLocal || allowed.has(p.id)} forceVideoOff={suppressVideo} />
             </div>
           ))}
           {hiddenCount > 0 && (
@@ -144,11 +169,8 @@ export const ClassLayout = memo(function ClassLayout({ showChat = true, onStopSh
         </div>
       )}
 
-      {mobileChat && (
-        <div className="cl-chat">
-          <ChatPanel compact />
-        </div>
-      )}
+      {mobileChat && !chatOpen && <ChatPreview onOpen={onOpenChat} />}
+      {mobileChat && <MobileChatSheet open={chatOpen} onClose={onCloseChat} />}
     </div>
   )
 })
