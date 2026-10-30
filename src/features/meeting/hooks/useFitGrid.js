@@ -26,12 +26,12 @@ export function computeFitGrid({ width, height, count, aspect, infoH, gap, minW,
   return { cardW, cols, scroll: true }
 }
 
-export function useFitGrid(ref, count, options) {
+// node: خودِ عنصر شبکه (از callback ref)؛ با عوض‌شدن عنصر (مثلاً بعد از بستن تخته) دوباره اندازه‌گیری می‌شود.
+export function useFitGrid(node, count, options) {
   const { aspect = 16 / 9, infoH = 30, gap = 10, minW = 150, maxW = 560 } = options || {}
   const [size, setSize] = useState({ width: 0, height: 0 })
 
   useEffect(() => {
-    const node = ref.current
     if (!node) return undefined
     const measure = () => {
       const { clientWidth, clientHeight } = node
@@ -45,7 +45,7 @@ export function useFitGrid(ref, count, options) {
     const observer = new ResizeObserver(measure)
     observer.observe(node)
     return () => observer.disconnect()
-  }, [ref])
+  }, [node])
 
   return computeFitGrid({ ...size, count, aspect, infoH, gap, minW, maxW })
 }

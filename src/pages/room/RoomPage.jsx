@@ -78,6 +78,21 @@ export default function RoomPage() {
     if (classLayout && classContentMode) closeMeetingPanel()
   }, [classLayout, classContentMode, closeMeetingPanel])
 
+  // گوشی: با اولین لمس تمام‌صفحه می‌شود تا تب و نوار آدرس مرورگر مخفی شود (مرورگرهایی که پشتیبانی کنند،
+  // مثل Chrome اندروید) و جهت صفحه افقی قفل می‌شود. iOS Safari این امکان را ندارد.
+  useEffect(() => {
+    if (!compactClass) return undefined
+    const enter = () => {
+      const el = document.documentElement
+      if (document.fullscreenElement || !el.requestFullscreen) return
+      el.requestFullscreen({ navigationUI: 'hide' })
+        .then(() => window.screen?.orientation?.lock?.('landscape').catch(() => {}))
+        .catch(() => {})
+    }
+    window.addEventListener('pointerup', enter, { once: true })
+    return () => window.removeEventListener('pointerup', enter)
+  }, [compactClass])
+
   const access = useClassAccess(roomName, { enabled: isConnected && (classLayout || moderated || handFeature || canWhiteboard) })
   const me = access.me
   const handRequests = useHandRequests(access.roster, classLayout && isHostRole)

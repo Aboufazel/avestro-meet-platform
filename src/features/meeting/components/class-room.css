@@ -30,7 +30,7 @@
   border: 1px solid var(--room-border);
   background: var(--room-surface);
 }
-.vc.is-speaking { border-color: var(--room-mint); box-shadow: 0 0 0 1px var(--room-mint); }
+.vc.is-speaking { border-color: var(--room-blue); box-shadow: 0 0 0 1px var(--room-blue), 0 0 18px rgba(77, 125, 255, .28); }
 .vc-media {
   position: relative;
   flex: none;

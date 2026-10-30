@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { MonitorUp } from 'lucide-react'
 import { useParticipants } from '../hooks/useParticipants'
 import { useFitGrid } from '../hooks/useFitGrid'
@@ -24,7 +24,7 @@ export const ClassLayout = memo(function ClassLayout({ board = null, contentMode
   const { participants, count } = useParticipants()
   const { compact } = useViewportContext()
   const isRecording = useMeetingStore((s) => s.isRecording)
-  const gridRef = useRef(null)
+  const [gridNode, setGridNode] = useState(null)
 
   const { teacher, sharer, gridList, others, allowed, onStageIds } = useMemo(() => {
     const t = participants.find((p) => p.isTeacher) || null
@@ -56,7 +56,7 @@ export const ClassLayout = memo(function ClassLayout({ board = null, contentMode
     return () => window.clearTimeout(timer)
   }, [onStageIds, allowed, paused])
 
-  const fit = useFitGrid(gridRef, gridList.length, {
+  const fit = useFitGrid(gridNode, gridList.length, {
     infoH: compact ? 29 : 37,
     gap: compact ? 8 : 12,
     minW: compact ? 132 : 220,
@@ -82,7 +82,7 @@ export const ClassLayout = memo(function ClassLayout({ board = null, contentMode
     return (
       <div className="cl-root">
         <div
-          ref={gridRef}
+          ref={setGridNode}
           className={`cl-grid ${fit.scroll ? 'is-scroll' : ''}`}
           style={{ '--card-w': `${fit.cardW}px`, '--cols': fit.cols }}
           aria-label="تصاویر شرکت‌کنندگان کلاس"
