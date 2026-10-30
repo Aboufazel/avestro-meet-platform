@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { MonitorUp, Users } from 'lucide-react'
 import { useParticipants } from '../hooks/useParticipants'
 import { useMeetingStore } from '../store/meeting-store'
@@ -8,6 +8,11 @@ import { VideoTile } from './VideoTile'
 import './class-layout.css'
 
 const hasLiveVideo = (p) => p.isScreenSharing || (p.hasVideo !== undefined ? p.hasVideo : !p.isVideoMuted)
+
+// بودجه‌ی رندر تایل‌ها: با کلاسِ شلوغ، بقیه‌ی حاضران با چیپ «+N» جمع می‌شوند
+// (ویدئوها از قبل با lastN/بودجه‌ی دستگاه محدودند؛ این سقف، سبکیِ DOM موبایل است)
+const STRIP_CAP = 10   // نوار افقی عمودی موبایل
+const RAIL_CAP = 14    // ریل عمودی حالت افقی/دسکتاپ
 
 /**
  * چیدمان «کلاس» — یک مالک واحد برای هر دو حالت:
@@ -35,6 +40,7 @@ export const ClassLayout = memo(function ClassLayout({ contentMode = false, whit
   const pinnedId = useMeetingStore((s) => s.pinnedParticipantId ?? null)
   const focusedId = useMeetingStore((s) => s.focusedParticipantId ?? null)
   const isRecording = useMeetingStore((s) => s.isRecording)
+  const [showAllStudents, setShowAllStudents] = useState(false)
 
   const layout = useMemo(() => {
     const teacher = participants.find((p) => p.isTeacher) || null
@@ -180,17 +186,31 @@ export const ClassLayout = memo(function ClassLayout({ contentMode = false, whit
           )}
         </section>
         <aside className="cl-strip" aria-label="سایر شرکت‌کنندگان کلاس">
-          {rail.length > 0 ? rail.map((p) => (
-            <div className="cl-strip-item" key={p.id}>
-              <VideoTile
-                participantId={p.id}
-                variant="card"
-                videoEnabled={p.isLocal || allowed.has(p.id)}
-                forceVideoOff={suppressVideo}
-                playAudio={p.id !== railAudioOwner}
-              />
-            </div>
-          )) : (
+          {rail.length > 0 ? (
+            <>
+              {rail.length > STRIP_CAP && (
+                <button
+                  type="button"
+                  className={`cl-strip-more ${showAllStudents ? 'is-open' : ''}`}
+                  onClick={() => setShowAllStudents((v) => !v)}
+                  aria-expanded={showAllStudents}
+                >
+                  {showAllStudents ? 'نمایش کمتر' : `+${rail.length - STRIP_CAP}`}
+                </button>
+              )}
+              {(showAllStudents ? rail : rail.slice(0, STRIP_CAP)).map((p) => (
+                <div className="cl-strip-item" key={p.id}>
+                  <VideoTile
+                    participantId={p.id}
+                    variant="card"
+                    videoEnabled={p.isLocal || allowed.has(p.id)}
+                    forceVideoOff={suppressVideo}
+                    playAudio={p.id !== railAudioOwner}
+                  />
+                </div>
+              ))}
+            </>
+          ) : (
             <div className="cl-strip-empty"><Users size={14} /><span>شرکت‌کننده‌ی دیگری آنلاین نیست</span></div>
           )}
         </aside>
@@ -219,7 +239,17 @@ export const ClassLayout = memo(function ClassLayout({ contentMode = false, whit
 
         {rail.length > 0 && (
           <div className="cl-rail-list" aria-label="سایر شرکت‌کنندگان">
-            {rail.map((p) => (
+            {rail.length > RAIL_CAP && (
+              <button
+                type="button"
+                className={`cl-rail-more ${showAllStudents ? 'is-open' : ''}`}
+                onClick={() => setShowAllStudents((v) => !v)}
+                aria-expanded={showAllStudents}
+              >
+                {showAllStudents ? 'نمایش کمتر' : `+${rail.length - RAIL_CAP}`}
+              </button>
+            )}
+            {(showAllStudents ? rail : rail.slice(0, RAIL_CAP)).map((p) => (
               <div className="cl-rail-item" key={p.id}>
                 <VideoTile
                   participantId={p.id}

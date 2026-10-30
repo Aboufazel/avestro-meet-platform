@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useJitsi } from '../../features/meeting/hooks/useJitsi'
 import { VideoGrid } from '../../features/meeting/components/VideoGrid'
@@ -24,7 +24,6 @@ import WhiteboardPanel from '../../features/whiteboard/WhiteboardPanel'
 import { useHandRaiseAlerts } from '../../features/meeting/hooks/useHandRaiseAlerts'
 import { MobileClassSheets, DockPeek } from '../../features/meeting/components/MobileClassSheets'
 import { HandRaiseAlert } from '../../features/meeting/components/HandRaiseAlert'
-import { RotateDeviceGate } from '../../features/meeting/components/RotateDeviceGate'
 
 export default function RoomPage() {
   const { slug: roomName } = useParams()
@@ -105,19 +104,50 @@ export default function RoomPage() {
   const whiteboardSettings = settings('whiteboard')
   const studentsCanDraw = Boolean(whiteboardSettings.students_can_draw)
 
+  // ───── همگام‌سازی تخته با سرور، همگام‌سازی «لبه‌ای» (edge-triggered) ─────
+  // باگ قبلی: هر پیام whiteboard_state مقدار whiteboardOpen را با is_open سرور
+  // بازنویسی می‌کرد؛ echoهای کهنه (یا snapshot اتصال دوباره) تخته را خودکار
+  // باز می‌کردند — نتیجه: با زدن ضربدر، تخته بلافاصله دوباره باز می‌شد.
+  // راه‌حل: فقط «تغییر واقعی» is_open اعمال می‌شود؛ پیام تکراری/کهنه بی‌اثر است.
+  const seenIsOpenRef = useRef(null) // آخرین مقدار is_open که از سرور دیده/اعمال شده
+  const isHostRoleRef = useRef(isHostRole)
+  useEffect(() => { isHostRoleRef.current = isHostRole }, [isHostRole])
+
+  // دسترسی‌های پایدار هوک برای deps تمیزِ اثر همگام‌سازی
+  const { whiteboardState: accessWhiteboardState, setWhiteboardOpen: publishWhiteboardOpen } = access
+
   useEffect(() => {
-    if (!access.whiteboardState) return
-    setWhiteboardObjects(access.whiteboardState.objects || [])
-    setWhiteboardOpen(Boolean(access.whiteboardState.is_open))
-  }, [access.whiteboardState])
+    const state = accessWhiteboardState
+    if (!state) return
+    // همگام‌سازی از سامانه‌ی خارجی (پیام‌های WebSocket سرور)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setWhiteboardObjects(state.objects || [])
+    const incoming = Boolean(state.is_open)
+    if (seenIsOpenRef.current === null) {
+      // اولین snapshot این نشست: کلاس همیشه با تخته‌ی بسته شروع می‌شود.
+      // میزبان سرور را هم به بسته همگام می‌کند تا برای همه از ابتدا بسته باشد؛
+      // دانش‌آموز از وضعیت واقعی سرور پیروی می‌کند (اگر مدرس تخته را باز کرده ببیند).
+      seenIsOpenRef.current = incoming
+      if (incoming && isHostRoleRef.current) {
+        publishWhiteboardOpen(false)
+        setWhiteboardOpen(false)
+      } else {
+        setWhiteboardOpen(incoming)
+      }
+      return
+    }
+    if (incoming === seenIsOpenRef.current) return // echo/snapshot تکراری — بی‌اثر
+    seenIsOpenRef.current = incoming
+    setWhiteboardOpen(incoming)
+  }, [accessWhiteboardState, publishWhiteboardOpen])
 
   const openWhiteboard = () => {
     setWhiteboardOpen(true)
-    access.setWhiteboardOpen(true)
+    publishWhiteboardOpen(true)
   }
   const closeWhiteboard = () => {
     setWhiteboardOpen(false)
-    access.setWhiteboardOpen(false)
+    publishWhiteboardOpen(false)
   }
 
   // معلم خودش را برای چیدمان کلاس علامت می‌زند (فقط نمایشی)
@@ -188,24 +218,6 @@ export default function RoomPage() {
     dismissHandAlert(alert.id)
   }, [access, dismissHandAlert])
 
-  // ───── گیت ورود کلاس آنلاین: «گوشی را افقی قرار بده» (فقط کلاس، نه سمینار) ─────
-  const isTouchDevice = useMediaQuery('(hover: none) and (pointer: coarse)')
-  // به‌محض افقی‌شدن گوشی (یا اگر از ابتدا افقی باشد) گیت باز می‌شود
-  const [rotateGatePassed, setRotateGatePassed] = useState(() => {
-    try { return window.matchMedia('(orientation: landscape)').matches } catch { return false }
-  })
-  useEffect(() => {
-    const mql = window.matchMedia('(orientation: landscape)')
-    const onChange = (event) => { if (event.matches) setRotateGatePassed(true) }
-    mql.addEventListener?.('change', onChange)
-    return () => mql.removeEventListener?.('change', onChange)
-  }, [])
-
-  // فقط کلاس آنلاین: موبایل لمسی + گوشی عمودی + هنوز نچرخیده
-  // استثنا: «ادامه با حالت عمودی» — چون چیدمان عمودی هم کامل و کاربردی است
-  const showRotateGate = classLayout && portraitClass && isTouchDevice && !rotateGatePassed
-  const passRotateGate = useCallback(() => setRotateGatePassed(true), [])
-
   // ───── جمع‌شدن خودکار داک در چیدمان عمودی وقتی کاربر مدتی تعامل نکرده (فقط حالت محتوا) ─────
   // در چیدمان افقی ریل عمودی همیشه پیدا است و جمع نمی‌شود.
   // dockShown در رندر مشتق می‌شود تا با تغییر حالت، نوار بدون تأخیر برگردد.
@@ -227,9 +239,7 @@ export default function RoomPage() {
     }
   }, [dockAutoHide])
 
-  const rotateGate = showRotateGate ? <RotateDeviceGate onContinue={passRotateGate} /> : null
-
-  if (isConnecting && !isReconnecting) return <div className="fixed inset-0 room-shell text-white"><MeetingLoading />{rotateGate}</div>
+  if (isConnecting && !isReconnecting) return <div className="fixed inset-0 room-shell text-white"><MeetingLoading /></div>
   if (error && !isReconnecting) return <div className="fixed inset-0 room-shell text-white"><MeetingError error={error} onLeave={leave} /></div>
 
   const whiteboardSlot = canWhiteboard && whiteboardOpen ? (
@@ -251,8 +261,6 @@ export default function RoomPage() {
 
   return (
     <ClassAccessContext.Provider value={access}>
-    {/* گیت ورود کلاس */}
-    {rotateGate}
     <div dir="rtl" className={`room-shell fixed inset-0 overflow-hidden flex flex-col text-white room-enter ${classContentMode ? 'room-class-content-mode' : ''}`}>
       <RoomHeader compact={mobileClass} canRecord={canRecord} slug={roomName} isConnected={isConnected} onCopyLink={handleCopyLink} isMeetingMuted={isMeetingMuted} onToggleMeetingMute={toggleMeetingMute} isRecording={isRecording} recordingSeconds={recordingSeconds} onToggleRecording={handleToggleRecording} isVoiceRecording={isVoiceRecording} voiceRecordingSeconds={voiceRecordingSeconds} onToggleVoiceRecording={handleToggleVoiceRecording} />
 
