@@ -5,6 +5,7 @@ import {
     RECONNECT_CONFIG,
     JITSI_INIT_OPTIONS,
     DESKTOP_SHARING_FRAME_RATE,
+    MULTI_STREAM_ENABLED,
     LOCAL_VIDEO_CONFIG,
     RECEIVER_QUALITY,
     PERF,
@@ -36,8 +37,9 @@ import {
  * 5. Screen-share permission is requested only after startScreenShare().
  * 6. Remote participants/tracks are available after conference join.
  * 7. Local media tracks are created lazily.
- * 8. Classroom screen-share keeps camera and desktop as independent tracks when
- *    the Jitsi deployment supports multi-stream video.
+ * 8. Screen-share: by default (MULTI_STREAM_ENABLED) camera and desktop are
+ *    independent tracks. With VITE_JITSI_MULTI_STREAM=false the camera is swapped
+ *    out for the desktop track and restored afterwards (single video slot).
  * 9. Async operations are protected against race conditions.
  * 10. Local tracks are disposed safely.
  * 11. Echo mitigation is delegated to WebRTC/Jitsi audio processing.
@@ -1342,8 +1344,13 @@ export class JitsiController {
         const JitsiMeetJS = ensureJitsiInitialized()
         this._screenShareTransitioning = true
 
+        // true  = دوربین و دسکتاپ هم‌زمان (پیش‌فرض؛ multi-stream روی سرور)
+        // false = مدل قدیمی meet: دوربین جایگزین دسکتاپ می‌شود
+        const keepCamera = MULTI_STREAM_ENABLED
+
         let desktopTrack = null
         let trackAttached = false
+        let cameraRemoved = false
 
         try {
             const tracks = await JitsiMeetJS.createLocalTracks({
@@ -1356,18 +1363,34 @@ export class JitsiController {
                 throw new Error('Could not create desktop track')
             }
 
+            const cameraTrack = this._findCameraTrack()
+
             this._bindLocalTrackEvents(desktopTrack)
 
-            // Camera and desktop are separate tracks. Keep the camera alive so
-            // participants can see the teacher while the shared content is shown.
-            await this._conference.addTrack(desktopTrack)
-            trackAttached = true
-            this._localTracks.push(desktopTrack)
+            if (!keepCamera && cameraTrack) {
+                // مهم: اول camera را کامل از سرور حذف کن، بعد desktop را اضافه کن.
+                // سرور فقط یک اسلات ویدیو به ازای هر نفر دارد؛ اگر برعکس انجام شود،
+                // سرور روی camera قفل می‌ماند و بقیه هیچ‌وقت desktop را نمی‌بینند.
+                await this._conference.removeTrack(cameraTrack)
+                cameraRemoved = true
+
+                await this._safeDisposeTrack(cameraTrack)
+
+                await this._conference.addTrack(desktopTrack)
+                trackAttached = true
+
+                this._replaceLocalTrack(cameraTrack, desktopTrack)
+            } else {
+                // بدون دوربین (یا حالت multi-stream): desktop فقط اضافه می‌شود
+                await this._conference.addTrack(desktopTrack)
+                trackAttached = true
+                this._localTracks.push(desktopTrack)
+            }
 
             this._screenShare = {
                 active: true,
                 desktopTrack,
-                wasCameraActiveBefore: Boolean(this._findCameraTrack()),
+                wasCameraActiveBefore: Boolean(cameraTrack),
             }
 
             const stoppedHandler = this._handleDesktopTrackStopped
@@ -1383,14 +1406,24 @@ export class JitsiController {
             this._broadcastScreenShareState(true)
             return true
         } catch (error) {
-            if (desktopTrack) {
-                if (trackAttached) {
-                    try {
-                        await this._conference?.removeTrack(desktopTrack)
-                    } catch (removeError) {
-                        console.warn('[JitsiController] Could not remove failed screen-share track:', removeError)
-                    }
+            try {
+                if (trackAttached && desktopTrack) {
+                    await this._conference?.removeTrack(desktopTrack)
                 }
+
+                // اگر دوربین حذف شده بود ولی بعدش خطا خوردیم، برای اینکه
+                // کاربر کاملاً بدون تصویر نماند، یک دوربین تازه می‌سازیم.
+                if (cameraRemoved) {
+                    await this._createAndAddLocalTrack('video')
+                }
+            } catch (rollbackError) {
+                console.warn(
+                    '[JitsiController] Screen-share rollback failed:',
+                    rollbackError
+                )
+            }
+
+            if (desktopTrack) {
                 this._removeLocalTrack(desktopTrack)
                 await this._safeDisposeTrack(desktopTrack)
             }
@@ -1404,6 +1437,7 @@ export class JitsiController {
             const normalized = normalizeError(error, ERROR_CODES.SCREEN_SHARE_FAILED)
             console.warn('[JitsiController] Screen share failed:', normalized)
             this._emit(JITSI_EVENTS.SCREEN_SHARE_FAILED, normalized)
+
             return false
         } finally {
             this._screenShareTransitioning = false
@@ -1411,9 +1445,9 @@ export class JitsiController {
     }
 
     /**
-     * Stop only the desktop track. The camera track is independent and must
-     * remain active; this also keeps the remote store in sync when cleanup
-     * encounters a Jitsi removeTrack error.
+     * Stop screen sharing. A screen-share stop/failure must NEVER tear down the
+     * Jitsi connection. In single-slot mode (default) the camera is recreated
+     * afterwards; in multi-stream mode the camera was never touched.
      */
     async stopScreenShare() {
         if (!this._conference || !this._screenShare.active) {
@@ -1426,6 +1460,8 @@ export class JitsiController {
 
         this._screenShareTransitioning = true
         const desktopTrack = this._screenShare.desktopTrack
+        const shouldRestoreCamera =
+            !MULTI_STREAM_ENABLED && this._screenShare.wasCameraActiveBefore
         const mappedDesktop = desktopTrack ? mapTrack(desktopTrack) : null
         let removeError = null
 
@@ -1454,6 +1490,18 @@ export class JitsiController {
                 active: false,
                 desktopTrack: null,
                 wasCameraActiveBefore: false,
+            }
+
+            if (shouldRestoreCamera) {
+                // دوربین را از صفر می‌سازیم — دقیقاً همان مسیر toggleVideo
+                // که همیشه درست کار کرده، نه resurrect کردن track قدیمی.
+                const restored = await this._createAndAddLocalTrack('video')
+
+                if (!restored) {
+                    console.warn(
+                        '[JitsiController] Failed to restore camera after screen share stopped'
+                    )
+                }
             }
 
             this._emit(JITSI_EVENTS.SCREEN_SHARE_STOPPED)

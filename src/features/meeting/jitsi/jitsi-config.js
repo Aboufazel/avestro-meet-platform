@@ -79,6 +79,17 @@ const IS_MOBILE = isMobileDevice()
 const IS_LOW_END = isLowEndDevice()
 
 /**
+ * مدل ارسال ویدیو:
+ *  - true (پیش‌فرض): دوربین و دسکتاپ هم‌زمان و جدا ارسال می‌شوند
+ *    (sendMultipleVideoStreams). سرور Jicofo/JVB فعلی این را پشتیبانی می‌کند.
+ *  - false (مدل قدیمی meet): هر نفر یک اسلات ویدیو دارد؛ هنگام اشتراک صفحه
+ *    دوربین جایگزین دسکتاپ می‌شود و بعد از پایان برمی‌گردد.
+ *    خاموش‌کردن: VITE_JITSI_MULTI_STREAM=false در .env
+ */
+export const MULTI_STREAM_ENABLED =
+  import.meta.env.VITE_JITSI_MULTI_STREAM !== 'false'
+
+/**
  * low    : موبایل/دسکتاپ ضعیف  → کمترین مصرف
  * medium : موبایل معمولی
  * high   : دسکتاپ قوی
@@ -90,16 +101,16 @@ export const PERF = {
 
   // حداکثر تعداد ویدیوی «زنده» که هم‌زمان decode می‌شود (دریافتی از bridge).
   // بقیه‌ی شرکت‌کننده‌ها فقط صدا + آواتار دارند.
-  maxRemoteVideos: { low: 3, medium: 5, high: 8 }[DEVICE_TIER],
+  maxRemoteVideos: { low: 4, medium: 6, high: 12 }[DEVICE_TIER],
 
   // ارتفاع ویدیوی ارسالی دوربین خودمان (encode روی CPU/GPU گوشی)
-  sendHeight: { low: 360, medium: 360, high: 480 }[DEVICE_TIER],
+  sendHeight: { low: 360, medium: 480, high: 720 }[DEVICE_TIER],
 
   // سقف فریم‌ریت دوربین ارسالی (best-effort؛ پایین‌تر = انکودر خنک‌تر)
-  sendMaxFps: { low: 15, medium: 20, high: 24 }[DEVICE_TIER],
+  sendMaxFps: { low: 20, medium: 24, high: 30 }[DEVICE_TIER],
 
   // کیفیت دریافتی: تایل بزرگ (focus / active speaker) در مقابل تایل کوچک
-  receiveLargeHeight: { low: 360, medium: 360, high: 540 }[DEVICE_TIER],
+  receiveLargeHeight: { low: 360, medium: 480, high: 720 }[DEVICE_TIER],
   receiveSmallHeight: 180,
 
   // اشتراک صفحه در قاب سینمایی بزرگ نمایش داده می‌شود؛ متن باید خوانا بماند
@@ -115,9 +126,7 @@ export const PERF = {
 // این گزینه‌ها طبق IJitsiMeetJSOptions مستندات lib-jitsi-meet معتبرند.
 // =============================================================================
 export const JITSI_INIT_OPTIONS = {
-  // audio level در هیچ‌جای اپ استفاده نمی‌شود (active speaker از سرور می‌آید)،
-  // ولی برای هر track یک AnalyserNode دائمی اجرا می‌کند.
-  disableAudioLevels: true,
+  disableAudioLevels: false,
   desktopSharingFrameRate: { min: 5, max: 15 },
   audioLevelsInterval: PERF.audioLevelsInterval,
   disableThirdPartyRequests: true,
@@ -145,23 +154,22 @@ export const CONFERENCE_CONFIG = {
 
     // کدک نرم‌افزاری سنگین (AV1/VP9) روی دستگاه ضعیف = CPU بالا = گرما.
     // VP8 روی همه‌جا کار می‌کند و H264 معمولاً hardware-accelerated است.
-    // VP9 نرم‌افزاری روی دسکتاپ مصرف CPU را بالا می‌برد؛ حذف شد.
-    codecPreferenceOrder: prefersH264() ? ['H264', 'VP8'] : ['VP8', 'H264'],
-    mobileCodecPreferenceOrder: prefersH264() ? ['H264', 'VP8'] : ['VP8', 'H264'],
+    codecPreferenceOrder:
+      DEVICE_TIER === 'high' ? ['VP9', 'VP8', 'H264'] : ['VP8', 'H264'],
+    mobileCodecPreferenceOrder: ['VP8', 'H264'],
   },
 
   p2p: { enabled: false },
 
-  // بدون کانال bridge، setReceiverConstraints/lastN بی‌اثر می‌شود و کلاینت
-  // همه‌ی ویدیوها را دریافت می‌کند (لگ + داغ شدن).
-  openBridgeChannel: true,
-
-  // Send camera and desktop as separate video sources. Requires multi-stream
-  // support in the deployed Jitsi/Jicofo/JVB versions.
-  flags: {
-    sendMultipleVideoStreams: true,
-    receiveMultipleVideoStreams: true,
-  },
+  // multi-stream با سوییچ MULTI_STREAM_ENABLED (بالای همین فایل) کنترل می‌شود.
+  ...(MULTI_STREAM_ENABLED
+    ? {
+        flags: {
+          sendMultipleVideoStreams: true,
+          receiveMultipleVideoStreams: true,
+        },
+      }
+    : {}),
 
   // اشتراک صفحه: پیش‌فرض lib فقط ۵fps است
   desktopSharingFrameRate: { min: 5, max: 15 },
