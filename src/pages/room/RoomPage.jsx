@@ -18,6 +18,7 @@ import { useClassAccess } from '../../hooks/useClassAccess'
 import { ClassLayout } from '../../features/meeting/components/ClassLayout'
 import { ClassSheets } from '../../features/meeting/components/ClassSheets'
 import { HandRequestToasts } from '../../features/meeting/components/HandRequestToasts'
+import { canFullscreen, isFullscreen, enterFullscreen } from '../../features/meeting/utils/fullscreen'
 import { useParticipants } from '../../features/meeting/hooks/useParticipants'
 import { useClassViewport } from '../../features/meeting/hooks/useClassViewport'
 import { useHandRequests } from '../../features/meeting/hooks/useHandRequests'
@@ -78,19 +79,13 @@ export default function RoomPage() {
     if (classLayout && classContentMode) closeMeetingPanel()
   }, [classLayout, classContentMode, closeMeetingPanel])
 
-  // گوشی: با اولین لمس تمام‌صفحه می‌شود تا تب و نوار آدرس مرورگر مخفی شود (مرورگرهایی که پشتیبانی کنند،
-  // مثل Chrome اندروید) و جهت صفحه افقی قفل می‌شود. iOS Safari این امکان را ندارد.
+  // گوشی: با لمس تمام‌صفحه می‌شود. پنجره‌ی اجازه‌ی دوربین اولین لمس را می‌گیرد؛ پس تا وقتی موفق
+  // نشده روی هر لمس دوباره تلاش می‌شود. دکمه‌ی «تمام‌صفحه» در منوی بیشتر هم همین کار را می‌کند.
   useEffect(() => {
-    if (!compactClass) return undefined
-    const enter = () => {
-      const el = document.documentElement
-      if (document.fullscreenElement || !el.requestFullscreen) return
-      el.requestFullscreen({ navigationUI: 'hide' })
-        .then(() => window.screen?.orientation?.lock?.('landscape').catch(() => {}))
-        .catch(() => {})
-    }
-    window.addEventListener('pointerup', enter, { once: true })
-    return () => window.removeEventListener('pointerup', enter)
+    if (!compactClass || !canFullscreen() || isFullscreen()) return undefined
+    const onTap = async () => { if (await enterFullscreen()) window.removeEventListener('pointerup', onTap) }
+    window.addEventListener('pointerup', onTap)
+    return () => window.removeEventListener('pointerup', onTap)
   }, [compactClass])
 
   const access = useClassAccess(roomName, { enabled: isConnected && (classLayout || moderated || handFeature || canWhiteboard) })
@@ -249,7 +244,7 @@ export default function RoomPage() {
     <ClassViewportContext.Provider value={viewportValue}>
     <ClassAccessContext.Provider value={access}>
     <div dir="rtl" className={shellClass} style={classLayout ? viewport.shellStyle : undefined}>
-      <RoomHeader canRecord={canRecord} slug={roomName} isConnected={isConnected} onCopyLink={handleCopyLink} isMeetingMuted={isMeetingMuted} onToggleMeetingMute={toggleMeetingMute} isRecording={isRecording} recordingSeconds={recordingSeconds} onToggleRecording={handleToggleRecording} isVoiceRecording={isVoiceRecording} voiceRecordingSeconds={voiceRecordingSeconds} onToggleVoiceRecording={handleToggleVoiceRecording} />
+      <RoomHeader showFullscreen={compactClass} canRecord={canRecord} slug={roomName} isConnected={isConnected} onCopyLink={handleCopyLink} isMeetingMuted={isMeetingMuted} onToggleMeetingMute={toggleMeetingMute} isRecording={isRecording} recordingSeconds={recordingSeconds} onToggleRecording={handleToggleRecording} isVoiceRecording={isVoiceRecording} voiceRecordingSeconds={voiceRecordingSeconds} onToggleVoiceRecording={handleToggleVoiceRecording} />
 
       <div className="flex-1 min-h-0 relative">
         {compactClass ? (

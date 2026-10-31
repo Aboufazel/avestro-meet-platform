@@ -1,7 +1,8 @@
 import { memo, useState } from 'react'
-import { MessageSquare, Mic, MicOff, MonitorUp, PhoneOff, Settings, Users, Video, VideoOff, MoreHorizontal, Hand, UserCheck, PenTool } from 'lucide-react'
+import { MessageSquare, Mic, MicOff, MonitorUp, PhoneOff, Settings, Users, Video, VideoOff, MoreHorizontal, Hand, UserCheck, PenTool, Maximize, Minimize } from 'lucide-react'
 import { selectActivePanelTab, selectIsPanelOpen, selectUnreadCount } from '../store/meeting-selectors'
 import { useMeetingStore } from '../store/meeting-store'
+import { canFullscreen, isFullscreen, toggleFullscreen } from '../utils/fullscreen'
 
 export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isVideoMuted, isScreenSharing, onToggleAudio, onToggleVideo, onToggleScreenShare, onLeave, canChat = true, canParticipants = true, canScreenShare = true, showHand = false, isHandRaised = false, onToggleHand, showMic = true, showCamera = true, showAttendance = false, onOpenAttendance, rail = false, showSettings = true, handCount = 0, showBoard = false, boardOpen = false, onToggleBoard }) {
   const unreadCount = useMeetingStore(selectUnreadCount)
@@ -20,6 +21,7 @@ export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isV
     const moreItems = [
       canScreenShare && { key: 'share', label: isScreenSharing ? 'توقف اشتراک صفحه' : 'اشتراک‌گذاری صفحه', icon: <MonitorUp size={19} />, onClick: onToggleScreenShare },
       showAttendance && { key: 'attendance', label: 'حضور و غیاب', icon: <UserCheck size={19} />, onClick: onOpenAttendance },
+      canFullscreen() && { key: 'fullscreen', label: isFullscreen() ? 'خروج از تمام‌صفحه' : 'تمام‌صفحه (مخفی‌کردن نوار مرورگر)', icon: isFullscreen() ? <Minimize size={19} /> : <Maximize size={19} />, onClick: toggleFullscreen },
       showSettings && { key: 'settings', label: 'تنظیمات', icon: <Settings size={19} />, onClick: openSettings },
     ].filter(Boolean)
     const runMore = (fn) => () => { setMoreOpen(false); fn?.() }
