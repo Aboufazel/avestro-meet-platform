@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { MessageSquare, Mic, MicOff, MonitorUp, PhoneOff, Settings, Users, Video, VideoOff, MoreHorizontal, Hand, UserCheck, PenTool, Maximize, Minimize, FileText } from 'lucide-react'
 import { selectActivePanelTab, selectIsPanelOpen, selectUnreadCount } from '../store/meeting-selectors'
 import { useMeetingStore } from '../store/meeting-store'
@@ -12,6 +12,12 @@ export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isV
   const togglePanel = useMeetingStore((s) => s.togglePanel)
 
   const [moreOpen, setMoreOpen] = useState(false)
+  const [, setFsTick] = useState(0) // آیکن تمام‌صفحه با تغییر واقعی وضعیت به‌روز شود
+  useEffect(() => {
+    const sync = () => setFsTick((n) => n + 1)
+    document.addEventListener('fullscreenchange', sync)
+    return () => document.removeEventListener('fullscreenchange', sync)
+  }, [])
 
   if (rail) {
     // گوشیِ کلاس: ریل عمودی کنار صحنه. روی محتوا قرار نمی‌گیرد و با ارتفاع نمایش هماهنگ است.
@@ -22,7 +28,6 @@ export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isV
       canScreenShare && { key: 'share', label: isScreenSharing ? 'توقف اشتراک صفحه' : 'اشتراک‌گذاری صفحه', icon: <MonitorUp size={19} />, onClick: onToggleScreenShare },
       showDocuments && { key: 'documents', label: 'فایل‌های کلاس', icon: <FileText size={19} />, onClick: onOpenDocuments },
       showAttendance && { key: 'attendance', label: 'حضور و غیاب', icon: <UserCheck size={19} />, onClick: onOpenAttendance },
-      canFullscreen() && { key: 'fullscreen', label: isFullscreen() ? 'خروج از تمام‌صفحه' : 'تمام‌صفحه (مخفی‌کردن نوار مرورگر)', icon: isFullscreen() ? <Minimize size={19} /> : <Maximize size={19} />, onClick: toggleFullscreen },
       showSettings && { key: 'settings', label: 'تنظیمات', icon: <Settings size={19} />, onClick: openSettings },
     ].filter(Boolean)
     const runMore = (fn) => () => { setMoreOpen(false); fn?.() }
@@ -46,6 +51,7 @@ export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isV
           {canParticipants && <RailButton state={peopleActive ? 'active' : 'idle'} onClick={() => togglePanel('participants')} label={handCount > 0 ? `شرکت‌کنندگان؛ ${handCount} درخواست صحبت` : 'شرکت‌کنندگان'} pressed={peopleActive} badge={handCount} badgeKind="hand" icon={<Users size={19} />} />}
           {moreItems.length > 0 && <RailButton state={moreOpen ? 'active' : 'idle'} onClick={() => setMoreOpen((v) => !v)} label="بیشتر" pressed={moreOpen} icon={<MoreHorizontal size={19} />} />}
           <span className="cl-rail-spacer" />
+          {canFullscreen() && <RailButton state="idle" onClick={toggleFullscreen} label={isFullscreen() ? 'خروج از تمام‌صفحه' : 'تمام‌صفحه'} icon={isFullscreen() ? <Minimize size={19} /> : <Maximize size={19} />} />}
           <RailButton state="danger" onClick={onLeave} label="خروج از کلاس" icon={<PhoneOff size={19} />} />
         </div>
       </div>
