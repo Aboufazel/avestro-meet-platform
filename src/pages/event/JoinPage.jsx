@@ -76,6 +76,7 @@ export default function JoinPage() {
             <div className="relative">
               <div className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs bg-white/[.05] border border-white/[.08] text-white/65"><span className={`w-1.5 h-1.5 rounded-full ${status.dot} ${room.status === 'live' ? 'animate-pulse' : ''}`} /> {status.label}</div>
               <h1 className="text-2xl sm:text-4xl font-bold mt-4 sm:mt-7 leading-tight">{room.title}</h1>
+              {room.kind === 'class' && room.teacher_display_name && <p className="text-sm text-white/60 mt-3">مدرس: {room.teacher_display_name}</p>}
               {room.description && <p className="text-sm text-white/45 leading-7 mt-4 max-w-xl">{room.description}</p>}
             </div>
             <div className="relative grid grid-cols-2 gap-2 sm:gap-3 mt-5 sm:mt-10">

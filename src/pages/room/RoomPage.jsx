@@ -26,6 +26,8 @@ import { ClassAccessContext } from '../../features/meeting/ClassAccessContext'
 import { ClassViewportContext } from '../../features/meeting/ClassViewportContext'
 import { PenTool } from 'lucide-react'
 import WhiteboardPanel from '../../features/whiteboard/WhiteboardPanel'
+import { DocumentStage } from '../../features/meeting/components/DocumentStage'
+import { DocumentsModal } from '../../features/meeting/components/DocumentsModal'
 
 export default function RoomPage() {
   const { slug: roomName } = useParams()
@@ -43,6 +45,7 @@ export default function RoomPage() {
   const canScreenShare = can('screen_share')
   const canRecord = can('recording')
   const canWhiteboard = has('whiteboard')
+  const canDocuments = kind === 'class' && has('documents')
 
   // ───── کنترل صحبت/تصویر (لحظه‌ای از طریق WebSocket) ─────
   // بر اساس فعال‌بودن ماژول است، نه نوع رویداد؛ پس هر امکان برای سمینار هم قابل روشن‌کردن است.
@@ -51,6 +54,7 @@ export default function RoomPage() {
   const handFeature = has('raise_hand')
   const canControlMedia = isHostRole && has('speak_permission', 'control')
   const canAttendance = isHostRole && has('attendance', 'control')
+  const canControlDocuments = isHostRole && has('documents', 'control')
   const classLayout = kind === 'class'
   // در کلاس فقط معلم/مدیر دکمه‌ی اشتراک صفحه را می‌بیند؛ رفتار سمینار تغییری نکرده
   const canShowScreenShare = canScreenShare && (!classLayout || isHostRole)
@@ -60,16 +64,21 @@ export default function RoomPage() {
   const compactClass = classLayout && viewport.compact
 
   const [attendanceOpen, setAttendanceOpen] = useState(false)
+  const [documentsOpen, setDocumentsOpen] = useState(false)
   const [whiteboardOpen, setWhiteboardOpen] = useState(false)
   const [whiteboardObjects, setWhiteboardObjects] = useState([])
   const storeHand = useMeetingStore((s) => !!s.participants.get(s.localParticipantId)?.isHandRaised)
 
   const { error, isConnecting, isReconnecting, isAudioMuted, isVideoMuted, isScreenSharing, isConnected, leave, toggleAudio, toggleVideo, toggleScreenShare } = useJitsi(roomName)
   const { participants } = useParticipants()
-  const boardOpen = canWhiteboard && whiteboardOpen
+  const access = useClassAccess(roomName, { enabled: isConnected && (classLayout || moderated || handFeature || canWhiteboard) })
+  // صحنه‌ی سند و تخته هم‌زمان نیستند؛ سرور هم همین را تضمین می‌کند.
+  const docState = access.documentState
+  const docOpen = canDocuments && Boolean(docState?.is_open && docState?.document)
+  const boardOpen = canWhiteboard && whiteboardOpen && !docOpen
   // تخته و اشتراک صفحه هر دو چیدمان «محتوا» را فعال می‌کنند.
   const hasActiveScreenShare = isScreenSharing || participants.some((participant) => participant.isScreenSharing)
-  const classContentMode = classLayout && (boardOpen || hasActiveScreenShare)
+  const classContentMode = classLayout && (boardOpen || docOpen || hasActiveScreenShare)
 
   // ورود به کلاس در گوشی و شروع تخته/اشتراک صفحه: پنل‌ها بسته شروع شوند (نه بازشدن خودکار روی محتوا)
   useEffect(() => {
@@ -88,7 +97,6 @@ export default function RoomPage() {
     return () => window.removeEventListener('pointerup', onTap)
   }, [compactClass])
 
-  const access = useClassAccess(roomName, { enabled: isConnected && (classLayout || moderated || handFeature || canWhiteboard) })
   const me = access.me
   const handRequests = useHandRequests(access.roster, classLayout && isHostRole)
 
@@ -201,6 +209,19 @@ export default function RoomPage() {
     />
   ) : null
 
+  const documentStage = docOpen ? (
+    <DocumentStage
+      slug={roomName}
+      state={docState}
+      canControl={canControlDocuments}
+      onPage={access.setDocumentPage}
+      onClose={access.closeDocument}
+      onSettings={access.setDocumentSettings}
+      onClearPage={access.clearDocumentPage}
+      onAnnotate={access.annotateDocument}
+    />
+  ) : null
+
   const viewportValue = useMemo(() => viewport, [viewport])
 
   if (isConnecting && !isReconnecting) return <div className="fixed inset-0 room-shell text-white"><MeetingLoading /></div>
@@ -217,11 +238,12 @@ export default function RoomPage() {
     showHand: canHand, isHandRaised, onToggleHand: handleToggleHand,
     showMic, showCamera, showAttendance: canAttendance, onOpenAttendance: () => setAttendanceOpen(true),
     handCount: handRequests.pending.length,
+    showDocuments: canControlDocuments, onOpenDocuments: () => setDocumentsOpen(true), documentOpen: docOpen,
   }
 
   const classStage = classLayout && (
     <>
-      <ClassLayout board={board} contentMode={classContentMode} onStopShare={toggleScreenShare} />
+      <ClassLayout board={documentStage || board} contentMode={classContentMode} onStopShare={toggleScreenShare} />
       {isHostRole && (
         <HandRequestToasts
           notices={handRequests.notices}
@@ -264,7 +286,7 @@ export default function RoomPage() {
               <main className="relative flex-1 min-w-0 min-h-0 room-surface overflow-hidden rounded-[20px] border room-border room-panel-shadow">
                 <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_42%,rgba(77,125,255,.08),transparent_34%)]" />
                 {classLayout ? classStage : <VideoGrid />}
-                {classLayout && canWhiteboard && isHostRole && !boardOpen && <button type="button" onClick={openWhiteboard} className="absolute top-3 right-3 z-30 flex items-center gap-2 rounded-xl border room-border bg-[var(--room-surface)]/95 px-3 py-2 text-xs text-white shadow-lg transition hover:bg-[var(--room-elevated)]" aria-label="بازکردن تخته تعاملی"><PenTool size={16} /><span>تخته تعاملی</span></button>}
+                {classLayout && canWhiteboard && isHostRole && !boardOpen && !docOpen && <button type="button" onClick={openWhiteboard} className="absolute top-3 right-3 z-30 flex items-center gap-2 rounded-xl border room-border bg-[var(--room-surface)]/95 px-3 py-2 text-xs text-white shadow-lg transition hover:bg-[var(--room-elevated)]" aria-label="بازکردن تخته تعاملی"><PenTool size={16} /><span>تخته تعاملی</span></button>}
                 {reconnectBanner}
                 <MeetingControls {...controlProps} />
               </main>
@@ -272,6 +294,7 @@ export default function RoomPage() {
           </div>
         )}
         <SettingsModal />
+        {canControlDocuments && <DocumentsModal slug={roomName} open={documentsOpen} activeId={docOpen ? docState.document.id : null} onClose={() => setDocumentsOpen(false)} onShow={(doc) => access.openDocument(doc.id)} onRemoved={() => access.closeDocument()} />}
         {canAttendance && <AttendanceModal slug={roomName} open={attendanceOpen} onClose={() => setAttendanceOpen(false)} />}
       </div>
     </div>

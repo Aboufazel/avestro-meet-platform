@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, ArrowLeft, GraduationCap, Presentation, CalendarDays, Users, ShieldCheck, PenTool, MessageCircle, ScreenShare, Video, Hand, ClipboardCheck, Mic, Check, Loader2, Settings2 } from 'lucide-react'
+import { ArrowRight, ArrowLeft, GraduationCap, Presentation, CalendarDays, Users, ShieldCheck, PenTool, MessageCircle, ScreenShare, Video, Hand, ClipboardCheck, Mic, Check, Loader2, Settings2, FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import { Button } from '../../components/ui/Button'
@@ -18,6 +18,7 @@ const FEATURE_META = {
   speak_permission: { title: 'مدیریت دسترسی میکروفون و دوربین', hint: 'کنترل باز شدن میکروفون و دوربین شرکت‌کنندگان', icon: Mic, kinds: ['class', 'seminar'] },
   raise_hand: { title: 'دست بلند کردن', hint: 'ارسال درخواست صحبت و مدیریت صف', icon: Hand, kinds: ['class', 'seminar'] },
   attendance: { title: 'حضور و غیاب', hint: 'ثبت وضعیت حضور شرکت‌کنندگان', icon: ClipboardCheck, kinds: ['class', 'seminar'] },
+  documents: { title: 'اشتراک فایل در کلاس', hint: 'نمایش عکس، PDF، Word و PowerPoint داخل خود کلاس و نوشتن روی آن', icon: FileText, kinds: ['class'] },
   whiteboard: { title: 'تخته تعاملی', hint: 'فضای نوشتن و ترسیم هم‌زمان؛ مخصوص کلاس آموزشی', icon: PenTool, kinds: ['class'] },
 }
 
@@ -37,6 +38,7 @@ export default function CreateEventPage() {
   const [slug, setSlug] = useState('')
   const [slugTouched, setSlugTouched] = useState(false)
   const [description, setDescription] = useState('')
+  const [teacherName, setTeacherName] = useState('')
   const [scheduledAt, setScheduledAt] = useState('')
   const [maxParticipants, setMaxParticipants] = useState('100')
   const [isPrivate, setIsPrivate] = useState(false)
@@ -88,6 +90,7 @@ export default function CreateEventPage() {
         title: title.trim(),
         slug: slug.trim(),
         description,
+        ...(kind === 'class' ? { teacher_name: teacherName.trim() } : {}),
         scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
         max_participants: capacity,
         is_private: isPrivate,
@@ -199,6 +202,12 @@ export default function CreateEventPage() {
                 <Input label="شناسه رویداد (لینک)" placeholder="project-management" value={slug} onChange={(event) => { setSlugTouched(true); setSlug(slugify(event.target.value)) }} className="meet-auth-input" />
                 <p className="mt-1.5 text-xs text-[#8d98aa]">لینک ورود: meet.avestro.ir/join/{slug || 'your-event'}</p>
               </div>
+              {kind === 'class' && (
+                <div>
+                  <Input label="نام معلم (اختیاری)" placeholder="مثلاً خانم احمدی" value={teacherName} maxLength={150} onChange={(event) => setTeacherName(event.target.value)} className="meet-auth-input" />
+                  <p className="mt-1.5 text-xs text-[#8d98aa]">در گزارش حضور و غیاب نمایش داده می‌شود. اگر خالی بماند، نام صاحب حساب نوشته می‌شود.</p>
+                </div>
+              )}
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm text-[#536074]">توضیحات (اختیاری)</label>
                 <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} placeholder="توضیح کوتاهی درباره رویداد..." className="w-full resize-none rounded-xl border border-[#e1e6ef] bg-[#f8faff] px-4 py-3 text-sm text-[#101827] outline-none transition focus:border-[#9eb6ff] focus:ring-2 focus:ring-[#4f7cff]/15" />

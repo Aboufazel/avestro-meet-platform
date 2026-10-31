@@ -1,10 +1,10 @@
 import { memo, useState } from 'react'
-import { MessageSquare, Mic, MicOff, MonitorUp, PhoneOff, Settings, Users, Video, VideoOff, MoreHorizontal, Hand, UserCheck, PenTool, Maximize, Minimize } from 'lucide-react'
+import { MessageSquare, Mic, MicOff, MonitorUp, PhoneOff, Settings, Users, Video, VideoOff, MoreHorizontal, Hand, UserCheck, PenTool, Maximize, Minimize, FileText } from 'lucide-react'
 import { selectActivePanelTab, selectIsPanelOpen, selectUnreadCount } from '../store/meeting-selectors'
 import { useMeetingStore } from '../store/meeting-store'
 import { canFullscreen, isFullscreen, toggleFullscreen } from '../utils/fullscreen'
 
-export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isVideoMuted, isScreenSharing, onToggleAudio, onToggleVideo, onToggleScreenShare, onLeave, canChat = true, canParticipants = true, canScreenShare = true, showHand = false, isHandRaised = false, onToggleHand, showMic = true, showCamera = true, showAttendance = false, onOpenAttendance, rail = false, showSettings = true, handCount = 0, showBoard = false, boardOpen = false, onToggleBoard }) {
+export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isVideoMuted, isScreenSharing, onToggleAudio, onToggleVideo, onToggleScreenShare, onLeave, canChat = true, canParticipants = true, canScreenShare = true, showHand = false, isHandRaised = false, onToggleHand, showMic = true, showCamera = true, showAttendance = false, onOpenAttendance, rail = false, showSettings = true, handCount = 0, showBoard = false, boardOpen = false, onToggleBoard, showDocuments = false, documentOpen = false, onOpenDocuments }) {
   const unreadCount = useMeetingStore(selectUnreadCount)
   const activeTab = useMeetingStore(selectActivePanelTab)
   const isPanelOpen = useMeetingStore(selectIsPanelOpen)
@@ -20,6 +20,7 @@ export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isV
     const peopleActive = isPanelOpen && activeTab === 'participants'
     const moreItems = [
       canScreenShare && { key: 'share', label: isScreenSharing ? 'توقف اشتراک صفحه' : 'اشتراک‌گذاری صفحه', icon: <MonitorUp size={19} />, onClick: onToggleScreenShare },
+      showDocuments && { key: 'documents', label: 'فایل‌های کلاس', icon: <FileText size={19} />, onClick: onOpenDocuments },
       showAttendance && { key: 'attendance', label: 'حضور و غیاب', icon: <UserCheck size={19} />, onClick: onOpenAttendance },
       canFullscreen() && { key: 'fullscreen', label: isFullscreen() ? 'خروج از تمام‌صفحه' : 'تمام‌صفحه (مخفی‌کردن نوار مرورگر)', icon: isFullscreen() ? <Minimize size={19} /> : <Maximize size={19} />, onClick: toggleFullscreen },
       showSettings && { key: 'settings', label: 'تنظیمات', icon: <Settings size={19} />, onClick: openSettings },
@@ -61,6 +62,7 @@ export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isV
         className="room-control h-10 sm:h-11 px-3 sm:px-4 rounded-xl sm:rounded-2xl flex items-center gap-2 bg-[var(--room-blue)] text-white text-xs font-medium shadow-[0_8px_22px_rgba(77,125,255,.35)] hover:brightness-110">
         <UserCheck size={17} /><span className="hidden sm:inline">حضور و غیاب</span>
       </button>}
+      {showDocuments && <ControlButton active={documentOpen} onClick={onOpenDocuments} label="فایل‌های کلاس" icon={<FileText size={17} />} extra="" />}
       {canScreenShare && <ControlButton active={isScreenSharing} onClick={onToggleScreenShare} label="اشتراک‌گذاری" icon={<MonitorUp size={17} />} extra="" />}
       {showCamera && <ControlButton active={!isVideoMuted} off={isVideoMuted} onClick={onToggleVideo} label="دوربین" icon={isVideoMuted ? <VideoOff size={17} /> : <Video size={17} />} />}
       {showMic && <ControlButton active={!isAudioMuted} off={isAudioMuted} onClick={onToggleAudio} label="میکروفون" icon={isAudioMuted ? <MicOff size={17} /> : <Mic size={17} />} />}

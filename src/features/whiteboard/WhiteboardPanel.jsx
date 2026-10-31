@@ -55,7 +55,11 @@ const hitsItem = (item, p, r) => {
  * طراحی: یک نوار ابزار فشرده؛ ابزارهای پرکاربرد مستقیم، بقیه (اشکال، رنگ و ضخامت، بیشتر)
  * فقط با درخواست کاربر در یک پنل کوچک باز می‌شوند. بوم تمام فضای باقی‌مانده را دارد.
  */
-export default function WhiteboardPanel({ onClose, initialObjects = [], onObjectsChange, onClear, readOnly = false, isHost = false }) {
+export default function WhiteboardPanel({
+  onClose, initialObjects = [], onObjectsChange, onClear, readOnly = false, isHost = false,
+  // برای صحنه‌ی سند: بوم هم‌اندازه‌ی صفحه، با تصویر صفحه به‌جای شبکه‌ی تخته
+  canvasWidth = WIDTH, canvasHeight = HEIGHT, background = null, labels = {}, moreExtra = null,
+}) {
   const rootRef = useRef(null)
   const svgRef = useRef(null)
   const textInputRef = useRef(null)
@@ -219,7 +223,7 @@ export default function WhiteboardPanel({ onClose, initialObjects = [], onObject
       <div className="wb-toolbar" role="toolbar" aria-label="ابزارهای تخته">
         {readOnly ? (
           <>
-            <span className="wb-readonly"><Hand size={15} aria-hidden="true" />تخته مدرس · فقط مشاهده</span>
+            <span className="wb-readonly"><Hand size={15} aria-hidden="true" />{labels.readOnly || 'تخته مدرس · فقط مشاهده'}</span>
             <span className="wb-spacer" />
           </>
         ) : (
@@ -272,21 +276,22 @@ export default function WhiteboardPanel({ onClose, initialObjects = [], onObject
               <button type="button" data-wb-pop-trigger className="wb-btn" aria-label="بیشتر" title="بیشتر" aria-expanded={popover === 'more'} onClick={() => togglePop('more')}><MoreHorizontal size={18} /></button>
               {popover === 'more' && (
                 <div className="wb-pop wb-pop-end" data-wb-pop role="menu">
+                  {moreExtra}
                   <button type="button" role="menuitem" className="wb-pop-item" onClick={() => { resetView(); setPopover(null) }}><RotateCcw size={17} /><span>بازنشانی نما</span></button>
-                  {isHost && <button type="button" role="menuitem" className="wb-pop-item is-danger" disabled={!objects.length} onClick={() => { setPopover(null); setClearConfirmOpen(true) }}><Trash2 size={17} /><span>پاک‌کردن تخته برای همه</span></button>}
+                  {isHost && <button type="button" role="menuitem" className="wb-pop-item is-danger" disabled={!objects.length} onClick={() => { setPopover(null); setClearConfirmOpen(true) }}><Trash2 size={17} /><span>{labels.clear || 'پاک‌کردن تخته برای همه'}</span></button>}
                 </div>
               )}
             </div>
           </>
         )}
-        {isHost && <button type="button" className="wb-btn wb-close" onClick={onClose} aria-label="بستن تخته برای کلاس" title="بستن تخته برای کلاس"><X size={18} /></button>}
+        {isHost && <button type="button" className="wb-btn wb-close" onClick={onClose} aria-label={labels.close || 'بستن تخته برای کلاس'} title={labels.close || 'بستن تخته برای کلاس'}><X size={18} /></button>}
       </div>
 
       <div className="wb-canvas-wrap">
         <svg
           ref={svgRef}
           className={`wb-canvas ${tool === 'hand' ? 'is-panning' : 'is-drawing'}`}
-          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+          viewBox={`0 0 ${canvasWidth} ${canvasHeight}`}
           onPointerDown={startGesture}
           onPointerMove={moveGesture}
           onPointerUp={endGesture}
@@ -300,13 +305,17 @@ export default function WhiteboardPanel({ onClose, initialObjects = [], onObject
             <marker id="whiteboard-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L6,3 z" fill="context-stroke" /></marker>
           </defs>
           <g transform={`translate(${pan.x} ${pan.y}) scale(${zoom})`}>
-            <rect x="-12000" y="-12000" width="24000" height="24000" fill="#ffffff" />
-            <rect x="-12000" y="-12000" width="24000" height="24000" fill="url(#whiteboard-grid)" />
+            {background || (
+              <>
+                <rect x="-12000" y="-12000" width="24000" height="24000" fill="#ffffff" />
+                <rect x="-12000" y="-12000" width="24000" height="24000" fill="url(#whiteboard-grid)" />
+              </>
+            )}
             {allObjects.map(renderObject)}
           </g>
         </svg>
 
-        {!objects.length && !draft && !readOnly && <div className="wb-empty" aria-hidden="true">با قلم روی بوم بنویسید</div>}
+        {!objects.length && !draft && !readOnly && <div className="wb-empty" aria-hidden="true">{labels.empty || 'با قلم روی بوم بنویسید'}</div>}
 
         <div className="wb-zoom" dir="ltr" role="group" aria-label="بزرگ‌نمایی">
           <button type="button" onClick={() => zoomBy(0.87)} aria-label="کوچک‌نمایی">−</button>
@@ -336,8 +345,8 @@ export default function WhiteboardPanel({ onClose, initialObjects = [], onObject
         <div className="wb-modal-backdrop" role="presentation" onPointerDown={(event) => { if (event.target === event.currentTarget) setClearConfirmOpen(false) }}>
           <section className="wb-confirm" role="dialog" aria-modal="true" aria-labelledby="wb-clear-title" dir="rtl">
             <AlertTriangle size={22} className="wb-confirm-icon" aria-hidden="true" />
-            <h2 id="wb-clear-title">پاک‌کردن تخته برای همه؟</h2>
-            <p>همه‌ی نوشته‌ها و شکل‌ها برای تمام حاضران کلاس پاک می‌شود و قابل بازگشت نیست.</p>
+            <h2 id="wb-clear-title">{labels.clearTitle || 'پاک‌کردن تخته برای همه؟'}</h2>
+            <p>{labels.clearText || 'همه‌ی نوشته‌ها و شکل‌ها برای تمام حاضران کلاس پاک می‌شود و قابل بازگشت نیست.'}</p>
             <div className="wb-confirm-actions">
               <button type="button" onClick={() => setClearConfirmOpen(false)}>انصراف</button>
               <button type="button" className="is-danger" onClick={() => { onClear?.(); setRedoStack([]); setClearConfirmOpen(false) }}><Trash2 size={15} /> پاک‌کردن</button>

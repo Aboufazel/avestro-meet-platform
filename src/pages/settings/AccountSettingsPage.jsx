@@ -15,6 +15,7 @@ const FEATURES = [
   { key: 'raise_hand', hint: 'دست‌بلندکردن و صف درخواست صحبت' },
   { key: 'attendance', hint: 'حضور و غیاب' },
   { key: 'whiteboard', hint: 'تخته تعاملی (فقط کلاس)' },
+  { key: 'documents', hint: 'اشتراک فایل در کلاس (عکس، PDF، Word، PowerPoint)' },
 ]
 
 const MEDIA_DEFAULT_OPTIONS = [

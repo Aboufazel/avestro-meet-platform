@@ -17,6 +17,7 @@
     "clsx": "^2.1.1",
     "lib-jitsi-meet": "^1.0.6",
     "lucide-react": "^1.28.0",
+    "pdfjs-dist": "4.10.38",
     "motion": "^12.43.0",
     "react": "^19.2.8",
     "react-date-object": "^2.1.9",

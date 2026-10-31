@@ -31,6 +31,11 @@ const schema = yup.object({
         .string()
         .nullable(),
 
+    teacher_name: yup
+        .string()
+        .max(150, 'حداکثر ۱۵۰ کاراکتر')
+        .nullable(),
+
     scheduled_at: yup
         .string()
         .nullable(),
@@ -76,6 +81,7 @@ export default function EditEventPage() {
         defaultValues: {
             title: '',
             description: '',
+            teacher_name: '',
             scheduled_at: '',
             max_participants: 100,
             is_private: false,
@@ -90,6 +96,7 @@ export default function EditEventPage() {
             slug: room.slug || '',
             title: room.title || '',
             description: room.description || '',
+            teacher_name: room.teacher_name || '',
             scheduled_at: room.scheduled_at
                 ? isoToLocalValue(room.scheduled_at)
                 : '',
@@ -105,6 +112,7 @@ export default function EditEventPage() {
                 slug: data.slug,
                 title: data.title,
                 description: data.description || '',
+                teacher_name: (data.teacher_name || '').trim(),
                 max_participants: Number(data.max_participants),
                 is_private: Boolean(data.is_private),
                 scheduled_at: data.scheduled_at
@@ -250,6 +258,21 @@ export default function EditEventPage() {
                             )}
                         </div>
 
+
+                        {room.kind === 'class' && (
+                            <div>
+                                <Input
+                                    className="meet-auth-input"
+                                    label="نام معلم (اختیاری)"
+                                    placeholder="مثلاً خانم احمدی"
+                                    error={errors.teacher_name?.message}
+                                    {...register('teacher_name')}
+                                />
+                                <p className="text-[#8d98aa] text-xs mt-1.5">
+                                    در گزارش حضور و غیاب نمایش داده می‌شود. اگر خالی بماند، نام صاحب حساب نوشته می‌شود.
+                                </p>
+                            </div>
+                        )}
 
                         {/* Description */}
                         <div className="flex flex-col gap-1.5">
