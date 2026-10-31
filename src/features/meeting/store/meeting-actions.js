@@ -143,6 +143,7 @@ export async function joinMeeting({roomName, displayName, email = ''}) {
         store._setError({message: allowed.message})
         return
     }
+    _startHeartbeat(roomName, externalId)
 
     /**
      * ─────────────────────────────────────────────────────────────
@@ -561,6 +562,7 @@ export async function leaveMeeting() {
     try {
         await jitsiController.leave()
     } finally {
+        _stopHeartbeat()
         _unbindAll()
         useMeetingStore.getState().resetMeeting()
         _notifyBackendLeave(roomName, externalId)
@@ -691,6 +693,43 @@ async function _checkRoomCapacity(roomName, externalId, displayName) {
 //         console.warn('[meeting-actions] Failed to notify backend of leave:', error)
 //     }
 // }
+
+// ─── Heartbeat حضور ────────────────────────────────────────────
+// بدون این، قطع شبکه/بستن مرورگر موبایل/خواب لپ‌تاپ باعث می‌شد رکورد حضور برای همیشه «آنلاین» بماند.
+const HEARTBEAT_MS = 20000
+let _heartbeatTimer = null
+
+function _stopHeartbeat() {
+    if (_heartbeatTimer) {
+        clearInterval(_heartbeatTimer)
+        _heartbeatTimer = null
+    }
+}
+
+function _startHeartbeat(roomName, externalId) {
+    _stopHeartbeat()
+    const beat = async () => {
+        // session عوض شده/خارج شده → دیگر ضربان نزن
+        if (_currentRoomName !== roomName || _currentExternalId !== externalId) {
+            _stopHeartbeat()
+            return
+        }
+        try {
+            await _postWithAuth(
+                `${API_BASE_URL}/rooms/${roomName}/heartbeat/`,
+                JSON.stringify({external_participant_id: externalId})
+            )
+        } catch (_) { /* قطعی شبکه؛ ضربان بعدی دوباره تلاش می‌کند */ }
+    }
+    _heartbeatTimer = setInterval(beat, HEARTBEAT_MS)
+    // وقتی تب دوباره دیده شد یا شبکه برگشت، فوری ضربان بزن
+    if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') beat()
+        })
+    }
+    if (typeof window !== 'undefined') window.addEventListener('online', beat)
+}
 
 async function _notifyBackendLeave(roomName, externalId) {
     if (!roomName || !externalId) return
@@ -879,7 +918,8 @@ if (typeof window !== 'undefined') {
                 `${API_BASE_URL}/rooms/${_currentRoomName}/leave/`,
                 new Blob(
                     [JSON.stringify({external_participant_id: _currentExternalId})],
-                    {type: 'application/json'}
+                    // text/plain تا درخواست cross-origin بدون preflight ارسال شود (بک‌اند بدنه را دستی می‌خواند)
+                    {type: 'text/plain;charset=UTF-8'}
                 )
             )
         }
