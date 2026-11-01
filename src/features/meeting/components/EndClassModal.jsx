@@ -4,11 +4,11 @@ import { useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CheckCircle2, Circle, Loader2, Power } from 'lucide-react'
 import { roomsService } from '../../../services/rooms'
 import { leaveMeeting, stopPresenceHeartbeat } from '../store/meeting-actions'
-import { formatIsoJalali } from '../../../utils/jalali'
+import { pdfFilename } from '../../../utils/pdfFilename'
 
 /**
- * پایان کلاس برای همه (فقط میزبان):
- *   ۱) کلاس پایان می‌یابد و همه‌ی شرکت‌کنندگان بیرون می‌روند
+ * پایان جلسه برای همه (فقط میزبان) — لینک کلاس باقی می‌ماند و برای جلسه‌ی بعد قابل استفاده است:
+ *   ۱) جلسه‌ی فعلی پایان می‌یابد و همه‌ی شرکت‌کنندگان بیرون می‌روند
  *   ۲) گزارش PDF حضور و غیاب ساخته و دانلود می‌شود
  *   ۳) فقط بعد از دانلود موفق، علامت‌های حضور و غیاب این کلاس پاک می‌شوند
  * اگر دانلود شکست بخورد، چیزی پاک نمی‌شود و میزبان می‌تواند دوباره تلاش کند.
@@ -30,7 +30,7 @@ export function EndClassModal({ slug, open, withReport = true, onClose }) {
     const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
     const a = document.createElement('a')
     a.href = url
-    a.download = `attendance-${slug}-${formatIsoJalali(new Date().toISOString()).replace(/\//g, '-')}.pdf`
+    a.download = pdfFilename(res.headers?.['content-disposition']) || `attendance-${slug}.pdf`
     document.body.appendChild(a)
     a.click()
     a.remove()
@@ -51,7 +51,7 @@ export function EndClassModal({ slug, open, withReport = true, onClose }) {
         qc.invalidateQueries({ queryKey: ['rooms'] })
       } catch {
         set('end', 'fail')
-        setErrorText('پایان دادن به کلاس انجام نشد. اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.')
+        setErrorText('پایان جلسه انجام نشد. اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.')
         setPhase('error')
         return
       }
@@ -90,10 +90,10 @@ export function EndClassModal({ slug, open, withReport = true, onClose }) {
   }
 
   const items = [
-    { k: 'end', label: 'پایان دادن به کلاس و خروج شرکت‌کنندگان' },
+    { k: 'end', label: 'پایان جلسه و خروج شرکت‌کنندگان' },
     ...(withReport ? [
       { k: 'pdf', label: 'ساخت و دانلود گزارش حضور و غیاب (PDF)' },
-      { k: 'clear', label: 'پاک‌کردن اطلاعات حضور و غیاب این کلاس' },
+      { k: 'clear', label: 'پاک‌کردن اطلاعات حضور و غیاب این جلسه' },
     ] : []),
   ]
 
@@ -104,13 +104,13 @@ export function EndClassModal({ slug, open, withReport = true, onClose }) {
           {phase === 'done' ? <CheckCircle2 size={22} /> : phase === 'error' ? <AlertTriangle size={22} /> : <Power size={22} />}
         </div>
         <h2 className="text-lg font-bold text-center mt-4">
-          {phase === 'done' ? 'کلاس پایان یافت' : phase === 'error' ? 'خطا در پایان کلاس' : 'پایان کلاس برای همه؟'}
+          {phase === 'done' ? 'جلسه پایان یافت' : phase === 'error' ? 'خطا در پایان جلسه' : 'پایان جلسه برای همه؟'}
         </h2>
 
         {phase === 'confirm' && (
           <p className="text-white/55 text-sm leading-7 text-center mt-2">
-            کلاس برای همه بسته می‌شود و دیگر قابل ورود نیست.
-            {withReport && ' گزارش حضور و غیاب به‌صورت PDF دانلود می‌شود و بعد از آن علامت‌های حضور و غیاب این کلاس پاک می‌شوند.'}
+            جلسه‌ی فعلی برای همه تمام می‌شود، ولی لینک کلاس سر جایش می‌ماند و جلسه‌ی بعد با همان لینک شروع می‌شود.
+            {withReport && ' گزارش حضور و غیاب به‌صورت PDF دانلود می‌شود و بعد از آن علامت‌های حضور و غیاب این جلسه پاک می‌شوند.'}
           </p>
         )}
 
@@ -140,7 +140,7 @@ export function EndClassModal({ slug, open, withReport = true, onClose }) {
         <div className="mt-6 flex gap-2 justify-center">
           {phase === 'confirm' && (<>
             <button onClick={onClose} className="px-5 py-2.5 rounded-xl border room-border text-sm text-white/80 hover:bg-white/5">انصراف</button>
-            <button onClick={run} className="px-5 py-2.5 rounded-xl bg-[var(--room-danger)] text-white text-sm font-medium">پایان کلاس</button>
+            <button onClick={run} className="px-5 py-2.5 rounded-xl bg-[var(--room-danger)] text-white text-sm font-medium">پایان جلسه</button>
           </>)}
           {phase === 'error' && (<>
             <button onClick={finish} className="px-5 py-2.5 rounded-xl border room-border text-sm text-white/80 hover:bg-white/5">خروج بدون دانلود</button>

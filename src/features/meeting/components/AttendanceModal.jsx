@@ -3,6 +3,7 @@ import { FileText, Loader2, Plus, X } from 'lucide-react'
 import { roomsService } from '../../../services/rooms'
 import { useAttendance } from '../../../hooks/useAttendance'
 import { formatIsoJalali, formatIsoTime } from '../../../utils/jalali'
+import { pdfFilename } from '../../../utils/pdfFilename'
 
 const STATUSES = [
   { value: 'present', label: 'حاضر', color: 'var(--room-mint)' },
@@ -52,7 +53,7 @@ export const AttendanceModal = memo(function AttendanceModal({ slug, open, onClo
       const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
       const a = document.createElement('a')
       a.href = url
-      a.download = `attendance-${slug}-${formatIsoJalali(report?.reference_time || new Date().toISOString()).replace(/\//g, '-')}.pdf`
+      a.download = pdfFilename(res.headers?.['content-disposition']) || `attendance-${slug}-${formatIsoJalali(report?.reference_time || new Date().toISOString()).replace(/\//g, '-')}.pdf`
       a.click()
       URL.revokeObjectURL(url)
     } catch {

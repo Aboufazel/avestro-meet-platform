@@ -30,7 +30,8 @@ export default function DashboardPage() {
   const user = useAuthStore((s) => s.user)
   const { data: rooms = [], isLoading } = useRooms()
   const liveCount = rooms.filter((r) => r.status === 'live').length
-  const scheduledCount = rooms.filter((r) => r.status === 'scheduled').length
+  // اتاقی که جلسه‌اش تمام شده (ended_at دارد) «رویداد آینده» نیست؛ لینکش فقط برای جلسه‌ی بعد آماده است
+  const scheduledCount = rooms.filter((r) => r.status === 'scheduled' && !r.ended_at).length
   const totalParticipants = rooms.reduce((s, r) => s + (r.active_participants_count || 0), 0)
 
   return (
@@ -105,12 +106,12 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 self-stretch sm:self-auto">
-                        <Badge variant={room.status}>{statusLabels[room.status]}</Badge>
+                        <Badge variant={room.status}>{room.status === 'scheduled' && room.ended_at ? 'آماده‌ی جلسه‌ی بعد' : statusLabels[room.status]}</Badge>
                         {room.status !== 'ended' && (
                           <>
                             <Link to={`/dashboard/edit/${encodeURIComponent(room.slug)}`} className="flex-1 sm:flex-none text-center px-3 py-2 rounded-lg text-xs text-[#68758a] border border-[#e5eaf2] hover:border-[#b9c8ef] hover:bg-[#edf2ff]">ویرایش</Link>
                             <Link to={`/join/${room.slug}`} className="flex-1 sm:flex-none justify-center meet-primary-btn inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium">
-                              <ExternalLink className="w-3 h-3" />{room.status === 'live' ? 'ورود' : 'مشاهده'}
+                              <ExternalLink className="w-3 h-3" />{room.status === 'live' ? 'ورود' : (room.ended_at ? 'ورود' : 'مشاهده')}
                             </Link>
                           </>
                         )}

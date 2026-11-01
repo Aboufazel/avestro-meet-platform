@@ -46,7 +46,7 @@ export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isV
           {canParticipants && <RailButton state={peopleActive ? 'active' : 'idle'} onClick={() => togglePanel('participants')} label={handCount > 0 ? `شرکت‌کنندگان؛ ${handCount} درخواست صحبت` : 'شرکت‌کنندگان'} pressed={peopleActive} badge={handCount} badgeKind="hand" icon={<Users size={19} />} />}
           {moreItems.length > 0 && <RailButton state={moreOpen ? 'active' : 'idle'} onClick={() => setMoreOpen((v) => !v)} label="بیشتر" pressed={moreOpen} icon={<MoreHorizontal size={19} />} />}
           <span className="cl-rail-spacer" />
-          {showEnd && <RailButton state="danger" onClick={onEnd} label="پایان کلاس برای همه" icon={<Power size={19} />} />}
+          {showEnd && <RailButton state="danger" onClick={onEnd} label="پایان جلسه برای همه" icon={<Power size={19} />} />}
           <RailButton state="danger" onClick={onLeave} label="خروج از کلاس" icon={<PhoneOff size={19} />} />
         </div>
       </div>
@@ -67,7 +67,7 @@ export const MeetingControls = memo(function MeetingControls({ isAudioMuted, isV
       {canScreenShare && <ControlButton active={isScreenSharing} onClick={onToggleScreenShare} label="اشتراک‌گذاری" icon={<MonitorUp size={17} />} extra="" />}
       {showCamera && <ControlButton active={!isVideoMuted} off={isVideoMuted} onClick={onToggleVideo} label="دوربین" icon={isVideoMuted ? <VideoOff size={17} /> : <Video size={17} />} />}
       {showMic && <ControlButton active={!isAudioMuted} off={isAudioMuted} onClick={onToggleAudio} label="میکروفون" icon={isAudioMuted ? <MicOff size={17} /> : <Mic size={17} />} />}
-      {showEnd && <ControlButton danger onClick={onEnd} label="پایان کلاس" icon={<Power size={17} />} />}
+      {showEnd && <ControlButton danger onClick={onEnd} label="پایان جلسه" icon={<Power size={17} />} />}
       <ControlButton danger onClick={onLeave} label="خروج" icon={<PhoneOff size={17} />} />
       <ControlButton onClick={() => togglePanel(activeTab || 'participants')} label="بیشتر" icon={<MoreHorizontal size={17} />} extra="hidden" />
     </div>

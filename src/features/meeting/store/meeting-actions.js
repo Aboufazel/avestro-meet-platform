@@ -726,8 +726,8 @@ function _startHeartbeat(roomName, externalId) {
             if (res.status === 410) {
                 _stopHeartbeat()
                 useMeetingStore.getState()._setError({
-                    title: 'کلاس پایان یافت',
-                    message: 'میزبان کلاس را به پایان رساند.',
+                    title: 'جلسه پایان یافت',
+                    message: 'میزبان جلسه را به پایان رساند. برای جلسه‌ی بعد دوباره از همان لینک وارد شوید.',
                 })
             }
         } catch (_) { /* قطعی شبکه؛ ضربان بعدی دوباره تلاش می‌کند */ }
@@ -936,6 +936,6 @@ if (typeof window !== 'undefined') {
         }
     }
 
-    window.addEventListener('beforeunload', sendLeaveBeacon)
+    // beforeunload عمداً نیست: اگر میزبان در هشدار «ماندن» را بزند، نباید خروج ثبت شود.
     window.addEventListener('pagehide', sendLeaveBeacon)
 }

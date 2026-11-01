@@ -72,6 +72,19 @@ export default function RoomPage() {
   const storeHand = useMeetingStore((s) => !!s.participants.get(s.localParticipantId)?.isHandRaised)
 
   const { error, isConnecting, isReconnecting, isAudioMuted, isVideoMuted, isScreenSharing, isConnected, leave, toggleAudio, toggleVideo, toggleScreenShare } = useJitsi(roomName)
+
+  // میزبان: بستن تب/مرورگر یا رفرش، کلاس را باز و بدون گزارش حضور و غیاب رها می‌کند → هشدار بده.
+  // (متن پیام را مرورگر خودش تعیین می‌کند؛ با باز بودن پنجره‌ی «پایان کلاس» هشدار لازم نیست.)
+  useEffect(() => {
+    if (!isHostRole || !isConnected || endOpen) return undefined
+    const warn = (e) => {
+      e.preventDefault()
+      e.returnValue = ''
+      return ''
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [isHostRole, isConnected, endOpen])
   const { participants } = useParticipants()
   const access = useClassAccess(roomName, { enabled: isConnected && (classLayout || moderated || handFeature || canWhiteboard) })
   // صحنه‌ی سند و تخته هم‌زمان نیستند؛ سرور هم همین را تضمین می‌کند.
