@@ -14,6 +14,13 @@ export const CONNECTION_CONFIG = {
   },
   serviceUrl: `wss://${JITSI_HOST}/xmpp-websocket`,
   clientNode: 'https://jitsi.org/jitmeet',
+
+  // دریافت سرورهای STUN/TURN از prosody (XEP-0215 / external_services).
+  // بدون این گزینه lib-jitsi-meet هیچ iceServer ای به RTCPeerConnection نمی‌دهد
+  // و در شبکه‌هایی که UDP مستقیم به JVB بسته است، ICE شکست می‌خورد.
+  useStunTurn: true,
+  // TURN/UDP پیش‌فرض فیلتر می‌شود؛ TURN/TCP روی ۳۴۷۸ برای شبکه‌های بدون UDP می‌ماند.
+  useTurnUdp: true,
 }
 
 // =============================================================================

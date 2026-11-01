@@ -1323,11 +1323,12 @@ export class JitsiController {
                 sentAt: Date.now(),
             })
             result?.catch?.((error) => {
-                console.warn('[JitsiController] Screen-share state broadcast failed:', error)
+                // کانال bridge وقتی ICE قطع است باز نیست؛ WebSocket مرجع اصلی است.
+                console.debug('[JitsiController] Screen-share endpoint broadcast skipped:', error?.message)
             })
             return true
         } catch (error) {
-            console.warn('[JitsiController] Screen-share state broadcast failed:', error)
+            console.debug('[JitsiController] Screen-share endpoint broadcast skipped:', error?.message)
             return false
         }
     }

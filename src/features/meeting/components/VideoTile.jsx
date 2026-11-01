@@ -315,8 +315,13 @@ export const VideoTile = memo(
         const isAudioMuted =
             participant.isAudioMuted
 
+        // نوع واقعی track فعال ملاک است (نه صرفِ وجود desktopTrack در store)؛
+        // وگرنه بعد از پایان اشتراک، تا وقتی store به‌روز نشده mirror اشتباه
+        // اعمال می‌شود و تصویر برعکس دیده می‌شود.
         const isScreenShare =
-            !preferCamera && !!desktopTrack
+            !preferCamera &&
+            !!desktopTrack &&
+            activeTrack === desktopTrack
 
         // فقط تصویر دوربین خودمان (روی صفحه‌ی خودمان) مثل آینه نمایش داده می‌شود؛
         // چیزی که برای بقیه ارسال می‌شود تغییری نمی‌کند. اشتراک صفحه و ویدیوی
@@ -333,7 +338,7 @@ export const VideoTile = memo(
                     ? `${shouldMirrorVideo ? 'scaleX(-1) ' : ''}scale(${zoom / 100})`
                     : ''
             element.style.transformOrigin = 'center center'
-        }, [shouldMirrorVideo, zoom, activeTrack?.jitsiTrack])
+        }, [shouldMirrorVideo, zoom, activeTrack?.jitsiTrack, isVideoOff, isScreenShare, variant])
 
         if (variant === 'card' || variant === 'stage') {
             const speaking = participant.isActiveSpeaker && !isAudioMuted
