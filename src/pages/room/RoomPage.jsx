@@ -6,6 +6,7 @@ import { MeetingLoading } from '../../features/meeting/components/MeetingLoading
 import { MeetingError } from '../../features/meeting/components/MeetingError'
 import { MeetingControls } from '../../features/meeting/components/MeetingControls'
 import { SidePanel } from '../../features/meeting/components/SidePanel'
+import { EndClassModal } from '../../features/meeting/components/EndClassModal'
 import { AttendanceModal } from '../../features/meeting/components/AttendanceModal'
 import { RoomHeader } from '../../components/shared/RoomHeader.jsx'
 import { SettingsModal } from '../../features/meeting/components/SettingsModal.jsx'
@@ -64,6 +65,7 @@ export default function RoomPage() {
   const compactClass = classLayout && viewport.compact
 
   const [attendanceOpen, setAttendanceOpen] = useState(false)
+  const [endOpen, setEndOpen] = useState(false)
   const [documentsOpen, setDocumentsOpen] = useState(false)
   const [whiteboardOpen, setWhiteboardOpen] = useState(false)
   const [whiteboardObjects, setWhiteboardObjects] = useState([])
@@ -238,6 +240,7 @@ export default function RoomPage() {
     showHand: canHand, isHandRaised, onToggleHand: handleToggleHand,
     showMic, showCamera, showAttendance: canAttendance, onOpenAttendance: () => setAttendanceOpen(true),
     handCount: handRequests.pending.length,
+    showEnd: isHostRole, onEnd: () => setEndOpen(true),
     showDocuments: canControlDocuments, onOpenDocuments: () => setDocumentsOpen(true), documentOpen: docOpen,
   }
 
@@ -295,6 +298,7 @@ export default function RoomPage() {
         )}
         <SettingsModal />
         {canControlDocuments && <DocumentsModal slug={roomName} open={documentsOpen} activeId={docOpen ? docState.document.id : null} onClose={() => setDocumentsOpen(false)} onShow={(doc) => access.openDocument(doc.id)} onRemoved={() => access.closeDocument()} />}
+        {isHostRole && <EndClassModal slug={roomName} open={endOpen} withReport={canAttendance} onClose={() => setEndOpen(false)} />}
         {canAttendance && <AttendanceModal slug={roomName} open={attendanceOpen} onClose={() => setAttendanceOpen(false)} />}
       </div>
     </div>

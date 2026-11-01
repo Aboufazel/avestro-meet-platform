@@ -699,6 +699,9 @@ async function _checkRoomCapacity(roomName, externalId, displayName) {
 const HEARTBEAT_MS = 20000
 let _heartbeatTimer = null
 
+// میزبان خودش کلاس را تمام می‌کند و مودال پایان کلاس را نشان می‌دهد؛ نباید صفحه‌ی خطا جایش بنشیند
+export const stopPresenceHeartbeat = () => _stopHeartbeat()
+
 function _stopHeartbeat() {
     if (_heartbeatTimer) {
         clearInterval(_heartbeatTimer)
@@ -715,10 +718,18 @@ function _startHeartbeat(roomName, externalId) {
             return
         }
         try {
-            await _postWithAuth(
+            const res = await _postWithAuth(
                 `${API_BASE_URL}/rooms/${roomName}/heartbeat/`,
                 JSON.stringify({external_participant_id: externalId})
             )
+            // 410: میزبان کلاس را پایان داده → بقیه‌ی شرکت‌کنندگان هم باید بیرون بروند
+            if (res.status === 410) {
+                _stopHeartbeat()
+                useMeetingStore.getState()._setError({
+                    title: 'کلاس پایان یافت',
+                    message: 'میزبان کلاس را به پایان رساند.',
+                })
+            }
         } catch (_) { /* قطعی شبکه؛ ضربان بعدی دوباره تلاش می‌کند */ }
     }
     _heartbeatTimer = setInterval(beat, HEARTBEAT_MS)

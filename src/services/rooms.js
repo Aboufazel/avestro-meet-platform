@@ -14,5 +14,6 @@ export const roomsService = {
   updateRoomFeature: (slug, key, data) => api.patch(`/rooms/${slug}/features/${key}/`, data),
   attendance: (slug) => api.get(`/rooms/${slug}/attendance/`),
   attendancePdf: (slug) => api.get(`/rooms/${slug}/attendance/pdf/`, { responseType: 'blob' }),
+  clearAttendance: (slug) => api.delete(`/rooms/${slug}/attendance/`),
   markAttendance: (slug, data) => api.put(`/rooms/${slug}/attendance/`, data),
 }
