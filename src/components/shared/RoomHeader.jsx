@@ -3,26 +3,43 @@ import { Mic, Check, Circle, Copy, Volume2, VolumeX, Wifi } from 'lucide-react'
 import { useRoom } from '../../hooks/useRooms.js'
 import { useAuthStore } from '../../store/authStore'
 
-function Timer({ isConnected }) {
+function Timer({ isConnected, alwaysVisible = false }) {
   const [seconds, setSeconds] = useState(0)
   useEffect(() => { if (!isConnected) return; const interval = setInterval(() => setSeconds((s) => s + 1), 1000); return () => clearInterval(interval) }, [isConnected])
   const format = (n) => `${String(Math.floor(n / 3600)).padStart(2, '0')}:${String(Math.floor((n % 3600) / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`
-  return <span className="text-[11px] text-white/45 tabular-nums hidden sm:block">{format(seconds)}</span>
+  return <span className={`${alwaysVisible ? '' : 'hidden sm:block'} text-[11px] text-white/45 tabular-nums`}>{format(seconds)}</span>
 }
 function RecordingTimer({ seconds }) {
   const format = (n) => `${String(Math.floor(n / 3600)).padStart(2, '0')}:${String(Math.floor((n % 3600) / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`
   return <span className="text-[11px] text-[var(--room-danger)] tabular-nums">{format(seconds)}</span>
 }
 
-export const RoomHeader = memo(function RoomHeader({ slug, isConnected, onCopyLink, isMeetingMuted, onToggleMeetingMute, isRecording, recordingSeconds, onToggleRecording, isVoiceRecording, voiceRecordingSeconds, onToggleVoiceRecording }) {
+export const RoomHeader = memo(function RoomHeader({ slug, isConnected, onCopyLink, isMeetingMuted, onToggleMeetingMute, isRecording, recordingSeconds, onToggleRecording, isVoiceRecording, voiceRecordingSeconds, onToggleVoiceRecording, canRecord = true, compact = false }) {
   const [copied, setCopied] = useState(false)
   const { data: room, isLoading, isError } = useRoom(slug)
   const currentUser = useAuthStore((s) => s.user)
   const isHost = room?.host?.id === currentUser?.id
   const handleCopy = () => { onCopyLink?.(); setCopied(true); setTimeout(() => setCopied(false), 1500) }
 
+  // کلاس موبایل: هدر حداقلی (یک ردیف باریک) تا بیشترین فضا به محتوای کلاس برسد
+  if (compact) {
+    return (
+      <header className="h-9 bg-[var(--room-surface)] border-b border-[var(--room-border)] flex items-center justify-between px-2.5 shrink-0 relative z-50">
+        <div className="flex items-center gap-2 min-w-0">
+          <img src="/avestro-logo.png" alt="اَوسترو" className="w-6 h-6 shrink-0 rounded-md" />
+          <span className="text-white/70 text-[11px] font-medium truncate max-w-[45vw]">{(isLoading && !isError) ? 'کلاس' : room?.title}</span>
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isConnected ? 'bg-[var(--room-mint)]' : 'bg-[var(--room-warning)] animate-pulse'}`} />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Timer isConnected={isConnected} alwaysVisible />
+          <button type="button" onClick={onToggleMeetingMute} title={isMeetingMuted ? 'روشن کردن صدای جلسه' : 'خاموش کردن صدای جلسه'} aria-label={isMeetingMuted ? 'روشن کردن صدای جلسه' : 'خاموش کردن صدای جلسه'} className={`w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-lg border transition-all active:scale-95 ${isMeetingMuted ? 'text-[var(--room-danger)] border-[var(--room-danger)]/30 bg-[var(--room-danger)]/10' : 'text-white/65 border-[var(--room-border)] bg-white/[.025]'}`}>{isMeetingMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}</button>
+        </div>
+      </header>
+    )
+  }
+
   return (
-    <header className="h-[62px] bg-[var(--room-surface)] border-b border-[var(--room-border)] flex items-center justify-between px-3 sm:px-5 shrink-0 relative z-50">
+    <header className="h-12 sm:h-[62px] bg-[var(--room-surface)] border-b border-[var(--room-border)] flex items-center justify-between px-3 sm:px-5 shrink-0 relative z-50">
       <div className="flex items-center gap-2.5 min-w-0">
         <img src="/avestro-logo.png" alt="اَوسترو" className="w-8 h-8 shrink-0 rounded-lg" />
         <div className="hidden sm:block min-w-0"><p className="text-white text-xs font-medium">اَوسترو میت</p><p className="text-[9px] text-white/25 mt-0.5 tracking-wide">AVESTRO MEET</p></div>
@@ -33,8 +50,8 @@ export const RoomHeader = memo(function RoomHeader({ slug, isConnected, onCopyLi
       <div className="flex items-center gap-1.5 sm:gap-2">
         <div className="hidden sm:flex items-center gap-2 rounded-xl bg-white/[.035] border border-white/[.06] px-3 py-2"><span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-[var(--room-mint)] shadow-[0_0_0_4px_rgba(84,217,176,.08)]' : 'bg-[var(--room-warning)] animate-pulse'}`} /><span className="text-[10px] text-white/55">{isConnected ? 'متصل' : 'در حال اتصال...'}</span><Timer isConnected={isConnected} /></div>
 
-        {isHost && <button type="button" onClick={onToggleVoiceRecording} title={isVoiceRecording ? 'توقف ضبط صدا' : 'شروع ضبط صدا'} className={`hidden md:flex items-center gap-1.5 text-[10px] border rounded-xl px-2.5 py-2 transition-colors ${isVoiceRecording ? 'text-[var(--room-danger)] border-[var(--room-danger)]/30 bg-[var(--room-danger)]/10' : 'text-white/45 border-[var(--room-border)] hover:text-white/80 hover:bg-white/[.07]'}`}>{isVoiceRecording ? <><span className="w-1.5 h-1.5 rounded-full bg-[var(--room-danger)] animate-pulse" /><RecordingTimer seconds={voiceRecordingSeconds} /></> : <Mic className="w-3.5 h-3.5" />}<span>{isVoiceRecording ? 'ضبط صدا' : 'ضبط صدا'}</span></button>}
-        {isHost && <button type="button" onClick={onToggleRecording} title={isRecording ? 'توقف ضبط جلسه' : 'شروع ضبط جلسه'} className={`hidden md:flex items-center gap-1.5 text-[10px] border rounded-xl px-2.5 py-2 transition-colors ${isRecording ? 'text-[var(--room-danger)] border-[var(--room-danger)]/30 bg-[var(--room-danger)]/10' : 'text-white/45 border-[var(--room-border)] hover:text-white/80 hover:bg-white/[.07]'}`}>{isRecording ? <><span className="w-1.5 h-1.5 rounded-full bg-[var(--room-danger)] animate-pulse" /><RecordingTimer seconds={recordingSeconds} /></> : <Circle className="w-3.5 h-3.5" />}<span>{isRecording ? 'در حال ضبط' : 'ضبط جلسه'}</span></button>}
+        {isHost && canRecord && <button type="button" onClick={onToggleVoiceRecording} title={isVoiceRecording ? 'توقف ضبط صدا' : 'شروع ضبط صدا'} className={`hidden md:flex items-center gap-1.5 text-[10px] border rounded-xl px-2.5 py-2 transition-colors ${isVoiceRecording ? 'text-[var(--room-danger)] border-[var(--room-danger)]/30 bg-[var(--room-danger)]/10' : 'text-white/45 border-[var(--room-border)] hover:text-white/80 hover:bg-white/[.07]'}`}>{isVoiceRecording ? <><span className="w-1.5 h-1.5 rounded-full bg-[var(--room-danger)] animate-pulse" /><RecordingTimer seconds={voiceRecordingSeconds} /></> : <Mic className="w-3.5 h-3.5" />}<span>{isVoiceRecording ? 'ضبط صدا' : 'ضبط صدا'}</span></button>}
+        {isHost && canRecord && <button type="button" onClick={onToggleRecording} title={isRecording ? 'توقف ضبط جلسه' : 'شروع ضبط جلسه'} className={`hidden md:flex items-center gap-1.5 text-[10px] border rounded-xl px-2.5 py-2 transition-colors ${isRecording ? 'text-[var(--room-danger)] border-[var(--room-danger)]/30 bg-[var(--room-danger)]/10' : 'text-white/45 border-[var(--room-border)] hover:text-white/80 hover:bg-white/[.07]'}`}>{isRecording ? <><span className="w-1.5 h-1.5 rounded-full bg-[var(--room-danger)] animate-pulse" /><RecordingTimer seconds={recordingSeconds} /></> : <Circle className="w-3.5 h-3.5" />}<span>{isRecording ? 'در حال ضبط' : 'ضبط جلسه'}</span></button>}
 
         <button type="button" onClick={onToggleMeetingMute} title={isMeetingMuted ? 'روشن کردن صدای جلسه' : 'خاموش کردن صدای جلسه'} aria-label={isMeetingMuted ? 'روشن کردن صدای جلسه' : 'خاموش کردن صدای جلسه'} className={`hidden sm:flex items-center gap-1.5 text-[10px] border rounded-xl px-2.5 py-2 transition-colors ${isMeetingMuted ? 'text-[var(--room-danger)] border-[var(--room-danger)]/30 bg-[var(--room-danger)]/10' : 'text-white/45 border-[var(--room-border)] hover:text-white/80 hover:bg-white/[.07]'}`}>{isMeetingMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}<span>{isMeetingMuted ? 'صدا خاموش' : 'صدای جلسه'}</span></button>
         <button type="button" onClick={onToggleMeetingMute} title={isMeetingMuted ? 'روشن کردن صدای جلسه' : 'خاموش کردن صدای جلسه'} aria-label={isMeetingMuted ? 'روشن کردن صدای جلسه' : 'خاموش کردن صدای جلسه'} className={`sm:hidden w-9 h-9 shrink-0 inline-flex items-center justify-center rounded-xl border transition-all active:scale-95 ${isMeetingMuted ? 'text-[var(--room-danger)] border-[var(--room-danger)]/30 bg-[var(--room-danger)]/10' : 'text-white/65 border-[var(--room-border)] bg-white/[.025]'}`}>{isMeetingMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}</button>

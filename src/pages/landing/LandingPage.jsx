@@ -116,7 +116,7 @@ export default function LandingPage() {
                         <span className="text-xs text-white/85">شرکت‌کنندگان</span>
                         <Users className="w-4 h-4 text-[#6c93ff]" />
                       </div>
-                      {[['ع','عباس'],['س','سارا'],['م','مهدی']].map(([avatar, name], i) => (
+                      {[['ع','عباس'],['پ','پرنیا'],['م','مهدی']].map(([avatar, name], i) => (
                         <div key={name} className="flex items-center gap-2 py-2.5 sm:py-3 border-b border-white/[.05]">
                           <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs ${i === 0 ? 'bg-[#31584f] text-white' : 'bg-white/10 text-white/70'}`}>{avatar}</span>
                           <span className="text-[10px] text-white/65">{name}</span>

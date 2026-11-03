@@ -49,6 +49,7 @@ export function mapParticipant(jitsiParticipant, isLocal = false) {
     isVideoMuted: jitsiParticipant.isVideoMuted(),
     isScreenSharing: false,
     isModerator: jitsiParticipant.isModerator(),
+    isHandRaised: Number(jitsiParticipant.getProperty?.('raisedHand') || 0) > 0,
     isActiveSpeaker: false,
     isConnectionInterrupted: false,
     connectionQuality: 100,
@@ -59,12 +60,38 @@ export function mapParticipant(jitsiParticipant, isLocal = false) {
  * @param {JitsiTrack} jitsiTrack
  * @returns {AppTrack}
  */
+/**
+ * نوع track برای اپ: 'audio' | 'video' | 'desktop'
+ *
+ * در lib-jitsi-meet اشتراک صفحه هم یک track از نوع 'video' است؛ فقط
+ * getVideoType() مشخص می‌کند 'desktop' است یا 'camera'. استور و UI به نوع
+ * 'desktop' تکیه دارند (کلید `${id}-desktop`، isScreenSharing و ...). قبلاً
+ * این‌جا فقط getType() برگردانده می‌شد، پس اشتراک صفحه‌ی دیگران هیچ‌وقت
+ * به‌عنوان اشتراک صفحه شناخته نمی‌شد و مثل یک دوربین معمولی نمایش داده می‌شد.
+ */
+function resolveTrackType(jitsiTrack) {
+  const type = jitsiTrack.getType()
+
+  if (type === 'video') {
+    const videoType =
+      typeof jitsiTrack.getVideoType === 'function'
+        ? jitsiTrack.getVideoType()
+        : jitsiTrack.videoType
+
+    if (videoType === 'desktop') {
+      return 'desktop'
+    }
+  }
+
+  return type
+}
+
 export function mapTrack(jitsiTrack) {
   return {
     participantId: jitsiTrack.isLocal()
       ? 'local'
       : jitsiTrack.getParticipantId(),
-    type: jitsiTrack.getType(),
+    type: resolveTrackType(jitsiTrack),
     isMuted: jitsiTrack.isMuted(),
     isLocal: jitsiTrack.isLocal(),
     track: jitsiTrack.getTrack(),

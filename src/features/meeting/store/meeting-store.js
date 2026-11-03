@@ -152,6 +152,12 @@ export const useMeetingStore = create((set, get) => ({
                         isModerator:
                             participant.isModerator ?? false,
 
+                        isHandRaised:
+                            participant.isHandRaised ?? false,
+
+                        isTeacher:
+                            participant.isTeacher ?? false,
+
                         isActiveSpeaker:
                             participant.isActiveSpeaker ?? false,
                     }
@@ -323,12 +329,12 @@ export const useMeetingStore = create((set, get) => ({
                             !!track.isMuted
                     }
 
-                    if (
-                        track.type === 'video' ||
-                        track.type === 'desktop'
-                    ) {
-                        updates.isVideoMuted =
-                            !!track.isMuted
+                    // وضعیت دوربین فقط از camera/video track می‌آید.
+                    // desktop track منبع جداگانه‌ای است؛ اگر mute آن را به
+                    // isVideoMuted نسبت بدهیم، وضعیت دوربین مدرس اشتباه می‌شود
+                    // و تصویر کوچک دوربین هنگام اشتراک صفحه یا تخته پنهان می‌ماند.
+                    if (track.type === 'video') {
+                        updates.isVideoMuted = !!track.isMuted
                     }
 
                     if (track.type === 'desktop') {
@@ -377,16 +383,49 @@ export const useMeetingStore = create((set, get) => ({
     // TRACK REMOVE
     // ─────────────────────────────────────────────────────────────
 
-    _removeTrack: (track) =>
+    _removeTrack: (incomingTrack) =>
         set((state) => {
-            if (!track?.participantId || !track?.type) {
+            if (!incomingTrack?.participantId || !incomingTrack?.type) {
                 return {}
             }
 
-            const key =
+            let track = incomingTrack
+            let key =
                 `${track.participantId}-${track.type}`
 
             const tracks = new Map(state.tracks)
+
+            // Remove by track IDENTITY first. Some browsers (Firefox) report a
+            // different video type at removal time than at add time, so the
+            // `${id}-${type}` key can miss the stored entry and leave a dead
+            // screen-share track (and its badge) behind.
+            if (incomingTrack.jitsiTrack) {
+                for (const [storedKey, stored] of tracks) {
+                    if (stored?.jitsiTrack === incomingTrack.jitsiTrack) {
+                        key = storedKey
+                        track = {
+                            ...incomingTrack,
+                            type: stored.type,
+                            participantId: stored.participantId,
+                        }
+                        break
+                    }
+                }
+            }
+
+            const existingTrack = tracks.get(key)
+
+            // A remote video can initially be reported as 'camera' and then
+            // corrected to 'desktop' by lib-jitsi-meet. Do not let removal of
+            // that stale mapping delete a different camera track that has
+            // already claimed the same key.
+            const matchesStoredTrack =
+                !existingTrack || !track.jitsiTrack || existingTrack.jitsiTrack === track.jitsiTrack
+
+            if (!matchesStoredTrack) {
+                // A stale mapping must not change participant mute flags either.
+                return { tracks: state.tracks }
+            }
 
             tracks.delete(key)
 
@@ -476,17 +515,23 @@ export const useMeetingStore = create((set, get) => ({
             const tracks = new Map(state.tracks)
             const existing = tracks.get(key)
 
-            if (!existing) {
-                tracks.set(key, {
-                    ...track,
-                    streamingStatus: status || null,
-                })
-            } else {
-                tracks.set(key, {
-                    ...existing,
-                    streamingStatus: status || null,
-                })
+            // A late status event for a track that was already removed (or
+            // replaced) must never bring it back: that was the source of the
+            // black tile / stuck screen-share badge after stopping a share.
+            if (!existing) return {}
+            if (
+                track.jitsiTrack &&
+                existing.jitsiTrack &&
+                existing.jitsiTrack !== track.jitsiTrack
+            ) {
+                return {}
             }
+            if (existing.streamingStatus === (status || null)) return {}
+
+            tracks.set(key, {
+                ...existing,
+                streamingStatus: status || null,
+            })
 
             return {tracks}
         }),
@@ -504,18 +549,22 @@ export const useMeetingStore = create((set, get) => ({
 
             const existing = tracks.get(key)
 
-            /**
-             * اگر track قبلاً در store نبود،
-             * باز هم وضعیت participant را update می‌کنیم.
-             */
-            if (existing) {
-                tracks.set(key, {
-                    ...existing,
-                    isMuted: !!track.isMuted,
-                })
-            } else {
-                tracks.set(key, track)
+            // A mute event for a track that is no longer in the store (removed,
+            // replaced or never added) must NOT recreate it: that resurrected
+            // dead screen-share tracks and their badge/black tile.
+            if (!existing) return {}
+            if (
+                track.jitsiTrack &&
+                existing.jitsiTrack &&
+                existing.jitsiTrack !== track.jitsiTrack
+            ) {
+                return {}
             }
+
+            tracks.set(key, {
+                ...existing,
+                isMuted: !!track.isMuted,
+            })
 
             // ─────────────────────────────────────────────
             // Participant sync
@@ -546,10 +595,9 @@ export const useMeetingStore = create((set, get) => ({
                             !!track.isMuted
                     }
 
-                    if (track.type === 'desktop') {
-                        updates.isScreenSharing =
-                            !track.isMuted
-                    }
+                    // desktop: isScreenSharing follows the track's presence only
+                    // (_addTrack/_removeTrack). Tying it to mute made the share
+                    // flip off and the bridge stop forwarding it (frozen frame).
 
                     participants.set(
                         participantId,
@@ -602,6 +650,31 @@ export const useMeetingStore = create((set, get) => ({
                 }
                 : state.renegotiationTicks,
         })),
+    _clearRemoteScreenShare: (participantId) =>
+        set((state) => {
+            if (!participantId) return {}
+
+            const tracks = new Map(state.tracks)
+            for (const [key, track] of tracks) {
+                if (track?.participantId !== participantId) continue
+                const isDesktop = track.type === 'desktop' ||
+                    track.jitsiTrack?.getVideoType?.() === 'desktop' ||
+                    track.jitsiTrack?.videoType === 'desktop'
+                if (isDesktop) tracks.delete(key)
+            }
+
+            const participants = new Map(state.participants)
+            const participant = participants.get(participantId)
+            if (participant) {
+                participants.set(participantId, {
+                    ...participant,
+                    isScreenSharing: false,
+                })
+            }
+
+            return { tracks, participants }
+        }),
+
     _setScreenSharing: (enabled, track = null) =>
         set((state) => {
             const participants =
@@ -622,9 +695,20 @@ export const useMeetingStore = create((set, get) => ({
                 }
             }
 
+            // با پایان اشتراک، track محلی صفحه هم از استور پاک شود؛ وگرنه
+            // VideoTile (desktopTrack || videoTrack) همچنان track مرده را
+            // نشان می‌دهد و تایل سیاه می‌ماند.
+            let tracks = state.tracks
+
+            if (!enabled && tracks.has('local-desktop')) {
+                tracks = new Map(tracks)
+                tracks.delete('local-desktop')
+            }
+
             return {
                 isScreenSharing: enabled,
                 participants,
+                tracks,
             }
         }),
 

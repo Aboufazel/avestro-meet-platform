@@ -14,6 +14,13 @@ export const CONNECTION_CONFIG = {
   },
   serviceUrl: `wss://${JITSI_HOST}/xmpp-websocket`,
   clientNode: 'https://jitsi.org/jitmeet',
+
+  // دریافت سرورهای STUN/TURN از prosody (XEP-0215 / external_services).
+  // بدون این گزینه lib-jitsi-meet هیچ iceServer ای به RTCPeerConnection نمی‌دهد
+  // و در شبکه‌هایی که UDP مستقیم به JVB بسته است، ICE شکست می‌خورد.
+  useStunTurn: true,
+  // TURN/UDP پیش‌فرض فیلتر می‌شود؛ TURN/TCP روی ۳۴۷۸ برای شبکه‌های بدون UDP می‌ماند.
+  useTurnUdp: true,
 }
 
 // =============================================================================
@@ -51,8 +58,43 @@ export function isLowEndDevice() {
   return cores <= 4 || memory <= 2
 }
 
+/**
+ * مک/iOS/Safari: انکودر H264 سخت‌افزاری (VideoToolbox) دارد و VP8/VP9 نرم‌افزاری
+ * اجرا می‌شود (CPU بالا و داغ شدن). برای این دستگاه‌ها H264 را اول می‌گذاریم.
+ */
+export function isFirefoxBrowser() {
+  if (typeof navigator === 'undefined') return false
+  return /Firefox|FxiOS/i.test(navigator.userAgent || '')
+}
+
+export function isAppleDevice() {
+  if (typeof navigator === 'undefined') return false
+  return /Macintosh|iPhone|iPad|iPod/i.test(navigator.userAgent || '')
+}
+
+/**
+ * H264 اول فقط برای مرورگرهایی که واقعاً انکودر سخت‌افزاری Apple را دارند
+ * (Safari/Chrome روی مک و iOS). Firefox حتی روی مک از OpenH264 نرم‌افزاری
+ * استفاده می‌کند و H264 + اشتراک صفحه + دوربین هم‌زمان در آن سیاه/ناپایدار
+ * می‌شود؛ برای Firefox همیشه VP8 اول است.
+ */
+export function prefersH264() {
+  return isAppleDevice() && !isFirefoxBrowser()
+}
+
 const IS_MOBILE = isMobileDevice()
 const IS_LOW_END = isLowEndDevice()
+
+/**
+ * مدل ارسال ویدیو:
+ *  - true (پیش‌فرض): دوربین و دسکتاپ هم‌زمان و جدا ارسال می‌شوند
+ *    (sendMultipleVideoStreams). سرور Jicofo/JVB فعلی این را پشتیبانی می‌کند.
+ *  - false (مدل قدیمی meet): هر نفر یک اسلات ویدیو دارد؛ هنگام اشتراک صفحه
+ *    دوربین جایگزین دسکتاپ می‌شود و بعد از پایان برمی‌گردد.
+ *    خاموش‌کردن: VITE_JITSI_MULTI_STREAM=false در .env
+ */
+export const MULTI_STREAM_ENABLED =
+  import.meta.env.VITE_JITSI_MULTI_STREAM !== 'false'
 
 /**
  * low    : موبایل/دسکتاپ ضعیف  → کمترین مصرف
@@ -78,6 +120,9 @@ export const PERF = {
   receiveLargeHeight: { low: 360, medium: 480, high: 720 }[DEVICE_TIER],
   receiveSmallHeight: 180,
 
+  // اشتراک صفحه در قاب سینمایی بزرگ نمایش داده می‌شود؛ متن باید خوانا بماند
+  receiveScreenHeight: { low: 720, medium: 720, high: 1080 }[DEVICE_TIER],
+
   // فاصله‌ی اندازه‌گیری audio level (ms). پیش‌فرض خود lib خیلی پرتکرار است.
   audioLevelsInterval: { low: 1000, medium: 500, high: 300 }[DEVICE_TIER],
 }
@@ -89,6 +134,7 @@ export const PERF = {
 // =============================================================================
 export const JITSI_INIT_OPTIONS = {
   disableAudioLevels: false,
+  desktopSharingFrameRate: { min: 5, max: 15 },
   audioLevelsInterval: PERF.audioLevelsInterval,
   disableThirdPartyRequests: true,
 }
@@ -122,6 +168,19 @@ export const CONFERENCE_CONFIG = {
 
   p2p: { enabled: false },
 
+  // multi-stream با سوییچ MULTI_STREAM_ENABLED (بالای همین فایل) کنترل می‌شود.
+  ...(MULTI_STREAM_ENABLED
+    ? {
+        flags: {
+          sendMultipleVideoStreams: true,
+          receiveMultipleVideoStreams: true,
+        },
+      }
+    : {}),
+
+  // اشتراک صفحه: پیش‌فرض lib فقط ۵fps است
+  desktopSharingFrameRate: { min: 5, max: 15 },
+
   // این دو تشخیص هیچ‌جای اپ استفاده نشده‌اند ولی هرکدام یک پردازش صوتی
   // دائمی روی میکروفون اجرا می‌کنند.
   enableNoisyMicDetection: false,
@@ -147,6 +206,7 @@ export const LOCAL_VIDEO_CONFIG = {
 export const RECEIVER_QUALITY = {
   LARGE: PERF.receiveLargeHeight,
   SMALL: PERF.receiveSmallHeight,
+  SCREEN: PERF.receiveScreenHeight,
 }
 
 // =============================================================================
@@ -157,3 +217,5 @@ export const RECONNECT_CONFIG = {
   baseDelayMs: 1000, // تلاش اول بعد از ۱ ثانیه
   maxDelayMs: 15000, // سقف فاصله بین تلاش‌ها
 }
+// فریم‌ریت اشتراک صفحه (برای createLocalTracks({devices:['desktop']}))
+export const DESKTOP_SHARING_FRAME_RATE = { min: 1, max: 15 }

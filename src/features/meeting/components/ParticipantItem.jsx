@@ -1,5 +1,7 @@
 import { memo } from 'react'
-import { Mic, MicOff, Video, VideoOff, Crown, Pin } from 'lucide-react'
+import { Mic, MicOff, Video, VideoOff, Crown, Pin, Hand, SignalHigh, SignalMedium, SignalLow } from 'lucide-react'
+import { getConnectionLevel, CONNECTION_LABEL } from '../utils/connection'
+import { muteParticipantMedia } from '../store/meeting-actions'
 import { useParticipants } from '../hooks/useParticipants'
 import { useMeetingStore } from '../store/meeting-store'
 
@@ -22,10 +24,13 @@ export const ParticipantList = memo(function ParticipantList() {
   )
 })
 
-export const ParticipantItem = memo(function ParticipantItem({ participant }) {
+export const ParticipantItem = memo(function ParticipantItem({ participant, canControl = false }) {
   const pinnedParticipantId = useMeetingStore((s) => s.pinnedParticipantId)
   const initial = participant.displayName?.[0]?.toUpperCase() || '?'
   const isPinned = pinnedParticipantId === participant.id
+  const level = getConnectionLevel(participant.connectionQuality, participant.packetLoss)
+  const SignalIcon = { strong: SignalHigh, medium: SignalMedium, weak: SignalLow }[level]
+  const signalColor = { strong: 'text-green-400', medium: 'text-yellow-400', weak: 'text-red-400' }[level]
 
   return (
     <div className={`
@@ -48,6 +53,7 @@ export const ParticipantItem = memo(function ParticipantItem({ participant }) {
           <span className="text-white text-sm truncate">{participant.displayName}</span>
           {participant.isLocal && <span className="text-white/35 text-xs">(شما)</span>}
           {participant.isModerator && <Crown className="w-3 h-3 text-[var(--room-warning)] shrink-0" />}
+          {participant.isHandRaised && <Hand className="w-3.5 h-3.5 text-[var(--room-warning)] shrink-0" title="دست بلند کرده" />}
         </div>
         {participant.isActiveSpeaker && !participant.isAudioMuted && (
           <span className="text-[10px] text-[var(--room-mint)]">در حال صحبت</span>
@@ -55,6 +61,18 @@ export const ParticipantItem = memo(function ParticipantItem({ participant }) {
       </div>
 
       <div className="flex items-center gap-1.5 shrink-0">
+        {canControl && !participant.isLocal && !participant.isModerator && (
+          <>
+            {!participant.isAudioMuted && (
+              <button type="button" title="قطع صدا" onClick={() => muteParticipantMedia(participant.id, 'audio')}
+                className="p-1 rounded-md hover:bg-white/10 text-white/60"><MicOff className="w-3.5 h-3.5" /></button>
+            )}
+            {!participant.isVideoMuted && (
+              <button type="button" title="قطع تصویر" onClick={() => muteParticipantMedia(participant.id, 'video')}
+                className="p-1 rounded-md hover:bg-white/10 text-white/60"><VideoOff className="w-3.5 h-3.5" /></button>
+            )}
+          </>
+        )}
         {isPinned && <Pin className="w-3.5 h-3.5 text-[var(--room-blue-2)]" title="پین شده" />}
         {participant.isAudioMuted
           ? <MicOff className="w-3.5 h-3.5 text-[var(--room-danger)]" />
@@ -64,6 +82,7 @@ export const ParticipantItem = memo(function ParticipantItem({ participant }) {
           ? <VideoOff className="w-3.5 h-3.5 text-white/35" />
           : <Video className="w-3.5 h-3.5 text-[var(--room-mint)]" />
         }
+        <SignalIcon className={`w-3.5 h-3.5 ${signalColor}`} aria-label={CONNECTION_LABEL[level]} />
       </div>
     </div>
   )

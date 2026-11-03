@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Plus, LogOut, X, ChevronLeft, Video, Sparkles } from 'lucide-react'
+import { LayoutDashboard, Plus, Settings, LogOut, X, ChevronLeft, Video, Sparkles } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { Avatar } from '../ui/Avatar'
 import toast from 'react-hot-toast'
@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'نمای کلی' },
   { to: '/dashboard/create', icon: Plus, label: 'ساخت جلسه' },
+  { to: '/dashboard/settings', icon: Settings, label: 'تنظیمات حساب' },
 ]
 
 export function Sidebar({ onClose }) {

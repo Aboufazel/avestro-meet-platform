@@ -12,7 +12,7 @@ import { useMeetingStore } from '../store/meeting-store'
 import { selectLocalParticipantId, selectReplyingTo } from '../store/meeting-selectors'
 import { useParticipants } from '../hooks/useParticipants'
 
-export const ChatPanel = memo(function ChatPanel() {
+export const ChatPanel = memo(function ChatPanel({ compact = false }) {
     const {
         messages,
         send,
@@ -42,6 +42,12 @@ export const ChatPanel = memo(function ChatPanel() {
                 .includes(query)
         )
     }, [messages, search, localParticipantId])
+
+    // با هر بازشدن پنل (مثلاً کشوی موبایل) از آخرین پیام شروع کن
+    useEffect(() => {
+        const el = scrollRef.current
+        if (el) el.scrollTop = el.scrollHeight
+    }, [])
 
     useEffect(() => {
         const element = scrollRef.current
@@ -95,6 +101,7 @@ export const ChatPanel = memo(function ChatPanel() {
     return (
         <div dir="rtl" className="flex flex-col h-full min-h-0 bg-olive-950 text-olive-100 text-right">
             {/* Header */}
+            {!compact && (
             <div className="px-4 py-3 border-b border-olive-800/80 shrink-0 bg-olive-900/60">
                 <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-olive-800 border border-olive-700 flex items-center justify-center text-olive-300">
@@ -146,11 +153,12 @@ export const ChatPanel = memo(function ChatPanel() {
                     </div>
                 )}
             </div>
+            )}
 
             {/* Messages */}
-            <div ref={scrollRef} className="relative flex-1 min-h-0 overflow-y-auto px-3 py-4 space-y-3">
+            <div ref={scrollRef} className={`relative flex-1 min-h-0 overflow-y-auto px-3 ${compact ? 'py-2 space-y-1' : 'py-4 space-y-3'}`}>
                 {filteredMessages.length === 0 ? (
-                    <EmptyChat hasSearch={Boolean(search.trim())} />
+                    <EmptyChat hasSearch={Boolean(search.trim())} compact={compact} />
                 ) : (
                     filteredMessages.map((message, index) => {
                         const previous = filteredMessages[index - 1]
@@ -173,7 +181,7 @@ export const ChatPanel = memo(function ChatPanel() {
                     <button
                         type="button"
                         onClick={scrollToBottom}
-                        className="sticky bottom-2 mx-auto flex items-center gap-1.5 rounded-full bg-olive-700/95 border border-olive-600 px-3 py-1.5 text-[11px] text-olive-100 shadow-lg backdrop-blur-md hover:bg-olive-600 transition-colors"
+                        className="sticky bottom-2 mx-auto flex items-center gap-1.5 rounded-full bg-olive-700/95 border border-olive-600 px-3 py-1.5 text-[11px] text-olive-100 shadow-lg hover:bg-olive-600 transition-colors"
                     >
                         <ArrowDown size={13} />
                         پیام‌های جدید
@@ -207,7 +215,7 @@ export const ChatPanel = memo(function ChatPanel() {
             )}
 
             {/* Composer */}
-            <form dir="rtl" onSubmit={handleSubmit} className="shrink-0 px-3 pb-3 pt-2 border-t border-olive-800/80 bg-olive-900/70">
+            <form dir="rtl" onSubmit={handleSubmit} className={`shrink-0 px-3 ${compact ? 'pb-2 pt-1.5' : 'pb-3 pt-2'} border-t border-olive-800/80 bg-olive-900/70`}>
                 <div className="flex items-end gap-2 rounded-2xl border border-olive-700/80 bg-olive-950/80 p-1.5 focus-within:border-olive-600 transition-colors">
                     <textarea
                         value={text}
@@ -232,7 +240,7 @@ export const ChatPanel = memo(function ChatPanel() {
                         <Send size={16} />
                     </button>
                 </div>
-                <div className="flex items-center justify-between px-1 pt-1.5 text-[10px] text-olive-600">
+                <div className={`${compact ? 'hidden' : 'flex'} items-center justify-between px-1 pt-1.5 text-[10px] text-olive-600`}>
                     <span>Enter برای ارسال · Shift + Enter برای خط جدید</span>
                     {search.trim() && <span>{filteredMessages.length} نتیجه</span>}
                 </div>
@@ -241,7 +249,10 @@ export const ChatPanel = memo(function ChatPanel() {
     )
 })
 
-const EmptyChat = memo(function EmptyChat({ hasSearch }) {
+const EmptyChat = memo(function EmptyChat({ hasSearch, compact = false }) {
+    if (compact) {
+        return <div className="h-full flex items-center justify-center text-[12px] text-olive-600">{hasSearch ? 'پیامی پیدا نشد' : 'هنوز پیامی نیست — اولین پیام را بنویسید'}</div>
+    }
     return (
         <div className="h-full min-h-[180px] flex items-center justify-center">
             <div className="text-center max-w-[220px]">

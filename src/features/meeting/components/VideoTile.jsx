@@ -9,17 +9,14 @@ import {
     Mic,
     MicOff,
     MonitorUp,
+    Hand,
     SignalHigh,
     SignalMedium,
     SignalLow,
-    Pin,
-    PinOff,
-    ZoomIn,
-    ZoomOut,
-    MoreHorizontal,
-    Maximize2,
-    Minimize2,
 } from 'lucide-react'
+
+import {TileActionsMenu} from './TileActionsMenu'
+import {getConnectionLevel, CONNECTION_LABEL} from '../utils/connection'
 
 import {useParticipant} from '../hooks/useParticipants'
 
@@ -39,6 +36,17 @@ export const VideoTile = memo(
         isFocused = false,
         // false = بیرون از بودجه‌ی ویدیو: آواتار نشان بده و decode نکن
         videoEnabled = true,
+        // کلاس: همیشه تصویر «دوربین» را نشان بده (نه اشتراک صفحه) — برای کادر کوچک معلم
+        preferCamera = false,
+        // false = صدا را از این تایل پخش نکن (وقتی همان فرد در تایل دیگری پخش می‌شود)
+        playAudio = true,
+        // در حالت تخته، صدای شرکت‌کننده باید بماند ولی ویدئوی زیر لایه دوباره رندر نشود.
+        forceVideoOff = false,
+        // undefined = تایل سمینار (بدون تغییر)
+        // 'card'    = کارت کلاس: بخش تصویر + نوار اطلاعات جدا در زیر آن (هیچ چیز روی تصویر نیست)
+        // 'stage'   = فقط تصویر/اشتراک صفحه که کل قاب را پر می‌کند (بدون نوار و آیکون)
+        variant,
+        isTeacherCard = false,
     }) {
         const participant =
             useParticipant(
@@ -103,8 +111,6 @@ export const VideoTile = memo(
         // ---------------------------------------------------------------------
         const [isVisible, setIsVisible] = useState(isLarge)
         const [zoom, setZoom] = useState(100)
-        const [mobileActionsOpen, setMobileActionsOpen] = useState(false)
-        const [desktopActionsOpen, setDesktopActionsOpen] = useState(false)
         const togglePinnedParticipant = useMeetingStore((s) => s.togglePinnedParticipant)
         const toggleFocusedParticipant = useMeetingStore((s) => s.toggleFocusedParticipant)
 
@@ -167,6 +173,7 @@ export const VideoTile = memo(
             if (
                 !audioRef.current ||
                 !audioTrack?.jitsiTrack ||
+                !playAudio ||
                 participant?.isLocal
             ) {
                 return
@@ -196,6 +203,7 @@ export const VideoTile = memo(
         }, [
             audioTrack?.jitsiTrack,
             participant?.isLocal,
+            playAudio,
         ])
 
         // ---------------------------------------------------------------------
@@ -203,15 +211,18 @@ export const VideoTile = memo(
         // ---------------------------------------------------------------------
 
         const activeTrack =
-            desktopTrack ||
-            videoTrack
+            preferCamera
+                ? videoTrack
+                : desktopTrack ||
+                  videoTrack
 
         useEffect(() => {
             if (
                 !videoRef.current ||
                 !activeTrack?.jitsiTrack ||
                 !isVisible ||
-                !videoEnabled
+                !videoEnabled ||
+                forceVideoOff
             ) {
                 return
             }
@@ -245,6 +256,7 @@ export const VideoTile = memo(
                 : null,
             isVisible,
             videoEnabled,
+            forceVideoOff,
 
             ...(isSafariOrIOS
                 ? [renegotiationTick]
@@ -258,41 +270,6 @@ export const VideoTile = memo(
         // ---------------------------------------------------------------------
         // Connection
         // ---------------------------------------------------------------------
-
-        function getConnectionLevel(
-            quality,
-            packetLoss
-        ) {
-            // پکت‌لاس بالای ۱۰٪ یعنی مشکل واقعی —
-            // مستقل از اینکه quality (که با adaptive bitrate
-            // خودش را جمع‌وجور می‌کند) چه می‌گوید.
-            if (
-                packetLoss != null &&
-                packetLoss > 10
-            ) {
-                return 'weak'
-            }
-
-            if (
-                quality == null
-            ) {
-                return 'strong'
-            }
-
-            if (
-                quality >= 60
-            ) {
-                return 'strong'
-            }
-
-            if (
-                quality >= 30
-            ) {
-                return 'medium'
-            }
-
-            return 'weak'
-        }
 
         const connectionLevel =
             getConnectionLevel(
@@ -329,6 +306,7 @@ export const VideoTile = memo(
             ]
 
         const isVideoOff =
+            forceVideoOff ||
             !activeTrack ||
             activeTrack.isMuted ||
             !isVisible ||
@@ -337,12 +315,17 @@ export const VideoTile = memo(
         const isAudioMuted =
             participant.isAudioMuted
 
+        // نوع واقعی track فعال ملاک است (نه صرفِ وجود desktopTrack در store)؛
+        // وگرنه بعد از پایان اشتراک، تا وقتی store به‌روز نشده mirror اشتباه
+        // اعمال می‌شود و تصویر برعکس دیده می‌شود.
         const isScreenShare =
-            !!desktopTrack
+            !preferCamera &&
+            !!desktopTrack &&
+            activeTrack === desktopTrack
 
-        // دوربین کاربر باید مثل آینه نمایش داده شود؛ اشتراک صفحه هرگز mirror نمی‌شود.
-        // این مقدار مستقل از کلاس CSS نگه داشته می‌شود تا بعد از attach شدن track توسط Jitsi
-        // نیز حالت mirror حتماً روی خود عنصر video اعمال شود.
+        // فقط تصویر دوربین خودمان (روی صفحه‌ی خودمان) مثل آینه نمایش داده می‌شود؛
+        // چیزی که برای بقیه ارسال می‌شود تغییری نمی‌کند. اشتراک صفحه و ویدیوی
+        // دیگران هرگز mirror نمی‌شود.
         const shouldMirrorVideo =
             Boolean(participant?.isLocal && !isScreenShare)
 
@@ -350,11 +333,69 @@ export const VideoTile = memo(
             const element = videoRef.current
             if (!element) return
 
-            element.style.transform = shouldMirrorVideo
-                ? `scaleX(-1) scale(${zoom / 100})`
-                : `scale(${zoom / 100})`
+            element.style.transform =
+                shouldMirrorVideo || zoom !== 100
+                    ? `${shouldMirrorVideo ? 'scaleX(-1) ' : ''}scale(${zoom / 100})`
+                    : ''
             element.style.transformOrigin = 'center center'
-        }, [shouldMirrorVideo, zoom, activeTrack?.jitsiTrack])
+        }, [shouldMirrorVideo, zoom, activeTrack?.jitsiTrack, isVideoOff, isScreenShare, variant])
+
+        if (variant === 'card' || variant === 'stage') {
+            const speaking = participant.isActiveSpeaker && !isAudioMuted
+            const fit = isScreenShare ? 'contain' : 'cover'
+            const media = !isVideoOff ? (
+                <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted={participant.isLocal}
+                    className="vc-video"
+                    style={{ objectFit: fit }}
+                />
+            ) : (
+                <div className="vc-avatar-wrap">
+                    <div className="vc-avatar" aria-hidden="true">
+                        {participant.displayName?.[0]?.toUpperCase() || '?'}
+                    </div>
+                </div>
+            )
+
+            if (variant === 'stage') {
+                return (
+                    <div ref={containerRef} className="vc-stage">
+                        {media}
+                        <audio ref={audioRef} autoPlay />
+                    </div>
+                )
+            }
+
+            return (
+                <div
+                    ref={containerRef}
+                    className={`vc ${speaking ? 'is-speaking' : ''} ${isTeacherCard ? 'is-teacher' : ''}`}
+                >
+                    <div className="vc-media">{media}</div>
+                    <div className="vc-info">
+                        <span className="vc-name">
+                            {participant.displayName}
+                            {participant.isLocal && ' (شما)'}
+                        </span>
+                        {isTeacherCard && <span className="vc-role">مدرس</span>}
+                        <span className="vc-icons">
+                            {participant.isHandRaised && <Hand className="vc-ic vc-ic-hand" aria-label="دست بلند کرده" />}
+                            {isAudioMuted
+                                ? <MicOff className="vc-ic vc-ic-off" aria-label="میکروفون بسته است" />
+                                : <Mic className="vc-ic vc-ic-on" aria-label="میکروفون باز است" />}
+                            <ConnectionIcon
+                                className={`vc-ic ${connectionColor}`}
+                                aria-label={CONNECTION_LABEL[connectionLevel]}
+                            />
+                        </span>
+                    </div>
+                    <audio ref={audioRef} autoPlay />
+                </div>
+            )
+        }
 
         return (
             <div
@@ -433,11 +474,14 @@ export const VideoTile = memo(
                         muted={
                             participant.isLocal
                         }
-                        className="w-full h-full object-contain bg-black !rounded-[18px] transition-transform duration-300 ease-out"
+                        className="w-full h-full object-contain bg-black !rounded-[18px]"
                         style={{
-                            transform: shouldMirrorVideo
-                                ? `scaleX(-1) scale(${zoom / 100})`
-                                : `scale(${zoom / 100})`,
+                            // transform فقط وقت لزوم (mirror خودم/zoom)؛ transform دائمی یک
+                            // لایه‌ی GPU جدا برای هر ویدیو می‌سازد.
+                            transform:
+                                shouldMirrorVideo || zoom !== 100
+                                    ? `${shouldMirrorVideo ? 'scaleX(-1) ' : ''}scale(${zoom / 100})`
+                                    : undefined,
                             transformOrigin: 'center center',
                         }}
                     />
@@ -475,69 +519,16 @@ export const VideoTile = memo(
                     </div>
                 )}
 
-                {/* Desktop: one unobtrusive action trigger. The menu never covers the video controls permanently. */}
-                <div className="hidden md:block absolute top-2 left-2 z-40 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                    <button
-                        type="button"
-                        onClick={() => setDesktopActionsOpen((value) => !value)}
-                        className="room-control w-9 h-9 rounded-xl flex items-center justify-center bg-black/65 border border-white/10 text-white/80 hover:text-white"
-                        title="گزینه‌های تصویر"
-                        aria-label="گزینه‌های تصویر"
-                    >
-                        <MoreHorizontal size={17} />
-                    </button>
-
-                    {desktopActionsOpen && (
-                        <div className="absolute left-0 top-10 w-44 rounded-2xl border room-border bg-[var(--room-surface)] p-1.5 shadow-[0_20px_60px_rgba(0,0,0,.45)] room-sheet">
-                            <button type="button" onClick={() => { togglePinnedParticipant(participant.id); setDesktopActionsOpen(false) }} className="w-full h-10 px-3 rounded-xl flex items-center gap-2 text-xs text-white/80 hover:bg-white/[.06]">
-                                {isPinned ? <PinOff size={15} /> : <Pin size={15} />}
-                                <span>{isPinned ? 'برداشتن پین' : 'پین کردن'}</span>
-                            </button>
-                            <button type="button" onClick={() => { toggleFocusedParticipant(participant.id); setDesktopActionsOpen(false) }} className="w-full h-10 px-3 rounded-xl flex items-center gap-2 text-xs text-white/80 hover:bg-white/[.06]">
-                                {isFocused ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-                                <span>{isFocused ? 'خروج از Focus' : 'ورود به Focus'}</span>
-                            </button>
-                            <button type="button" onClick={() => setZoom((z) => Math.min(160, z + 10))} className="w-full h-10 px-3 rounded-xl flex items-center gap-2 text-xs text-white/80 hover:bg-white/[.06]">
-                                <ZoomIn size={15} /><span>نمایش بزرگ‌تر</span>
-                            </button>
-                            {zoom !== 100 && (
-                                <button type="button" onClick={() => setZoom(100)} className="w-full h-9 px-3 rounded-xl flex items-center gap-2 text-[11px] text-white/50 hover:bg-white/[.06]">
-                                    <ZoomOut size={14} /><span>بازنشانی اندازه ({zoom}%)</span>
-                                </button>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                {/* Mobile: compact action trigger lives inside the tile footer, not above the frame. */}
-                <button
-                    type="button"
-                    onClick={() => setMobileActionsOpen(true)}
-                    className="md:hidden absolute bottom-2 left-2 z-40 w-8 h-8 rounded-lg flex items-center justify-center bg-black/65 border border-white/10 text-white/80 active:scale-95 transition-transform"
-                    title="گزینه‌های تصویر"
-                    aria-label="گزینه‌های تصویر"
-                >
-                    <MoreHorizontal size={16} />
-                </button>
-
-                {mobileActionsOpen && (
-                    <div className="md:hidden fixed inset-x-3 bottom-[calc(78px+env(safe-area-inset-bottom))] z-[90] rounded-[22px] border room-border bg-[var(--room-surface)] p-2 shadow-[0_24px_70px_rgba(0,0,0,.5)] room-sheet">
-                        <div className="px-2 pt-1 pb-2 flex items-center justify-between">
-                            <span className="text-xs text-white/55 truncate">گزینه‌های {participant.displayName}</span>
-                            <button type="button" onClick={() => setMobileActionsOpen(false)} className="text-xs text-white/40 px-2 py-1">بستن</button>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                            <button type="button" onClick={() => { togglePinnedParticipant(participant.id); setMobileActionsOpen(false) }} className={`h-12 rounded-2xl flex flex-col items-center justify-center gap-1 border ${isPinned ? 'bg-[var(--room-blue)] text-white border-[var(--room-blue)]/50' : 'bg-white/[.05] text-white/75 border-white/10'}`}>
-                                {isPinned ? <PinOff size={17} /> : <Pin size={17} />}<span className="text-[10px]">{isPinned ? 'برداشتن پین' : 'پین کردن'}</span>
-                            </button>
-                            <button type="button" onClick={() => { toggleFocusedParticipant(participant.id); setMobileActionsOpen(false) }} className={`h-12 rounded-2xl flex flex-col items-center justify-center gap-1 border ${isFocused ? 'bg-[var(--room-blue)] text-white border-[var(--room-blue)]/50' : 'bg-white/[.05] text-white/75 border-white/10'}`}>
-                                {isFocused ? <Minimize2 size={17} /> : <Maximize2 size={17} />}<span className="text-[10px]">{isFocused ? 'خروج از Focus' : 'Focus'}</span>
-                            </button>
-                            <button type="button" onClick={() => { setZoom((z) => Math.min(160, z + 10)); setMobileActionsOpen(false) }} className="h-12 rounded-2xl flex flex-col items-center justify-center gap-1 bg-white/[.05] text-white/75 border border-white/10"><ZoomIn size={17} /><span className="text-[10px]">بزرگ‌تر</span></button>
-                            <button type="button" onClick={() => { setZoom(100); setMobileActionsOpen(false) }} className="h-12 rounded-2xl flex flex-col items-center justify-center gap-1 bg-white/[.05] text-white/75 border border-white/10"><ZoomOut size={17} /><span className="text-[10px]">بازنشانی</span></button>
-                        </div>
-                    </div>
-                )}
+                <TileActionsMenu
+                    name={participant.displayName}
+                    isPinned={isPinned}
+                    isFocused={isFocused}
+                    zoom={zoom}
+                    onTogglePin={() => togglePinnedParticipant(participant.id)}
+                    onToggleFocus={() => toggleFocusedParticipant(participant.id)}
+                    onZoomIn={() => setZoom((z) => Math.min(160, z + 10))}
+                    onZoomReset={() => setZoom(100)}
+                />
 
                 {/* --------------------------------------------------------- */}
                 {/* Bottom bar                                                  */}

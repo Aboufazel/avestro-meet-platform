@@ -1,0 +1,413 @@
+/* چیدمان تخته و تصویر مدرس؛ اولویت با فضای آموزش و دسترسی لمسی است. */
+.classroom-whiteboard-layout {
+  position: absolute;
+  inset: 0;
+  z-index: 35;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px;
+  background: var(--room-bg, #080d16);
+}
+
+/* تخته در این حالت پنل توکار است، نه یک لایه‌ی تمام‌صفحه‌ی مستقل. */
+.classroom-whiteboard-layout .wb-root {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  flex: 1 1 auto;
+  width: 0;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 16px;
+}
+
+.classroom-teacher-panel {
+  display: flex;
+  flex: 0 0 220px;
+  flex-direction: column;
+  align-self: flex-start;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  padding: 10px;
+  border: 1px solid var(--room-border, rgba(255,255,255,.12));
+  border-radius: 16px;
+  background: var(--room-surface, #111827);
+  box-shadow: 0 12px 32px rgba(0,0,0,.18);
+}
+
+.classroom-teacher-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 28px;
+  color: var(--room-text, #fff);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.classroom-teacher-live-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: #35c995;
+  box-shadow: 0 0 0 3px rgba(53,201,149,.12);
+}
+
+.classroom-teacher-expand {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-inline-start: auto;
+  border: 1px solid var(--room-border, rgba(255,255,255,.12));
+  border-radius: 10px;
+  color: var(--room-text, #fff);
+  background: var(--room-surface-2, rgba(255,255,255,.06));
+  touch-action: manipulation;
+}
+
+.classroom-teacher-video {
+  position: relative;
+  flex: none;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--room-border, rgba(255,255,255,.12));
+  border-radius: 12px;
+  background: #05080e;
+}
+
+.classroom-teacher-video > div {
+  width: 100%;
+  height: 100%;
+  border-radius: 0 !important;
+}
+
+.classroom-teacher-caption {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  color: var(--room-text-soft, #aab4c5);
+  font-size: 11px;
+}
+
+.classroom-teacher-caption svg { flex: none; }
+
+@media (max-width: 767px) {
+  .classroom-whiteboard-layout {
+    padding: 0;
+    gap: 0;
+  }
+
+  .classroom-whiteboard-layout .wb-root {
+    border-radius: 0;
+  }
+
+  /* نوار پایین ثابت روی تخته نیفتد */
+  .classroom-whiteboard-layout.has-dock { padding-bottom: var(--dock-h, 64px); }
+
+  /* در موبایل تخته فضای اصلی را می‌گیرد؛ ویدئو یک پنجره‌ی شناور با کنترل بزرگ‌نمایی است. */
+  .classroom-teacher-panel {
+    position: absolute;
+    left: 8px;
+    top: calc(8px + env(safe-area-inset-top));
+    bottom: auto;
+    z-index: 50;
+    width: 136px;
+    height: auto;
+    padding: 5px;
+    gap: 3px;
+    border-radius: 12px;
+    background: rgba(12,18,30,.94);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 26px rgba(0,0,0,.28);
+  }
+
+  .classroom-teacher-heading {
+    min-height: 23px;
+    gap: 5px;
+    font-size: 10px;
+  }
+
+  .classroom-teacher-live-dot {
+    width: 6px;
+    height: 6px;
+  }
+
+  .classroom-teacher-expand {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+  }
+
+  .classroom-teacher-video {
+    min-height: 0;
+    border-radius: 8px;
+  }
+
+  .classroom-teacher-caption { display: none; }
+
+  .classroom-whiteboard-layout.teacher-video-expanded .classroom-teacher-panel {
+    left: 10px;
+    top: calc(10px + env(safe-area-inset-top));
+    bottom: auto;
+    width: min(58vw, 260px);
+    height: auto;
+    min-height: 0;
+    padding: 7px;
+  }
+
+  .classroom-whiteboard-layout.teacher-video-expanded .classroom-teacher-heading {
+    min-height: 27px;
+    font-size: 11px;
+  }
+
+  .classroom-whiteboard-layout.teacher-video-expanded .classroom-teacher-caption {
+    display: flex;
+    min-height: 20px;
+    font-size: 10px;
+  }
+}
+
+@media (min-width: 768px) {
+  .classroom-teacher-panel {
+    flex: 0 0 220px;
+    width: 220px;
+  }
+
+  .classroom-whiteboard-layout.teacher-video-expanded .classroom-teacher-panel {
+    flex-basis: 300px;
+    width: 300px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .classroom-teacher-panel { transition: width .16s ease, flex-basis .16s ease, height .16s ease; }
+}
+
+
+/* نوار محتوای آموزشی در کنار تخته: مدرس برجسته، سایر دوربین‌ها قابل مرور */
+.classroom-content-sidebar {
+  display: flex;
+  flex: 0 0 clamp(190px, 22vw, 250px);
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.classroom-content-sidebar .classroom-teacher-panel {
+  position: relative;
+  inset: auto;
+  flex: 0 0 auto;
+  width: 100%;
+  height: auto;
+}
+.classroom-participant-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.classroom-participant-tile {
+  position: relative;
+  flex: 0 0 auto;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 76px;
+  overflow: hidden;
+  border: 1px solid var(--room-border, rgba(255,255,255,.12));
+  border-radius: 11px;
+  background: #05080e;
+}
+.classroom-participant-tile > div { width: 100%; height: 100%; }
+
+@media (max-width: 767px) {
+  .classroom-whiteboard-layout.is-landscape-content {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: row;
+    gap: 7px;
+    padding: 7px;
+    padding-bottom: 7px;
+  }
+  .classroom-whiteboard-layout.is-landscape-content .wb-root {
+    flex: 1 1 0;
+    width: 0;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    border-radius: 12px;
+  }
+  .classroom-whiteboard-layout.is-landscape-content .classroom-content-sidebar {
+    flex: 0 0 clamp(112px, 23vw, 164px);
+    width: clamp(112px, 23vw, 164px);
+    gap: 6px;
+    overflow: hidden;
+  }
+  .classroom-whiteboard-layout.is-landscape-content .classroom-teacher-panel {
+    padding: 5px;
+    gap: 4px;
+    border-radius: 10px;
+  }
+  .classroom-whiteboard-layout.is-landscape-content .classroom-teacher-heading {
+    min-height: 22px;
+    font-size: 10px;
+  }
+  .classroom-whiteboard-layout.is-landscape-content .classroom-teacher-expand {
+    width: 25px;
+    height: 25px;
+  }
+  .classroom-whiteboard-layout.is-landscape-content .classroom-teacher-caption {
+    display: none;
+  }
+  .classroom-whiteboard-layout.is-landscape-content .classroom-participant-list {
+    gap: 6px;
+  }
+  .classroom-whiteboard-layout.is-landscape-content .classroom-participant-tile {
+    min-height: 0;
+    border-radius: 9px;
+  }
+  .classroom-whiteboard-layout.is-landscape-content.teacher-video-expanded .classroom-teacher-panel {
+    width: 100%;
+    height: auto;
+    min-height: 0;
+  }
+}
+
+/* در حالت محتوای کلاس، کل محیط (از هدر تا کنترل‌ها) روی موبایل افقی می‌شود.
+   این چرخش رابط کاربری است و به پشتیبانی قفل جهت‌گیری مرورگر وابسته نیست. */
+@media (max-width: 767px) and (orientation: portrait) {
+  .room-shell.room-class-content-mode {
+    position: fixed !important;
+    inset: auto !important;
+    top: 0 !important;
+    left: 100vw !important;
+    width: 100dvh !important;
+    height: 100vw !important;
+    max-width: none !important;
+    transform: rotate(90deg);
+    transform-origin: top left;
+    overflow: hidden !important;
+  }
+}
+@media (max-width: 767px) and (orientation: landscape) {
+  .room-shell.room-class-content-mode {
+    width: 100vw;
+    height: 100dvh;
+  }
+}
+
+
+/* Mobile teaching mode: clean board, optional chat and participant controls below video. */
+@media (max-width: 767px) {
+  .room-shell.room-class-content-mode .classroom-whiteboard-layout { padding: 4px; gap: 5px; }
+  .room-shell.room-class-content-mode .classroom-teacher-panel { position: relative; inset: auto; flex: 0 0 clamp(104px, 22vw, 150px); width: clamp(104px, 22vw, 150px); align-self: stretch; height: 100%; padding: 4px; gap: 4px; border-radius: 10px; background: #0b1320; box-shadow: none; }
+  .room-shell.room-class-content-mode .classroom-teacher-heading { display: none; }
+  .room-shell.room-class-content-mode .classroom-teacher-video { flex: 1 1 auto; min-height: 0; aspect-ratio: auto; border: 0; border-radius: 7px; }
+  .room-shell.room-class-content-mode .classroom-teacher-video > .room-tile { display: flex !important; flex-direction: column !important; justify-content: flex-start !important; overflow: hidden !important; border: 0 !important; border-radius: 7px !important; background: #000 !important; }
+  .room-shell.room-class-content-mode .classroom-teacher-video .room-tile > video { display: block; flex: 1 1 auto; width: 100%; height: calc(100% - 28px) !important; min-height: 0; object-fit: cover; border-radius: 0 !important; }
+  .room-shell.room-class-content-mode .classroom-teacher-video .room-tile > .absolute.bottom-0 { position: relative !important; inset: auto !important; flex: 0 0 28px; min-height: 28px; padding: 3px 6px !important; background: #111b2b !important; background-image: none !important; border-top: 1px solid rgba(255,255,255,.08); }
+  .room-shell.room-class-content-mode .classroom-teacher-video .room-tile > .absolute.bottom-0 span { font-size: 9px !important; }
+  .room-shell.room-class-content-mode .classroom-teacher-video .room-tile > .absolute.bottom-0 svg { width: 12px !important; height: 12px !important; }
+  .room-shell.room-class-content-mode .classroom-teacher-video .room-tile > button, .room-shell.room-class-content-mode .classroom-teacher-video .room-tile .room-tile-actions { display: none !important; }
+  .room-shell.room-class-content-mode .classroom-teacher-caption { display: none !important; }
+  .room-shell.room-class-content-mode .classroom-participant-list { flex-direction: row; flex: 0 0 auto; height: clamp(74px, 18vw, 112px); overflow-x: auto; overflow-y: hidden; gap: 5px; }
+  .room-shell.room-class-content-mode .classroom-participant-tile { flex: 0 0 clamp(88px, 18vw, 124px); width: clamp(88px, 18vw, 124px); height: 100%; min-height: 0; }
+  .room-shell.room-class-content-mode .classroom-participant-tile .room-tile { display: flex !important; flex-direction: column !important; overflow: hidden !important; border: 0 !important; border-radius: 8px !important; }
+  .room-shell.room-class-content-mode .classroom-participant-tile .room-tile > video { flex: 1 1 auto; height: calc(100% - 25px) !important; min-height: 0; object-fit: cover; border-radius: 0 !important; }
+  .room-shell.room-class-content-mode .classroom-participant-tile .room-tile > .absolute.bottom-0 { position: relative !important; inset: auto !important; flex: 0 0 25px; min-height: 25px; padding: 2px 5px !important; background: #111b2b !important; background-image: none !important; border-top: 1px solid rgba(255,255,255,.08); }
+  .room-shell.room-class-content-mode .classroom-participant-tile .room-tile > .absolute.bottom-0 span { font-size: 8px !important; }
+  .room-shell.room-class-content-mode .classroom-participant-tile .room-tile > button { display: none !important; }
+  .room-shell.room-class-content-mode .cl-dock { left: 50%; right: auto; bottom: calc(3px + env(safe-area-inset-bottom)); width: max-content; max-width: calc(100% - 12px); padding: 3px; transform: translateX(-50%); border: 1px solid rgba(255,255,255,.12); border-radius: 15px; background: rgba(9,16,28,.88); backdrop-filter: blur(12px); box-shadow: 0 5px 20px rgba(0,0,0,.24); }
+  .room-shell.room-class-content-mode .cl-dock-inner { gap: 4px; }
+  .room-shell.room-class-content-mode .cl-dock .room-control { width: 32px; height: 32px; min-width: 32px; border-radius: 10px; }
+  .room-shell.room-class-content-mode .cl-dock .room-control svg { width: 15px; height: 15px; }
+  .room-shell.room-class-content-mode .cl-dock .cl-hand { height: 32px; min-height: 32px; padding: 0 8px; flex: 0 1 auto; font-size: 10px; border-radius: 10px; }
+  .room-shell.room-class-content-mode .cl-dock .cl-hand svg { width: 14px; height: 14px; }
+}
+
+
+/* Mobile classroom video card: separate media from the information/control row. */
+@media (max-width: 767px) {
+  .room-shell.room-class-content-mode .classroom-teacher-panel {
+    flex: 0 0 156px; width: 156px; height: auto; align-self: flex-start;
+    padding: 5px; gap: 0; overflow: visible;
+    border: 1px solid rgba(148,163,184,.18); border-radius: 12px; background: #0c1422;
+  }
+  .room-shell.room-class-content-mode .classroom-teacher-video {
+    width: 100%; height: auto; aspect-ratio: 4 / 3; flex: none;
+    overflow: hidden; border: 1px solid rgba(148,163,184,.16);
+    border-radius: 8px; background: #05080e;
+  }
+  .room-shell.room-class-content-mode .classroom-teacher-video > .room-tile,
+  .room-shell.room-class-content-mode .classroom-participant-tile .room-tile {
+    position: relative !important; display: grid !important;
+    grid-template-rows: minmax(0,1fr) 30px; align-items: stretch !important;
+    justify-items: stretch !important; width: 100% !important; height: 100% !important;
+    min-height: 0; overflow: hidden !important; border: 0 !important;
+    border-radius: 7px !important; background: #05080e !important;
+  }
+  .room-shell.room-class-content-mode .room-tile > .room-tile-video {
+    position: relative !important; display: block; grid-row: 1;
+    width: 100% !important; height: 100% !important; min-height: 0;
+    object-fit: cover !important; border-radius: 0 !important; background: #000;
+  }
+  .room-shell.room-class-content-mode .room-tile > .room-tile-placeholder {
+    grid-row: 1; min-height: 0; width: 100%; height: 100%; gap: 5px;
+    overflow: hidden; background: #05080e;
+  }
+  .room-shell.room-class-content-mode .room-tile-placeholder > div {
+    width: clamp(42px,8vw,58px) !important; height: clamp(42px,8vw,58px) !important;
+    font-size: 22px !important;
+  }
+  .room-shell.room-class-content-mode .room-tile-placeholder > span { display: none; }
+  .room-shell.room-class-content-mode .room-tile > .room-tile-footer {
+    position: relative !important; inset: auto !important; grid-row: 2;
+    display: flex !important; align-items: center; justify-content: space-between;
+    width: 100%; min-width: 0; height: 30px; min-height: 30px;
+    padding: 0 6px !important; background: #172337 !important;
+    background-image: none !important; border-top: 1px solid rgba(255,255,255,.08);
+  }
+  .room-shell.room-class-content-mode .room-tile-footer > div:first-child {
+    min-width: 0; overflow: hidden;
+  }
+  .room-shell.room-class-content-mode .room-tile-footer > div:first-child span {
+    display: block; overflow: hidden; max-width: 88px; font-size: 9px !important;
+    line-height: 1.2; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .room-shell.room-class-content-mode .room-tile-footer .room-status-signal svg {
+    width: 12px !important; height: 12px !important;
+  }
+  .room-shell.room-class-content-mode .room-tile-footer .room-mic-status {
+    width: 16px; height: 16px;
+  }
+  .room-shell.room-class-content-mode .room-tile-footer .room-mic-status svg {
+    width: 11px; height: 11px;
+  }
+  .room-shell.room-class-content-mode .classroom-participant-list {
+    align-items: flex-start; height: 92px; flex: 0 0 92px;
+  }
+  .room-shell.room-class-content-mode .classroom-participant-tile {
+    flex: 0 0 112px; width: 112px; height: 84px; min-height: 0;
+  }
+  .room-shell.room-class-content-mode .classroom-participant-tile .room-tile {
+    grid-template-rows: minmax(0,1fr) 26px;
+  }
+  .room-shell.room-class-content-mode .classroom-participant-tile .room-tile > .room-tile-footer {
+    height: 26px; min-height: 26px;
+  }
+  .room-shell.room-class-content-mode .classroom-teacher-caption,
+  .room-shell.room-class-content-mode .classroom-teacher-heading { display: none !important; }
+}

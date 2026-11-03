@@ -1,0 +1,650 @@
+/* =========================================================
+   چیدمان کلاس — Avestro Meet
+   یک فایل واحد برای: کارت ویدئوی استاندارد (vt)، حالت ویدئو (grid)،
+   حالت محتوا (rail)، نوار کنترل باریک (dock)، Bottom Sheet ها،
+   اعلان درخواست صحبت، راهنمای چرخش و چرخش مجازی Landscape.
+   رنگ‌ها از متغیرهای تم اتاق (--room-*) می‌آیند.
+   ========================================================= */
+
+:root { --dock-h: calc(54px + env(safe-area-inset-bottom)); }
+
+/* ─────────────────────────────────────────────────────────
+   کارت ویدئوی استاندارد (VideoTile variant="card")
+   دو بخش مستقل: vt-media (تصویر) + vt-info (نوار اطلاعات زیر تصویر)
+   هیچ آیکون، نام یا کنترلی روی تصویر قرار نمی‌گیرد.
+   ───────────────────────────────────────────────────────── */
+.vt { position: relative; }
+.vt-card {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #05080e;
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 14px;
+  overflow: hidden;
+  container-type: size;
+}
+.vt-media {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: #000;
+}
+.vt-video { display: block; width: 100%; height: 100%; background: #000; }
+.vt-video.is-cover { object-fit: cover; }
+.vt-video.is-contain { object-fit: contain; }
+.vt-media-note {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, .7);
+}
+.vt-media-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.vt-avatar {
+  width: clamp(30px, 26cqi, 88px);
+  height: clamp(30px, 26cqi, 88px);
+  border-radius: 50%;
+  background: var(--room-surface-3, #172438);
+  color: #fff;
+  font-weight: 700;
+  font-size: clamp(13px, 9cqi, 34px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.vt-info {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 9px;
+  background: var(--room-surface-2, #131f31);
+  border-top: 1px solid rgba(255, 255, 255, .07);
+}
+.vt-info-main { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; }
+.vt-badge {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(77, 125, 255, .16);
+  color: #9db7ff;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.vt-name {
+  min-width: 0;
+  font-size: 11px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vt-info-status { display: flex; align-items: center; gap: 6px; flex: none; }
+.vt-signal { display: flex; align-items: center; }
+.vt-signal.strong { color: #4ade80; }
+.vt-signal.medium { color: #facc15; }
+.vt-signal.weak { color: #f87171; }
+.vt-mic {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.vt-mic.is-live { background: rgba(84, 217, 176, .15); color: var(--room-mint, #54d9b0); }
+.vt-mic.is-muted { background: rgba(255, 80, 104, .14); color: var(--room-danger, #ff5068); }
+.vt-weak-tag {
+  flex: none;
+  padding: 1px 5px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 80, 104, .35);
+  color: var(--room-danger, #ff5068);
+  font-size: 9px;
+  white-space: nowrap;
+}
+.vt-share-icon { color: #9db7ff; flex: none; }
+.vt-speaking { transform: scale(.8); }
+
+/* ─────────────────────────────────────────────────────────
+   ریشه‌ی چیدمان کلاس
+   ───────────────────────────────────────────────────────── */
+.cl-root {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+}
+
+/* ── حالت ۱: نمایش ویدئو (گرید سمیناری با کارت‌های بزرگ) ── */
+.cl-root.is-grid-mode { flex-direction: column; }
+.cl-grid {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr));
+  grid-auto-rows: auto;
+  align-content: center;
+  align-content: safe center;
+  gap: 12px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.cl-grid-tile {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 130px;
+  overflow: hidden;
+  border: 1px solid var(--room-border);
+  border-radius: 16px;
+  background: #05080e;
+}
+.cl-grid-tile > .vt { border-radius: 15px; }
+
+/* ── حالت ۲: محتوای آموزشی (تخته/اشتراک) + ریل مدرس و شرکت‌کنندگان ── */
+.cl-root.is-content-mode { flex-direction: row; }
+.cl-content {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--room-border);
+  background: #05080e;
+}
+.cl-content-fill { position: absolute; inset: 0; }
+.cl-content-fill > * { width: 100%; height: 100%; }
+.cl-content-fill .wb-root { border-radius: 14px; }
+.cl-content-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, .35);
+  font-size: 13px;
+}
+
+.cl-rail {
+  flex: 0 0 clamp(150px, 19vw, 224px);
+  width: clamp(150px, 19vw, 224px);
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cl-rail-teacher {
+  flex: 0 0 auto;
+  aspect-ratio: 16 / 10;
+  min-height: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--room-border);
+  background: #05080e;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .28);
+}
+.cl-rail-teacher .vt-card { border: 0; border-radius: 0; }
+.cl-rail-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.cl-rail-item {
+  position: relative;
+  flex: 0 0 auto;
+  aspect-ratio: 16 / 10;
+  min-height: 74px;
+  border-radius: 11px;
+  overflow: hidden;
+  border: 1px solid var(--room-border);
+  background: #05080e;
+}
+.cl-rail-item .vt-card { border: 0; border-radius: 0; }
+.cl-rail-empty {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 12px;
+  border: 1px dashed var(--room-border-strong, rgba(255, 255, 255, .12));
+  color: rgba(255, 255, 255, .35);
+  font-size: 11px;
+}
+
+/* اشتراک صفحه‌ی خودِ معلم: پیش‌نمایش بزرگ + نوار وضعیت پایین (بدون پوشاندن محتوا) */
+.cl-share { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.cl-share-preview { position: relative; flex: 1 1 auto; min-height: 0; }
+.cl-share-preview .vt-card { border: 0; border-radius: 0; }
+.cl-share-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 12px;
+  background: var(--room-surface, #101a2a);
+  border-top: 1px solid var(--room-border);
+}
+.cl-share-title { flex: 1 1 auto; min-width: 0; font-size: 12px; color: var(--room-text-soft, #aab4c5); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-share-stop {
+  position: absolute;
+  top: 12px;
+  inset-inline-end: 12px;
+  z-index: 12;
+  flex: none;
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .35);
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--room-danger, #ff5068);
+}
+
+/* ─────────────────────────────────────────────────────────
+   نوار کنترل باریک پایین (موبایل کلاس)
+   ───────────────────────────────────────────────────────── */
+.cl-dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: center;
+  padding: 7px 10px calc(7px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, rgba(4, 8, 15, .97), rgba(4, 8, 15, .9));
+  border-top: 1px solid var(--room-border);
+  transition: transform .3s cubic-bezier(.22, 1, .36, 1), opacity .3s ease;
+}
+.cl-dock.is-hidden { transform: translateY(calc(100% + 16px)); opacity: 0; pointer-events: none; }
+.cl-dock-inner { display: flex; align-items: center; gap: 5px; width: 100%; max-width: 560px; }
+.cl-dock .room-control { width: 40px; height: 40px; min-width: 40px; border-radius: 12px; }
+.cl-hand {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  height: 40px;
+  padding: 0 8px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #2a1c00;
+  background: var(--room-warning, #f5b84b);
+}
+.cl-hand.is-raised { background: rgba(245, 184, 75, .16); color: var(--room-warning); box-shadow: inset 0 0 0 1px rgba(245, 184, 75, .5); }
+.cl-btn-badge {
+  position: absolute;
+  top: -4px;
+  inset-inline-start: -4px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--room-blue, #4d7dff);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.cl-btn-badge.is-warn { background: var(--room-warning, #f5b84b); color: #2a1c00; }
+.cl-dock-peek {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  width: 56px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, .75);
+  background: rgba(10, 16, 28, .9);
+  border: 1px solid var(--room-border-strong, rgba(255, 255, 255, .12));
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+}
+
+/* ── منوی «بیشتر» نوار کنترل ── */
+.cl-more-backdrop { position: fixed; inset: 0; z-index: 58; background: transparent; border: 0; }
+.cl-more-menu {
+  position: fixed;
+  z-index: 61;
+  inset-inline-start: 10px;
+  bottom: calc(var(--dock-h) + 6px);
+  min-width: 216px;
+  padding: 6px;
+  border-radius: 16px;
+  background: var(--room-surface, #101a2a);
+  border: 1px solid var(--room-border-strong, rgba(255, 255, 255, .12));
+  box-shadow: 0 16px 44px rgba(0, 0, 0, .5);
+}
+.cl-more-item { width: 100%; height: 46px; padding: 0 12px; display: flex; align-items: center; gap: 12px; border-radius: 12px; font-size: 13px; color: #fff; text-align: start; }
+.cl-more-item:active { background: rgba(255, 255, 255, .08); }
+
+/* ─────────────────────────────────────────────────────────
+   Bottom Sheet گفتگو و شرکت‌کنندگان (موبایل کلاس)
+   ───────────────────────────────────────────────────────── */
+.cl-sheet-backdrop { position: fixed; inset: 0; z-index: 70; background: rgba(2, 6, 14, .55); border: 0; animation: room-backdrop .25s ease both; }
+.cl-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 72;
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--room-surface, #101a2a);
+  border: 1px solid var(--room-border-strong, rgba(255, 255, 255, .12));
+  box-shadow: 0 -12px 44px rgba(0, 0, 0, .5);
+  animation: cl-sheet-up .22s cubic-bezier(.22, 1, .36, 1);
+}
+@keyframes cl-sheet-up { from { transform: translateY(28px); opacity: 0; } to { transform: none; opacity: 1; } }
+.cl-sheet-handle {
+  position: relative;
+  flex: none;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  cursor: grab;
+  border-bottom: 1px solid var(--room-border);
+}
+.cl-sheet-grip { position: absolute; top: 7px; left: 50%; transform: translateX(-50%); width: 44px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .22); }
+.cl-sheet-title { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; font-weight: 700; color: #fff; }
+.cl-sheet-close {
+  position: absolute;
+  inset-inline-end: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  color: var(--room-text-soft, #aab4c5);
+  background: rgba(255, 255, 255, .05);
+}
+.cl-sheet-close:hover { color: #fff; background: rgba(255, 255, 255, .1); }
+.cl-sheet-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.cl-sheet-body > * { flex: 1 1 auto; min-height: 0; }
+
+/* ─────────────────────────────────────────────────────────
+   اعلان «درخواست اجازه صحبت» (مدرس)
+   ───────────────────────────────────────────────────────── */
+.cl-hand-alert-anchor {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 64;
+  width: min(94%, 430px);
+  pointer-events: none;
+}
+.cl-hand-alert {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(9, 15, 27, .94);
+  border: 1px solid rgba(245, 184, 75, .45);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, .45);
+  backdrop-filter: blur(8px);
+  animation: cl-alert-in .26s cubic-bezier(.22, 1, .36, 1);
+}
+@keyframes cl-alert-in { from { transform: translateY(-10px); opacity: 0; } to { transform: none; opacity: 1; } }
+.cl-hand-alert-icon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: rgba(245, 184, 75, .16);
+  color: var(--room-warning, #f5b84b);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cl-hand-alert-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.cl-hand-alert-body strong { font-size: 12px; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-hand-alert-body > span { font-size: 10.5px; color: rgba(255, 255, 255, .55); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-hand-alert-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.cl-hand-alert-view {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 9px;
+  background: var(--room-warning, #f5b84b);
+  color: #2a1c00;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.cl-hand-alert-view:hover { filter: brightness(1.08); }
+.cl-hand-alert-deny {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .07);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.cl-hand-alert-deny:hover { background: rgba(255, 255, 255, .12); }
+
+/* ─────────────────────────────────────────────────────────
+   ریل عمودی کنترل‌ها (موبایل کلاس در چیدمان افقی — طرح مرجع)
+   دکمه‌های گرد روی لبه‌ی شروع (راست در RTL) تا فضا برای محتوا آزاد بماند
+   ───────────────────────────────────────────────────────── */
+.cl-actions {
+  position: fixed;
+  inset-inline-start: 8px;
+  top: 42px;
+  bottom: 8px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 6px;
+  border-radius: 16px;
+  background: rgba(6, 11, 20, .93);
+  border: 1px solid var(--room-border-strong, rgba(255, 255, 255, .12));
+  box-shadow: 0 12px 34px rgba(0, 0, 0, .42);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  transition: transform .3s cubic-bezier(.22, 1, .36, 1), opacity .3s ease;
+}
+.cl-actions::-webkit-scrollbar { display: none; }
+.cl-actions.is-hidden { transform: translateX(calc(100% + 24px)); opacity: 0; pointer-events: none; }
+.cl-actions .room-control { width: 40px; height: 40px; min-width: 40px; border-radius: 12px; }
+.cl-actions-hand {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--room-warning, #f5b84b);
+  background: rgba(245, 184, 75, .12);
+  box-shadow: inset 0 0 0 1px rgba(245, 184, 75, .4);
+  transition: background .2s ease, transform .2s ease;
+}
+.cl-actions-hand.is-raised { background: var(--room-warning, #f5b84b); color: #2a1c00; animation: cl-hand-pulse 1.6s ease-in-out infinite; }
+@keyframes cl-hand-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(245, 184, 75, .45); } 50% { box-shadow: 0 0 0 7px rgba(245, 184, 75, 0); } }
+.cl-more-menu.is-rail {
+  inset-inline-start: 74px;
+  bottom: auto;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* ─────────────────────────────────────────────────────────
+   چیدمان عمودی موبایل (is-stacked) — «همه‌چیز در عمودی درست است»
+   محتوا تمام‌عرض بالا + مدرس شناور (PiP) + نوار افقی بقیه + داک پایین
+   ───────────────────────────────────────────────────────── */
+.cl-root.is-stacked {
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  padding-bottom: calc(var(--dock-h) + 6px);
+}
+.cl-root.is-stacked .cl-grid { grid-template-columns: 1fr; }
+.cl-pip {
+  position: absolute;
+  bottom: 10px;
+  inset-inline-start: 10px;
+  z-index: 40;
+  width: clamp(96px, 30vw, 140px);
+  aspect-ratio: 16 / 10;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--room-border-strong, rgba(255, 255, 255, .14));
+  background: #05080e;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+}
+.cl-pip .vt-card { border: 0; border-radius: 0; }
+.cl-strip {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  padding: 2px;
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.cl-strip::-webkit-scrollbar { display: none; }
+.cl-strip-item {
+  flex: 0 0 clamp(118px, 32vw, 152px);
+  aspect-ratio: 16 / 10;
+  min-height: 0;
+  border-radius: 11px;
+  overflow: hidden;
+  border: 1px solid var(--room-border);
+  background: #05080e;
+}
+.cl-strip-item .vt-card { border: 0; border-radius: 0; }
+.cl-strip-empty {
+  flex: 1 1 auto;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 11px;
+  border: 1px dashed var(--room-border-strong, rgba(255, 255, 255, .12));
+  color: rgba(255, 255, 255, .35);
+  font-size: 11px;
+}
+
+/* ─────────────────────────────────────────────────────────
+   موبایل — ابعاد فشرده‌تر؛ فضای ریل عمودی در چیدمان افقی
+   ───────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .cl-root { gap: 6px; padding: 6px; }
+  /* در چیدمان افقی، ریل عمودی دکمه‌ها روی لبه‌ی شروع است؛ محتوا زیرش نرود */
+  .cl-root:not(.is-stacked) { padding-inline-start: 72px; }
+  /* در چیدمان عمودی، داک پایین فضای خودش را دارد */
+  .cl-root.is-stacked { padding-bottom: calc(var(--dock-h) + 6px); }
+
+  .cl-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 185px), 1fr)); gap: 8px; }
+  .cl-grid-tile { min-height: 104px; border-radius: 13px; }
+
+  .cl-root.is-content-mode { gap: 6px; }
+  .cl-content { border-radius: 12px; }
+  .cl-content-fill .wb-root { border-radius: 12px; }
+  .cl-rail { flex-basis: clamp(104px, 24vw, 148px); width: clamp(104px, 24vw, 148px); gap: 6px; }
+  .cl-rail-teacher { border-radius: 11px; }
+  .cl-rail-list { gap: 6px; }
+  .cl-rail-item { min-height: 0; border-radius: 9px; }
+}
+
+/* دسکتاپ/تبلت: ریل کمی پهن‌تر و فهرست اسکرول‌پذیر */
+@media (min-width: 768px) {
+  .cl-rail-item { min-height: 84px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cl-sheet, .cl-hand-alert, .cl-actions-hand.is-raised { animation: none !important; }
+  .cl-dock, .cl-actions { transition: none !important; }
+}
+
+/* ─────────────────────────────────────────────────────────
+   سرریز شرکت‌کنندگان — با کلاس شلوغ، فقط بودجه‌ای از تایل‌ها
+   رندر می‌شود و باقی با چیپ «+N» جمع می‌شود (تا موبایل سنگین نشود)
+   ───────────────────────────────────────────────────────── */
+.cl-strip-more,
+.cl-rail-more {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 12px;
+  border: 1px solid var(--room-border);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--room-surface) 78%, transparent);
+  color: var(--room-text);
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .18s ease, border-color .18s ease;
+}
+.cl-strip-more { align-self: stretch; min-width: 54px; }
+.cl-rail-more { min-height: 40px; }
+.cl-strip-more:hover,
+.cl-rail-more:hover { background: var(--room-elevated, rgba(255, 255, 255, .06)); border-color: var(--room-blue); }
+.cl-strip-more.is-open,
+.cl-rail-more.is-open { color: rgba(245, 248, 255, .62); font-weight: 600; }

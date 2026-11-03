@@ -40,6 +40,10 @@ export function useJitsi(roomName) {
         (s) => s.user
     )
 
+    const token = useAuthStore(
+        (s) => s.token
+    )
+
     const joinedRef = useRef(false)
 
     const status = useMeetingStore(
@@ -83,9 +87,23 @@ export function useJitsi(roomName) {
             return
         }
 
-        const displayName =
+        // کاربر لاگین‌شده ممکن است display_name خالی داشته باشد (فیلد blank=True است).
+        // قبلاً در این حالت نام «خالی» حساب می‌شد و کاربر به /join برمی‌گشت؛
+        // الان به username یا ایمیل برمی‌گردیم، مثل منطق بک‌اند.
+        const userName =
             user?.display_name ||
             user?.displayName ||
+            user?.full_name ||
+            user?.username ||
+            user?.email?.split('@')[0]
+
+        // توکن هست ولی پروفایل هنوز نیامده؛ برگرداندن به /join اشتباه است.
+        if (token && !user && !sessionStorage.getItem('guest_name')) {
+            return
+        }
+
+        const displayName =
+            userName ||
             sessionStorage.getItem(
                 'guest_name'
             )
@@ -121,7 +139,10 @@ export function useJitsi(roomName) {
         roomName,
         user?.display_name,
         user?.displayName,
+        user?.full_name,
+        user?.username,
         user?.email,
+        token,
         navigate,
     ])
 

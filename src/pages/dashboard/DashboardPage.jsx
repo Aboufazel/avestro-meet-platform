@@ -1,3 +1,4 @@
+import { formatIsoJalali, formatIsoTime } from '../../utils/jalali'
 import { Link } from 'react-router-dom'
 import { Plus, Calendar, Users, Video, ExternalLink, Clock, Loader2, ArrowUpLeft, Activity, MoreHorizontal, ArrowLeft, Sparkles, Radio } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
@@ -29,7 +30,8 @@ export default function DashboardPage() {
   const user = useAuthStore((s) => s.user)
   const { data: rooms = [], isLoading } = useRooms()
   const liveCount = rooms.filter((r) => r.status === 'live').length
-  const scheduledCount = rooms.filter((r) => r.status === 'scheduled').length
+  // اتاقی که جلسه‌اش تمام شده (ended_at دارد) «رویداد آینده» نیست؛ لینکش فقط برای جلسه‌ی بعد آماده است
+  const scheduledCount = rooms.filter((r) => r.status === 'scheduled' && !r.ended_at).length
   const totalParticipants = rooms.reduce((s, r) => s + (r.active_participants_count || 0), 0)
 
   return (
@@ -98,18 +100,18 @@ export default function DashboardPage() {
                           <p className="font-medium text-sm truncate">{room.title}</p>
                         </div>
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 text-[11px] text-[#8d98aa]">
-                          {room.scheduled_at && <span className="inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />{new Date(room.scheduled_at).toLocaleDateString('fa-IR')}</span>}
-                          {room.scheduled_at && <span className="inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />{new Date(room.scheduled_at).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })}</span>}
+                          {room.scheduled_at && <span className="inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />{formatIsoJalali(room.scheduled_at)}</span>}
+                          {room.scheduled_at && <span className="inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />{formatIsoTime(room.scheduled_at)}</span>}
                           <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />{room.active_participants_count || 0}/{room.max_participants}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 self-stretch sm:self-auto">
-                        <Badge variant={room.status}>{statusLabels[room.status]}</Badge>
+                        <Badge variant={room.status}>{room.status === 'scheduled' && room.ended_at ? 'آماده‌ی جلسه‌ی بعد' : statusLabels[room.status]}</Badge>
                         {room.status !== 'ended' && (
                           <>
                             <Link to={`/dashboard/edit/${encodeURIComponent(room.slug)}`} className="flex-1 sm:flex-none text-center px-3 py-2 rounded-lg text-xs text-[#68758a] border border-[#e5eaf2] hover:border-[#b9c8ef] hover:bg-[#edf2ff]">ویرایش</Link>
                             <Link to={`/join/${room.slug}`} className="flex-1 sm:flex-none justify-center meet-primary-btn inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium">
-                              <ExternalLink className="w-3 h-3" />{room.status === 'live' ? 'ورود' : 'مشاهده'}
+                              <ExternalLink className="w-3 h-3" />{room.status === 'live' ? 'ورود' : (room.ended_at ? 'ورود' : 'مشاهده')}
                             </Link>
                           </>
                         )}

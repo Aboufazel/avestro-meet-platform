@@ -1,0 +1,293 @@
+/*
+ * محیط کلاس آموزشی.
+ *
+ * قاعده‌ی کلی: چیدمان فقط با کلاس‌های پوسته‌ی اتاق (.is-compact / .is-rotated) تعیین می‌شود،
+ * نه media query؛ چون وقتی گوشی عمودی است کل محیط با transform می‌چرخد و
+ * media queryها ابعاد واقعی نمایش را نمی‌دانند. (useClassViewport)
+ *
+ * رنگ‌ها از متغیرهای تم اتاق (--room-*) می‌آیند. هیچ !important در این فایل نیست.
+ */
+
+/* ───────────── پوسته‌ی کلاس ───────────── */
+.room-shell.is-class { --side-w: clamp(200px, 22%, 280px); min-height: 0; }
+.room-shell.is-compact { --side-w: clamp(112px, 20%, 148px); }
+.room-shell.is-compact > header { height: 40px; padding-inline: 10px; }
+.room-shell.is-compact > header img { width: 26px; height: 26px; }
+
+/* ───────────── بدنه: ریل کنترل + صحنه (فقط گوشی) ───────────── */
+.cl-body { position: absolute; inset: 0; display: flex; flex-direction: row; }
+.cl-main { position: relative; flex: 1; min-width: 0; min-height: 0; }
+.is-compact .cl-main { padding: 6px; }
+
+/* ───────────── کارت تصویر ───────────── */
+.vc {
+  display: flex;
+  flex-direction: column;
+  width: var(--card-w, 100%);
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--room-border);
+  background: var(--room-surface);
+}
+.vc.is-speaking { border-color: var(--room-blue); box-shadow: 0 0 0 1px var(--room-blue), 0 0 18px rgba(77, 125, 255, .28); }
+.vc-media {
+  position: relative;
+  flex: none;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #05080e;
+  container-type: size;
+}
+.vc-video { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: #000; }
+.vc-avatar-wrap { position: absolute; inset: 0; display: grid; place-items: center; }
+.vc-avatar {
+  width: clamp(30px, 40cqmin, 96px);
+  height: clamp(30px, 40cqmin, 96px);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 700;
+  font-size: clamp(15px, 18cqmin, 42px);
+  background: var(--room-surface-3);
+  border: 1px solid var(--room-border-strong);
+}
+.vc-info {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  border-top: 1px solid var(--room-border);
+  background: var(--room-surface-2);
+}
+.vc-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; color: var(--room-text); }
+.vc-role { flex: none; padding: 1px 6px; border-radius: 6px; font-size: 10px; color: var(--room-blue-2); background: rgba(77, 125, 255, .16); }
+.vc-icons { flex: none; display: flex; align-items: center; gap: 7px; }
+.vc-ic { width: 15px; height: 15px; }
+.vc-ic-on { color: var(--room-mint); }
+.vc-ic-off { color: var(--room-danger); }
+.vc-ic-hand { color: var(--room-warning); }
+
+.vc-stage { position: absolute; inset: 0; background: #000; container-type: size; }
+
+.is-compact .vc { border-radius: 9px; }
+.is-compact .vc-info { height: 26px; padding: 0 7px; gap: 4px; }
+.is-compact .vc-name { font-size: 10.5px; }
+.is-compact .vc-role { font-size: 9px; padding: 0 5px; }
+.is-compact .vc-ic { width: 13px; height: 13px; }
+
+/* ───────────── ریشه‌ی چیدمان ───────────── */
+.cl-root { height: 100%; min-height: 0; display: flex; padding: 12px 12px 96px; }
+.is-compact .cl-root { padding: 0; }
+.cl-empty { height: 100%; display: grid; place-items: center; font-size: 14px; color: var(--room-text-muted); }
+
+/* حالت ویدئو: شبکه‌ی کارت‌های بزرگ */
+.cl-grid {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 1), var(--card-w));
+  gap: 12px;
+  justify-content: center;
+  align-content: center;
+  overflow: hidden;
+  animation: cl-fade .22s ease-out;
+}
+.cl-grid.is-scroll { align-content: start; overflow-y: auto; overscroll-behavior: contain; }
+.is-compact .cl-grid { gap: 8px; }
+
+/* حالت محتوا: تخته/اشتراک صفحه + ستون مدرس و شرکت‌کنندگان */
+.cl-root.is-content { gap: 10px; }
+.is-compact .cl-root.is-content { gap: 6px; }
+.cl-content { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px; animation: cl-fade .22s ease-out; }
+.cl-content-main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--room-border);
+  background: #05080e;
+}
+.cl-side {
+  flex: 0 0 var(--side-w);
+  width: var(--side-w);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  animation: cl-fade .22s ease-out;
+}
+.is-compact .cl-side { gap: 6px; }
+.cl-side-teacher, .cl-side-list { flex: none; }
+.cl-side-list { display: flex; flex-direction: column; gap: 8px; }
+.is-compact .cl-side-list { gap: 6px; }
+.cl-side .vc { width: 100%; flex: none; }
+
+.cl-share-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 8px 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--room-border);
+  background: var(--room-surface);
+  color: var(--room-text-soft);
+  font-size: 11px;
+}
+.cl-share-bar svg { flex: none; color: var(--room-blue-2); }
+.cl-share-bar span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-share-bar button { flex: none; height: 26px; padding: 0 14px; border-radius: 8px; color: #fff; font-size: 11px; font-weight: 600; background: var(--room-danger); }
+
+@keyframes cl-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* ───────────── ریل کنترل (گوشی) ───────────── */
+.cl-rail-wrap { position: relative; flex: none; display: flex; }
+.cl-rail {
+  width: 54px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  background: var(--room-surface);
+  border-left: 1px solid var(--room-border);
+}
+.cl-rail::-webkit-scrollbar { display: none; }
+.cl-rail-spacer { flex: 1; min-height: 4px; }
+
+.rail-btn {
+  position: relative;
+  flex: none;
+  width: 42px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  color: var(--room-text-soft);
+  background: rgba(255, 255, 255, .05);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.rail-btn:active { transform: scale(.94); }
+.rail-btn.is-on { color: var(--room-mint); background: var(--room-mint-soft); }
+.rail-btn.is-off { color: var(--room-danger); background: rgba(255, 80, 104, .12); }
+.rail-btn.is-active { color: #fff; background: var(--room-blue); }
+.rail-btn.is-warn { color: #2a1c00; background: var(--room-warning); }
+.rail-btn.is-danger { color: #fff; background: var(--room-danger); }
+.rail-badge {
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--room-danger);
+}
+.rail-badge.is-hand { color: #2a1c00; background: var(--room-warning); }
+
+.cl-more-backdrop { position: absolute; inset: 0; z-index: 44; }
+.cl-more-menu {
+  position: absolute;
+  right: 100%;
+  bottom: 8px;
+  z-index: 45;
+  min-width: 200px;
+  padding: 5px;
+  border-radius: 14px;
+  background: var(--room-surface-2);
+  border: 1px solid var(--room-border-strong);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, .5);
+}
+.cl-more-item { width: 100%; height: 42px; padding: 0 12px; display: flex; align-items: center; gap: 10px; border-radius: 10px; color: #fff; font-size: 13px; text-align: right; }
+.cl-more-item:active { background: rgba(255, 255, 255, .08); }
+
+/* ───────────── شیت پایین (گفتگو / شرکت‌کنندگان) ───────────── */
+.cl-sheet-layer { position: absolute; inset: 0; z-index: 40; display: flex; align-items: flex-end; justify-content: center; }
+.cl-sheet-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .45); animation: cl-fade .18s ease-out; }
+.cl-sheet {
+  position: relative;
+  width: min(100%, 620px);
+  height: 94%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 16px 16px 0 0;
+  border: 1px solid var(--room-border-strong);
+  border-bottom: 0;
+  background: var(--room-surface);
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, .45);
+  animation: cl-sheet-up .22s ease-out;
+}
+@keyframes cl-sheet-up { from { transform: translateY(28px); opacity: 0; } to { transform: none; opacity: 1; } }
+.cl-sheet-head {
+  position: relative;
+  flex: none;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 0;
+  border-bottom: 1px solid var(--room-border);
+  touch-action: none;
+  cursor: grab;
+}
+.cl-sheet-grip { position: absolute; top: 5px; left: 50%; width: 38px; height: 4px; margin-left: -19px; border-radius: 2px; background: rgba(255, 255, 255, .25); }
+.cl-sheet-title { flex: 1; font-size: 13px; font-weight: 700; color: var(--room-text); }
+.cl-sheet-close { width: 34px; height: 32px; display: grid; place-items: center; border-radius: 10px; color: var(--room-text-soft); background: rgba(255, 255, 255, .06); }
+.cl-sheet-body { flex: 1; min-height: 0; overflow: hidden; }
+
+/* ───────────── اعلان درخواست اجازه صحبت ───────────── */
+.cl-toasts {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  z-index: 48;
+  width: min(94%, 440px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.cl-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px 7px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(245, 184, 75, .5);
+  background: var(--room-surface-3);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+  animation: cl-toast-in .2s ease-out;
+}
+.cl-toast > svg { flex: none; color: var(--room-warning); }
+.cl-toast-text { flex: 1; min-width: 0; font-size: 12px; line-height: 1.5; color: var(--room-text); }
+.cl-toast-text b { font-weight: 700; }
+.cl-toast button { flex: none; height: 30px; padding: 0 11px; border-radius: 8px; font-size: 11px; font-weight: 600; }
+.cl-toast-view { color: #2a1c00; background: var(--room-warning); }
+.cl-toast-reject { color: var(--room-text-soft); background: rgba(255, 255, 255, .08); }
+.cl-toast-more { align-self: center; padding: 2px 10px; border-radius: 10px; font-size: 10px; color: var(--room-text-soft); background: var(--room-surface-3); pointer-events: auto; }
+@keyframes cl-toast-in { from { transform: translateY(-8px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .cl-grid, .cl-content, .cl-side, .cl-sheet, .cl-sheet-backdrop, .cl-toast { animation: none; }
+}

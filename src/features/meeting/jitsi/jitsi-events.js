@@ -23,6 +23,7 @@ export const JITSI_EVENTS = {
 
   SCREEN_SHARE_STARTED: 'screenShareStarted',
   SCREEN_SHARE_STOPPED: 'screenShareStopped',
+  SCREEN_SHARE_STATE_RECEIVED: 'screenShareStateReceived',
 
   CONNECTION_ESTABLISHED: 'connectionEstablished',
   CONNECTION_INTERRUPTED: 'connectionInterrupted',

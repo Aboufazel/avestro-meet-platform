@@ -1,8 +1,9 @@
 import {jitsiController} from '../jitsi/JitsiController.js'
 import {JITSI_EVENTS} from '../jitsi/jitsi-events.js'
 import {useMeetingStore} from './meeting-store.js'
-import {startLocalRecording, stopLocalRecording, downloadRecording} from '../jitsi/recordingService.js'
+import {startLocalRecording, stopLocalRecording, downloadRecording, recoverOrphanedRecordings} from '../jitsi/recordingService.js'
 import {useAuthStore} from "../../../store/authStore.js";
+import {refreshAccessToken} from '../../../services/api.js'
 import {startVoiceRecording, stopVoiceRecording} from '../jitsi/recordingService.js'
 
 /**
@@ -18,18 +19,42 @@ import {startVoiceRecording, stopVoiceRecording} from '../jitsi/recordingService
 
 let _voiceRecordingInterval = null
 
+// صدای ضبط مستقیم از trackهای Jitsi می‌آید (نه صدای تب)
+const _recordingAudioOptions = {
+    getExtraAudioTracks: () => jitsiController.getAudioMediaTracks(),
+}
+
+/**
+ * ضبط‌های نیمه‌تمامِ جلسه‌ی قبلی (کرش/بسته شدن تب) را دانلود می‌کند.
+ */
+export async function recoverUnsavedRecordings() {
+    try {
+        const items = await recoverOrphanedRecordings()
+        for (const {blob, kind, startedAt} of items) {
+            const stamp = new Date(startedAt || Date.now()).toISOString().slice(0, 19)
+            downloadRecording(blob, `${kind === 'voice' ? 'صدای-جلسه' : 'جلسه'}-بازیابی-${stamp}`)
+        }
+    } catch (error) {
+        console.warn('[meeting-actions] recover failed:', error)
+    }
+}
+
 export async function startVoiceRec() {
     try {
         await startVoiceRecording('medium', async (blob) => {
             clearInterval(_voiceRecordingInterval)
             useMeetingStore.getState()._setVoiceRecording(false)
             if (blob) {
-                downloadRecording(blob, `صدای-جلسه-${new Date().toISOString().slice(0, 19)}.webm`)
+                downloadRecording(blob, `صدای-جلسه-${new Date().toISOString().slice(0, 19)}`)
             }
-        })
+        }, _recordingAudioOptions)
         useMeetingStore.getState()._setVoiceRecording(true)
+        // تایمر بر اساس ساعت واقعی (setInterval در تب پس‌زمینه عقب می‌افتد)
+        const voiceStartedAt = Date.now()
         _voiceRecordingInterval = setInterval(() => {
-            useMeetingStore.getState()._incrementVoiceRecordingSeconds()
+            const st = useMeetingStore.getState()
+            const target = Math.floor((Date.now() - voiceStartedAt) / 1000)
+            for (let i = st.voiceRecordingSeconds; i < target; i++) st._incrementVoiceRecordingSeconds()
         }, 1000)
     } catch (error) {
         console.warn('[meeting-actions] Failed to start voice recording:', error)
@@ -42,7 +67,7 @@ export async function stopVoiceRec() {
     const blob = await stopVoiceRecording()
     useMeetingStore.getState()._setVoiceRecording(false)
     if (blob) {
-        downloadRecording(blob, `صدای-جلسه-${new Date().toISOString().slice(0, 19)}.webm`)
+        downloadRecording(blob, `صدای-جلسه-${new Date().toISOString().slice(0, 19)}`)
     }
 }
 
@@ -63,12 +88,15 @@ export async function startRecording() {
             clearInterval(_recordingInterval)
             useMeetingStore.getState()._setRecording(false)
             if (blob) {
-                downloadRecording(blob, `جلسه-${new Date().toISOString().slice(0, 19)}.webm`)
+                downloadRecording(blob, `جلسه-${new Date().toISOString().slice(0, 19)}`)
             }
-        })
+        }, _recordingAudioOptions)
         useMeetingStore.getState()._setRecording(true)
+        const startedAt = Date.now()
         _recordingInterval = setInterval(() => {
-            useMeetingStore.getState()._incrementRecordingSeconds()
+            const st = useMeetingStore.getState()
+            const target = Math.floor((Date.now() - startedAt) / 1000)
+            for (let i = st.recordingSeconds; i < target; i++) st._incrementRecordingSeconds()
         }, 1000)
     } catch (error) {
         console.warn('[meeting-actions] Failed to start recording:', error)
@@ -81,7 +109,7 @@ export async function stopRecording() {
     const blob = await stopLocalRecording()
     useMeetingStore.getState()._setRecording(false)
     if (blob) {
-        downloadRecording(blob, `جلسه-${new Date().toISOString().slice(0, 19)}.webm`)
+        downloadRecording(blob, `جلسه-${new Date().toISOString().slice(0, 19)}`)
     }
 }
 
@@ -90,6 +118,9 @@ export async function stopRecording() {
  */
 export async function joinMeeting({roomName, displayName, email = ''}) {
     const store = useMeetingStore.getState()
+
+    // ضبط‌های نیمه‌تمام جلسه‌ی قبلی (کرش/بسته شدن تب) را بازیابی کن
+    recoverUnsavedRecordings()
 
     // اگر listener های قبلی باقی مانده‌اند، پاک شوند
     _unbindAll()
@@ -107,10 +138,12 @@ export async function joinMeeting({roomName, displayName, email = ''}) {
     // قبل از اتصال واقعی به Jitsi، از بک‌اند اجازه بگیر (چک ظرفیت بر اساس پلن میزبان)
     store._setStatus('connecting')
     const allowed = await _checkRoomCapacity(roomName, externalId, displayName)
-    if (!allowed) {
-        store._setError({message: 'ظرفیت این جلسه بر اساس پلن میزبان تکمیل شده است.'})
+    if (generation !== _joinGeneration) return
+    if (!allowed.ok) {
+        store._setError({message: allowed.message})
         return
     }
+    _startHeartbeat(roomName, externalId)
 
     /**
      * ─────────────────────────────────────────────────────────────
@@ -475,6 +508,23 @@ export async function joinMeeting({roomName, displayName, email = ''}) {
         )
     )
 
+    _unsubscribers.push(
+        jitsiController.on(
+            JITSI_EVENTS.SCREEN_SHARE_STATE_RECEIVED,
+            ({ participantId, isSharing }) => {
+                if (generation !== _joinGeneration || !participantId) return
+                const state = useMeetingStore.getState()
+                // The badge/tile for a share is driven by the real desktop track
+                // (see _addTrack). A "start" message alone must never turn it on,
+                // otherwise a lost/late message leaves a badge with a black tile.
+                if (!isSharing) {
+                    state._clearRemoteScreenShare(participantId)
+                    state._bumpRenegotiationTick(participantId)
+                }
+            }
+        )
+    )
+
     /**
      * شروع واقعی Jitsi
      */
@@ -483,6 +533,8 @@ export async function joinMeeting({roomName, displayName, email = ''}) {
             roomName,
             displayName,
             email,
+            token: allowed.token || null,
+            tokenProvider: () => _refreshJitsiToken(roomName, externalId),
         })
     } catch (error) {
         if (generation !== _joinGeneration) return
@@ -510,6 +562,7 @@ export async function leaveMeeting() {
     try {
         await jitsiController.leave()
     } finally {
+        _stopHeartbeat()
         _unbindAll()
         useMeetingStore.getState().resetMeeting()
         _notifyBackendLeave(roomName, externalId)
@@ -543,39 +596,85 @@ function _authHeaders() {
 }
 
 /**
- * چک ظرفیت روم و ثبت اولیه‌ی حضور — قبل از اتصال واقعی به Jitsi صدا زده می‌شود
+ * POST به بک‌اند با توکن؛ اگر توکن منقضی/نامعتبر بود (401)، یک بار بدون توکن تکرار می‌شود.
+ * endpointهای join/leave عمومی‌اند و با توکن خراب نباید شکست بخورند.
  */
-// async function _checkRoomCapacity(roomName, externalId) {
-//     try {
-//         const res = await fetch(`${API_BASE_URL}/rooms/${roomName}/join/`, {
-//             method: 'POST',
-//             headers: { 'Content-Type': 'application/json' },
-//             body: JSON.stringify({ external_participant_id: externalId }),
-//         })
-//         return res.ok
-//     } catch (error) {
-//         console.warn('[meeting-actions] Failed to check room capacity:', error)
-//         return true // اگه بک‌اند در دسترس نبود، اجازه بده وارد بشه (fail-open)
-//     }
-// }
-
-async function _checkRoomCapacity(roomName, externalId, displayName) {
-    try {
-        const res = await fetch(`${API_BASE_URL}/rooms/${roomName}/join/`, {
+async function _postWithAuth(url, body) {
+    const send = (token) =>
+        fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                ..._authHeaders(),
+                ...(token ? {Authorization: `Bearer ${token}`} : {}),
             },
-            body: JSON.stringify({
+            body,
+        })
+
+    const token = useAuthStore.getState().token
+    const res = await send(token)
+
+    // توکن منقضی شده: با refresh token تازه شود و با همان هویت تکرار شود.
+    // (هرگز بدون توکن تکرار نمی‌کنیم؛ وگرنه میزبان/مدیر مهمان حساب می‌شود.)
+    if (res.status === 401 && token) {
+        const fresh = await refreshAccessToken()
+        if (fresh) return send(fresh)
+    }
+
+    return res
+}
+
+/**
+ * چک ظرفیت روم و ثبت اولیه‌ی حضور — قبل از اتصال واقعی به Jitsi صدا زده می‌شود
+ */
+/**
+ * تمدید توکن Jitsi برای reconnect (اگر خطا بدهد، کنترلر از توکن قبلی استفاده می‌کند)
+ */
+async function _refreshJitsiToken(roomName, externalId) {
+    const res = await _postWithAuth(
+        `${API_BASE_URL}/rooms/${roomName}/jitsi-token/`,
+        JSON.stringify({external_participant_id: externalId})
+    )
+    if (!res.ok) throw new Error('token refresh failed')
+    const data = await res.json()
+    return data.jitsi_token || null
+}
+
+async function _checkRoomCapacity(roomName, externalId, displayName) {
+    try {
+        const res = await _postWithAuth(
+            `${API_BASE_URL}/rooms/${roomName}/join/`,
+            JSON.stringify({
                 external_participant_id: externalId,
                 guest_name: displayName || '',
-            }),
-        })
-        return res.ok
+            })
+        )
+
+        if (res.ok) {
+            const data = await res.json().catch(() => ({}))
+            // null = سرور Jitsi هنوز بدون JWT است (ورود آزاد)
+            return {ok: true, token: data.jitsi_token || null}
+        }
+
+        let detail = ''
+        try {
+            detail = (await res.json())?.detail || ''
+        } catch {
+            // پاسخ JSON نبود
+        }
+
+        return {
+            ok: false,
+            status: res.status,
+            message:
+                res.status === 409
+                    ? 'ظرفیت این جلسه بر اساس پلن میزبان تکمیل شده است.'
+                    : res.status === 401
+                        ? 'نشست شما منقضی شده است؛ لطفاً دوباره وارد شوید.'
+                        : detail || 'ورود به جلسه ممکن نشد.',
+        }
     } catch (error) {
         console.warn('[meeting-actions] Failed to check room capacity:', error)
-        return true
+        return {ok: true}
     }
 }
 
@@ -595,17 +694,61 @@ async function _checkRoomCapacity(roomName, externalId, displayName) {
 //     }
 // }
 
+// ─── Heartbeat حضور ────────────────────────────────────────────
+// بدون این، قطع شبکه/بستن مرورگر موبایل/خواب لپ‌تاپ باعث می‌شد رکورد حضور برای همیشه «آنلاین» بماند.
+const HEARTBEAT_MS = 20000
+let _heartbeatTimer = null
+
+// میزبان خودش کلاس را تمام می‌کند و مودال پایان کلاس را نشان می‌دهد؛ نباید صفحه‌ی خطا جایش بنشیند
+export const stopPresenceHeartbeat = () => _stopHeartbeat()
+
+function _stopHeartbeat() {
+    if (_heartbeatTimer) {
+        clearInterval(_heartbeatTimer)
+        _heartbeatTimer = null
+    }
+}
+
+function _startHeartbeat(roomName, externalId) {
+    _stopHeartbeat()
+    const beat = async () => {
+        // session عوض شده/خارج شده → دیگر ضربان نزن
+        if (_currentRoomName !== roomName || _currentExternalId !== externalId) {
+            _stopHeartbeat()
+            return
+        }
+        try {
+            const res = await _postWithAuth(
+                `${API_BASE_URL}/rooms/${roomName}/heartbeat/`,
+                JSON.stringify({external_participant_id: externalId})
+            )
+            // 410: میزبان کلاس را پایان داده → بقیه‌ی شرکت‌کنندگان هم باید بیرون بروند
+            if (res.status === 410) {
+                _stopHeartbeat()
+                useMeetingStore.getState()._setError({
+                    title: 'جلسه پایان یافت',
+                    message: 'میزبان جلسه را به پایان رساند. برای جلسه‌ی بعد دوباره از همان لینک وارد شوید.',
+                })
+            }
+        } catch (_) { /* قطعی شبکه؛ ضربان بعدی دوباره تلاش می‌کند */ }
+    }
+    _heartbeatTimer = setInterval(beat, HEARTBEAT_MS)
+    // وقتی تب دوباره دیده شد یا شبکه برگشت، فوری ضربان بزن
+    if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') beat()
+        })
+    }
+    if (typeof window !== 'undefined') window.addEventListener('online', beat)
+}
+
 async function _notifyBackendLeave(roomName, externalId) {
     if (!roomName || !externalId) return
     try {
-        await fetch(`${API_BASE_URL}/rooms/${roomName}/leave/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ..._authHeaders(),
-            },
-            body: JSON.stringify({external_participant_id: externalId}),
-        })
+        await _postWithAuth(
+            `${API_BASE_URL}/rooms/${roomName}/leave/`,
+            JSON.stringify({external_participant_id: externalId})
+        )
     } catch (error) {
         console.warn('[meeting-actions] Failed to notify backend of leave:', error)
     }
@@ -672,6 +815,14 @@ export async function setVideoQuality(height) {
 /**
  * شروع screen share
  */
+export function setScreenShareStatePublisher(publisher) {
+    jitsiController.setScreenShareStatePublisher(publisher)
+}
+
+export function applyAuthoritativeScreenShareState(state) {
+    jitsiController.applyAuthoritativeScreenShareState(state)
+}
+
 export async function startScreenShare() {
     return jitsiController.startScreenShare()
 }
@@ -708,6 +859,14 @@ export function sendMessage(text, replyTo = null) {
 /**
  * Mute a specific participant.
  */
+export const getCurrentExternalId = () => _currentExternalId
+export const markAsTeacher = (on = true) => jitsiController.setTeacherFlag(on)
+export const raiseHand = (raised) => jitsiController.setHandRaised(raised)
+export const muteParticipantMedia = (id, type) => jitsiController.muteParticipantMedia(id, type)
+export const muteAllParticipants = (type = 'audio') => jitsiController.muteAllParticipants(type)
+export const enableClassModeration = (types = ['audio', 'video']) => jitsiController.enableAVModeration(types)
+export const approveParticipant = (id, types) => jitsiController.approveParticipantMedia(id, types)
+
 export async function muteParticipantAudio(
     participantId
 ) {
@@ -770,12 +929,13 @@ if (typeof window !== 'undefined') {
                 `${API_BASE_URL}/rooms/${_currentRoomName}/leave/`,
                 new Blob(
                     [JSON.stringify({external_participant_id: _currentExternalId})],
-                    {type: 'application/json'}
+                    // text/plain تا درخواست cross-origin بدون preflight ارسال شود (بک‌اند بدنه را دستی می‌خواند)
+                    {type: 'text/plain;charset=UTF-8'}
                 )
             )
         }
     }
 
-    window.addEventListener('beforeunload', sendLeaveBeacon)
+    // beforeunload عمداً نیست: اگر میزبان در هشدار «ماندن» را بزند، نباید خروج ثبت شود.
     window.addEventListener('pagehide', sendLeaveBeacon)
 }
