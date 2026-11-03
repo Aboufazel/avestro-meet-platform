@@ -92,17 +92,17 @@ export default function JoinPage() {
             ) : mode === 'select' ? (
               <div>
                 <div className="w-11 h-11 rounded-2xl bg-[#edf2ff] text-[#4f7cff] flex items-center justify-center mb-5"><UserRound className="w-5 h-5" /></div>
-                <h2 className="text-lg sm:text-xl font-bold">ورود به جلسه</h2><p className="text-xs text-[#8d98aa] mt-2 mb-4 sm:mb-6">روش ورود خود را انتخاب کنید.</p>
+                <h2 className="text-lg sm:text-xl font-bold">ورود</h2><p className="text-xs text-[#8d98aa] mt-2 mb-4 sm:mb-6">روش ورود خود را انتخاب کنید.</p>
                 {token ? (
                   <>
                     <div className="flex items-center gap-3 p-3.5 bg-[#f8faff] rounded-2xl border border-[#e5eaf2] mb-3"><Avatar name={user?.display_name || user?.username} size="sm" /><div className="min-w-0"><p className="text-sm font-medium truncate">{user?.display_name || user?.username}</p><p className="text-[11px] text-[#9aa4b4] truncate mt-1">{user?.email}</p></div><span className="mr-auto w-2 h-2 rounded-full bg-[#54d9b0]" /></div>
                     <Button fullWidth size="lg" onClick={handleJoinAsUser} className="!bg-gradient-to-l !from-[#4f7cff] !to-[#6a8fff] !text-white !border-0 !rounded-xl">ورود با حساب کاربری</Button>
-                    <Button fullWidth variant="ghost" onClick={() => setMode('guest')} className="!text-[#68758a] hover:!bg-[#f4f7fb] mt-2">ورود به عنوان مهمان</Button>
+                    {/*<Button fullWidth variant="ghost" onClick={() => setMode('guest')} className="!text-[#68758a] hover:!bg-[#f4f7fb] mt-2">ورود</Button>*/}
                   </>
                 ) : (
                   <>
                     <Link to={`${appRoutes.auth.login}?next=/join/${slug}`} className="w-full block"><Button fullWidth size="lg" className="!bg-gradient-to-l !from-[#4f7cff] !to-[#6a8fff] !text-white !border-0 !rounded-xl">ورود با حساب کاربری</Button></Link>
-                    <Button fullWidth variant="secondary" size="lg" onClick={() => setMode('guest')} className="!text-[#101827] !border-[#e5eaf2] !bg-white hover:!bg-[#edf2ff] mt-2">ورود به عنوان مهمان</Button>
+                    {/*<Button fullWidth variant="secondary" size="lg" onClick={() => setMode('guest')} className="!text-[#101827] !border-[#e5eaf2] !bg-white hover:!bg-[#edf2ff] mt-2">ورود</Button>*/}
                   </>
                 )}
                 <div className="flex items-center justify-center gap-2 text-[10px] text-[#9aa4b4] mt-7"><ShieldCheck className="w-3.5 h-3.5 text-[#54d9b0]" /> ورود امن و بدون پیچیدگی</div>
@@ -110,7 +110,7 @@ export default function JoinPage() {
             ) : (
               <div>
                 <button onClick={() => setMode(token ? 'select' : 'guest')} className="text-xs text-[#8d98aa] hover:text-[#4f7cff] inline-flex items-center gap-1 mb-6"><ArrowRight className="w-3.5 h-3.5" /> بازگشت</button>
-                <h2 className="text-lg sm:text-xl font-bold">ورود به عنوان مهمان</h2><p className="text-xs text-[#8d98aa] mt-2 mb-4 sm:mb-6">نامی که سایر شرکت‌کنندگان در جلسه می‌بینند.</p>
+                <h2 className="text-lg sm:text-xl font-bold">ورود</h2><p className="text-xs text-[#8d98aa] mt-2 mb-4 sm:mb-6">نامی که سایر شرکت‌کنندگان در جلسه می‌بینند.</p>
                 <form onSubmit={handleSubmit(handleJoinAsGuest)} className="flex flex-col gap-4">
                   {isEducationalClass ? (
                     <>
@@ -120,7 +120,7 @@ export default function JoinPage() {
                   ) : (
                     <Input label="نام شما" placeholder="مثلاً عباس" error={errors.guest_name?.message} {...register('guest_name')} className="meet-auth-input" />
                   )}
-                  <Button type="submit" fullWidth size="lg" className="!bg-gradient-to-l !from-[#4f7cff] !to-[#6a8fff] !text-white !border-0 !rounded-xl">ورود به جلسه</Button>
+                  <Button type="submit" fullWidth size="lg" className="!bg-gradient-to-l !from-[#4f7cff] !to-[#6a8fff] !text-white !border-0 !rounded-xl">ورود</Button>
                 </form>
               </div>
             )}

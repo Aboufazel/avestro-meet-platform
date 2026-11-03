@@ -62,7 +62,7 @@ export default function LoginPage() {
             <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
               <Input label="نام کاربری" placeholder="نام کاربری یا ایمیل خود را وارد کنید" icon={Mail} error={errors.username?.message} {...register('username')} className="meet-auth-input" />
               <Input label="رمز عبور" type="password" placeholder="رمز عبور خود را وارد کنید" icon={Lock} error={errors.password?.message} {...register('password')} className="meet-auth-input" />
-              <Button type="submit" fullWidth size="lg" loading={isPending} className="!bg-gradient-to-l !from-[#4f7cff] !to-[#6a8fff] !text-white !border-0 !shadow-[0_12px_28px_rgba(79,124,255,.22)] !rounded-xl !py-3.5">ورود به جلسه</Button>
+              <Button type="submit" fullWidth size="lg" loading={isPending} className="!bg-gradient-to-l !from-[#4f7cff] !to-[#6a8fff] !text-white !border-0 !shadow-[0_12px_28px_rgba(79,124,255,.22)] !rounded-xl !py-3.5">ورود</Button>
             </form>
 
             <div className="flex items-center gap-3 my-7"><div className="h-px flex-1 bg-[#e9edf3]" /><span className="text-[10px] text-[#b0b8c6]">اَوسترو میت</span><div className="h-px flex-1 bg-[#e9edf3]" /></div>

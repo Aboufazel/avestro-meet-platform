@@ -331,7 +331,11 @@ export default function CreateEventPage() {
               {step > 0 && <Button type="button" variant="ghost" onClick={() => setStep((current) => current - 1)}><ArrowRight className="ml-1 h-4 w-4" /> قبلی</Button>}
               <Link to="/dashboard"><Button type="button" variant="ghost">انصراف</Button></Link>
             </div>
-            {step < 3 ? (
+            {
+              step === 0 ?
+                  ''
+                      :
+              (step < 3 ) ? (
               <Button type="button" size="lg" disabled={step === 2 && configureFeatures && featuresLoading} onClick={() => {
                 if (step === 1) {
                   if (!title.trim()) { toast.error('عنوان رویداد الزامی است'); return }

@@ -1143,7 +1143,8 @@ export class JitsiController {
                     }
                 }
 
-                mediaTrack.applyConstraints(constraints).catch(() => {})
+                mediaTrack.applyConstraints(constraints).catch(() => {
+                })
             }
         } catch {
         }
@@ -1153,10 +1154,11 @@ export class JitsiController {
             // screen share to camera resolution as well.
             this._conference
                 ?.setSenderVideoConstraint?.(
-                    LOCAL_VIDEO_CONFIG.maxHeight,
-                    track?.getSourceName?.()
-                )
-                ?.catch?.(() => {})
+                LOCAL_VIDEO_CONFIG.maxHeight,
+                track?.getSourceName?.()
+            )
+                ?.catch?.(() => {
+            })
         } catch {
         }
     }
@@ -1259,10 +1261,12 @@ export class JitsiController {
             this._screenShareSeqByParticipant.set(participantId, numericSeq)
         }
 
-        console.info('[ScreenShare] state', { participantId, isSharing, seq: numericSeq })
+        console.info('[ScreenShare] state', {participantId, isSharing, seq: numericSeq})
 
         if (isSharing) {
             this._authoritativelyStoppedScreenShares.delete(participantId)
+            this._receiverKey = null
+            this._applyReceiverConstraints()
         } else {
             this._authoritativelyStoppedScreenShares.set(participantId, Date.now())
         }
@@ -1299,7 +1303,7 @@ export class JitsiController {
         return false
     }
 
-    applyAuthoritativeScreenShareState({ participantId, isSharing, seq } = {}) {
+    applyAuthoritativeScreenShareState({participantId, isSharing, seq} = {}) {
         this._acceptScreenShareState(participantId, isSharing, seq)
     }
 
@@ -2239,6 +2243,8 @@ export class JitsiController {
             this._reconnectAttempts = 0
             this._isReconnecting = false
             this._setStatus(MEETING_STATUS.CONNECTED)
+            this._receiverKey = null
+            this._applyReceiverConstraints()
             this._emit(JITSI_EVENTS.CONNECTION_ESTABLISHED)
 
             // محدودیت‌های دریافت ویدیو روی conference جدید دوباره اعمال شود
@@ -2449,7 +2455,14 @@ export class JitsiController {
                         this._emit(JITSI_EVENTS.CONNECTION_RESTORED)
                     }
                 )
-
+                const dataChannelOpened = JitsiMeetJS.events.conference.DATA_CHANNEL_OPENED
+                if (dataChannelOpened) {
+                    bind(dataChannelOpened, () => {
+                        // کانال bridge دوباره باز شد؛ پیام قبلی گم شده بود
+                        this._receiverKey = null
+                        this._applyReceiverConstraints()
+                    })
+                }
                 // =================================================================
                 // Conference joined
                 // =================================================================
