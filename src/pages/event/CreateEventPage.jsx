@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, ArrowLeft, GraduationCap, Presentation, CalendarDays, Users, ShieldCheck, PenTool, MessageCircle, ScreenShare, Video, Hand, ClipboardCheck, Mic, Check, Loader2, Settings2, FileText } from 'lucide-react'
+import { ArrowRight, ArrowLeft, GraduationCap, Presentation, CalendarDays, Users, ShieldCheck, PenTool, MessageCircle, ScreenShare, Video, Hand, ClipboardCheck, Mic, Check, Loader2, Settings2, FileText, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import { Button } from '../../components/ui/Button'
@@ -9,15 +9,16 @@ import { Input } from '../../components/ui/Input'
 import { Card } from '../../components/ui/Card'
 import { JalaliDateTimePicker } from '../../components/ui/JalaliDateTimePicker'
 import { roomsService } from '../../services/rooms'
+import { paymentsService } from '../../services/payments'
 
 const FEATURE_META = {
-  chat: { title: 'گفت‌وگوی متنی', hint: 'امکان ارسال پیام در اتاق', icon: MessageCircle, kinds: ['class', 'seminar'] },
-  participants_list: { title: 'فهرست شرکت‌کنندگان', hint: 'نمایش افراد حاضر در جلسه', icon: Users, kinds: ['class', 'seminar'] },
-  screen_share: { title: 'اشتراک‌گذاری صفحه', hint: 'ارائه محتوا و نمایش صفحه', icon: ScreenShare, kinds: ['class', 'seminar'] },
-  recording: { title: 'ضبط جلسه', hint: 'امکان ضبط جلسه', icon: Video, kinds: ['class', 'seminar'] },
-  speak_permission: { title: 'مدیریت دسترسی میکروفون و دوربین', hint: 'کنترل باز شدن میکروفون و دوربین شرکت‌کنندگان', icon: Mic, kinds: ['class', 'seminar'] },
-  raise_hand: { title: 'دست بلند کردن', hint: 'ارسال درخواست صحبت و مدیریت صف', icon: Hand, kinds: ['class', 'seminar'] },
-  attendance: { title: 'حضور و غیاب', hint: 'ثبت وضعیت حضور شرکت‌کنندگان', icon: ClipboardCheck, kinds: ['class', 'seminar'] },
+  chat: { title: 'گفت‌وگوی متنی', hint: 'امکان ارسال پیام در اتاق', icon: MessageCircle, kinds: ['class', 'meeting'] },
+  participants_list: { title: 'فهرست شرکت‌کنندگان', hint: 'نمایش افراد حاضر در جلسه', icon: Users, kinds: ['class', 'meeting'] },
+  screen_share: { title: 'اشتراک‌گذاری صفحه', hint: 'ارائه محتوا و نمایش صفحه', icon: ScreenShare, kinds: ['class', 'meeting'] },
+  recording: { title: 'ضبط جلسه', hint: 'امکان ضبط جلسه', icon: Video, kinds: ['class', 'meeting'] },
+  speak_permission: { title: 'مدیریت دسترسی میکروفون و دوربین', hint: 'کنترل باز شدن میکروفون و دوربین شرکت‌کنندگان', icon: Mic, kinds: ['class', 'meeting'] },
+  raise_hand: { title: 'دست بلند کردن', hint: 'ارسال درخواست صحبت و مدیریت صف', icon: Hand, kinds: ['class', 'meeting'] },
+  attendance: { title: 'حضور و غیاب', hint: 'ثبت وضعیت حضور شرکت‌کنندگان', icon: ClipboardCheck, kinds: ['class', 'meeting'] },
   documents: { title: 'اشتراک فایل در کلاس', hint: 'نمایش عکس، PDF، Word و PowerPoint داخل خود کلاس و نوشتن روی آن', icon: FileText, kinds: ['class'] },
   whiteboard: { title: 'تخته تعاملی', hint: 'فضای نوشتن و ترسیم هم‌زمان؛ مخصوص کلاس آموزشی', icon: PenTool, kinds: ['class'] },
 }
@@ -41,9 +42,33 @@ export default function CreateEventPage() {
   const [teacherName, setTeacherName] = useState('')
   const [scheduledAt, setScheduledAt] = useState('')
   const [maxParticipants, setMaxParticipants] = useState('100')
+  const { data: subscriptionInfo, isLoading: subscriptionLoading } = useQuery({
+    queryKey: ['my-subscription'],
+    queryFn: () => paymentsService.me().then((response) => response.data),
+  })
+  const activeSubscription = subscriptionInfo?.active
+  const allowedKinds = subscriptionInfo?.allowed_room_kinds || []
+  const participantLimit = subscriptionInfo?.limits?.max_participants?.value ?? null
+  const kindOptions = useMemo(() => allowedKinds.map((value) => ({
+    value,
+    title: allowedKinds.length === 1 ? (activeSubscription?.plan?.plan_type?.name || (value === 'class' ? 'کلاس آموزشی' : 'جلسه آنلاین')) : (value === 'class' ? 'کلاس آموزشی' : 'جلسه آنلاین'),
+    text: value === 'class' ? 'برای آموزش تعاملی و مدیریت کلاس' : 'برای جلسه آنلاین، ارائه و وبینار',
+    hint: value === 'class' ? 'تخته تعاملی، حضور و غیاب و مدیریت مشارکت' : 'ارتباط با شرکت‌کنندگان و ارائه محتوا',
+    Icon: value === 'class' ? GraduationCap : Presentation,
+  })), [allowedKinds, activeSubscription?.plan?.plan_type?.name])
   const [isPrivate, setIsPrivate] = useState(false)
   const [configureFeatures, setConfigureFeatures] = useState(true)
   const [featureDraft, setFeatureDraft] = useState({})
+  useEffect(() => {
+    if (participantLimit != null) {
+      setMaxParticipants((current) => {
+        const value = Number(current)
+        if (Number.isInteger(value) && value >= 2 && value <= participantLimit) return current
+        return String(Math.max(2, participantLimit))
+      })
+    }
+  }, [participantLimit])
+
   const { data: accountFeatures = [], isLoading: featuresLoading, isError: featuresError } = useQuery({
     queryKey: ['account-features'],
     queryFn: () => roomsService.accountFeatures().then((response) => response.data),
@@ -51,7 +76,7 @@ export default function CreateEventPage() {
   })
 
   const availableFeatures = useMemo(
-    () => accountFeatures.filter((feature) => FEATURE_META[feature.key] && FEATURE_META[feature.key].kinds.includes(kind)),
+    () => accountFeatures.filter((feature) => !feature.applies_to?.length || feature.applies_to.includes(kind)),
     [accountFeatures, kind],
   )
 
@@ -75,6 +100,7 @@ export default function CreateEventPage() {
   }
 
   function isFeatureEnabled(feature) {
+    if (feature.reason === 'not_in_plan') return false
     return featureDraft[feature.key]?.enabled ?? Boolean(feature.configured_enabled)
   }
 
@@ -82,7 +108,7 @@ export default function CreateEventPage() {
     if (!title.trim()) { toast.error('عنوان رویداد را وارد کنید'); setStep(1); return }
     if (!slug.trim() || !/^[a-z0-9-]+$/.test(slug)) { toast.error('شناسه لینک معتبر نیست'); setStep(1); return }
     const capacity = Number(maxParticipants)
-    if (!Number.isInteger(capacity) || capacity < 2 || capacity > 500) { toast.error('ظرفیت باید بین ۲ تا ۵۰۰ نفر باشد'); setStep(1); return }
+    if (!Number.isInteger(capacity) || capacity < 2 || (participantLimit != null && capacity > participantLimit)) { toast.error(participantLimit != null ? `ظرفیت باید بین ۲ تا ${participantLimit} نفر باشد` : 'ظرفیت باید حداقل ۲ نفر باشد'); setStep(1); return }
 
     setSaving(true)
     try {
@@ -95,7 +121,7 @@ export default function CreateEventPage() {
         max_participants: capacity,
         is_private: isPrivate,
         // Backend currently distinguishes classroom from ordinary meeting.
-        kind: kind === 'class' ? 'class' : 'meeting',
+        kind,
       }
       const response = await roomsService.create(payload)
       const room = response.data
@@ -103,7 +129,7 @@ export default function CreateEventPage() {
       await queryClient.invalidateQueries({ queryKey: ['rooms'] })
       if (configureFeatures) {
         try {
-          const updates = availableFeatures.map((feature) => {
+          const updates = availableFeatures.filter((feature) => feature.reason !== 'not_in_plan').map((feature) => {
             const draft = featureDraft[feature.key] || {}
             const enabled = draft.enabled ?? Boolean(feature.configured_enabled)
             const settings = { ...(feature.settings || {}), ...(draft.settings || {}) }
@@ -133,9 +159,11 @@ export default function CreateEventPage() {
     }
   }
 
-  const selectedKind = kind === 'class'
-    ? { title: 'کلاس آموزشی', description: 'برای آموزش تعاملی، مدیریت کلاس و حضور و غیاب', icon: GraduationCap }
-    : { title: 'سمینار', description: 'برای ارائه، وبینار و ارتباط با مخاطبان', icon: Presentation }
+  const selectedKind = kindOptions.find((item) => item.value === kind) || { title: 'رویداد', description: '', Icon: Presentation }
+
+  if (subscriptionLoading) return <div className="min-h-full p-6 flex justify-center items-center"><Card className="!p-10 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-[#4f7cff]"/><p className="mt-3 text-sm text-[#68758a]">در حال بررسی اشتراک شما…</p></Card></div>
+  if (!activeSubscription) return <div className="min-h-full p-4 sm:p-8 flex items-center justify-center"><Card className="!p-6 sm:!p-10 max-w-lg text-center"><ShieldCheck className="mx-auto h-10 w-10 text-[#4f7cff]"/><h1 className="mt-4 text-xl font-bold text-[#101827]">برای ساخت جلسه به اشتراک فعال نیاز دارید</h1><p className="mt-2 text-sm leading-7 text-[#68758a]">جلسات و لینک‌های قبلی شما باقی می‌مانند؛ برای ساخت رویداد جدید، ابتدا یک پلن انتخاب کنید.</p><Link to="/pricing" className="meet-primary-btn inline-flex mt-5 rounded-xl px-5 py-3 text-sm">مشاهده تعرفه‌ها</Link></Card></div>
+  if (kindOptions.length === 0) return <div className="min-h-full p-4 sm:p-8 flex items-center justify-center"><Card className="!p-6 max-w-lg text-center"><h1 className="font-bold">نوع رویدادی برای پلن شما تعریف نشده است</h1><p className="text-sm text-[#68758a] mt-2">برای اصلاح دسترسی نوع رویداد با پشتیبانی تماس بگیرید یا پلن دیگری انتخاب کنید.</p><Link to="/pricing" className="text-[#4f7cff] text-sm inline-block mt-4">مشاهده تعرفه‌ها</Link></Card></div>
 
   return (
     <div className="min-h-full bg-[#f4f7fb] p-4 sm:p-6 lg:p-8">
@@ -173,10 +201,7 @@ export default function CreateEventPage() {
                 <p className="mt-2 text-sm text-[#8d98aa]">با انتخاب نوع رویداد، تنظیمات مناسب همان تجربه نمایش داده می‌شود.</p>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
-                {[
-                  { value: 'class', title: 'کلاس آموزشی', text: 'برای تدریس و یادگیری تعاملی', hint: 'تخته تعاملی، حضور و غیاب و مدیریت مشارکت', Icon: GraduationCap, tint: 'bg-[#edf2ff] text-[#4f7cff]' },
-                  { value: 'seminar', title: 'سمینار', text: 'برای وبینار، ارائه و رویدادهای آنلاین', hint: 'ارائه محتوا و ارتباط با شرکت‌کنندگان', Icon: Presentation, tint: 'bg-[#e8faf4] text-[#2eaf89]' },
-                ].map(({ value, title: cardTitle, text, hint, Icon, tint }) => (
+                {kindOptions.map(({ value, title: cardTitle, text, hint, Icon }) => (
                   <button key={value} type="button" onClick={() => chooseKind(value)} className={`group relative isolate min-h-[260px] overflow-hidden rounded-3xl border p-5 text-right transition duration-300 hover:-translate-y-1 hover:shadow-[0_22px_55px_rgba(30,55,100,.14)] focus:outline-none focus:ring-2 focus:ring-[#4f7cff]/25 sm:p-6 ${value === 'class' ? 'border-[#cbd8ff] bg-gradient-to-br from-[#f1f5ff] via-white to-[#e7edff] hover:border-[#9db4ff]' : 'border-[#bfeadd] bg-gradient-to-br from-[#eafaf4] via-white to-[#dcf6ec] hover:border-[#8ed9bd]'}`}>
                     <span aria-hidden="true" className={`pointer-events-none absolute -left-10 -top-12 h-44 w-44 rounded-full opacity-60 blur-2xl transition duration-500 group-hover:scale-125 ${value === 'class' ? 'bg-[#cbd8ff]' : 'bg-[#b8eed9]'}`} />
                     <span aria-hidden="true" className={`pointer-events-none absolute -bottom-12 right-24 h-32 w-32 rounded-full border-[18px] opacity-30 ${value === 'class' ? 'border-[#9eb5ff]' : 'border-[#8ed9bd]'}`} />
@@ -195,7 +220,7 @@ export default function CreateEventPage() {
             <section className="space-y-5">
               <div className="mb-2 flex items-center gap-3">
                 <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${kind === 'class' ? 'bg-[#edf2ff] text-[#4f7cff]' : 'bg-[#e8faf4] text-[#2eaf89]'}`}>{kind === 'class' ? <GraduationCap className="h-5 w-5" /> : <Presentation className="h-5 w-5" />}</span>
-                <div><h2 className="font-bold text-[#101827]">اطلاعات {selectedKind.title}</h2><p className="mt-1 text-xs text-[#8d98aa]">{selectedKind.description}</p></div>
+                <div><h2 className="font-bold text-[#101827]">اطلاعات {selectedKind.title}</h2><p className="mt-1 text-xs text-[#8d98aa]">{selectedKind.text}</p></div>
               </div>
               <Input label="عنوان رویداد" placeholder={kind === 'class' ? 'مثلاً آموزش طراحی رابط کاربری' : 'مثلاً سمینار تحول دیجیتال'} value={title} onChange={(event) => { setTitle(event.target.value); if (!slugTouched) setSlug(slugify(event.target.value)) }} className="meet-auth-input" />
               <div>
@@ -214,7 +239,7 @@ export default function CreateEventPage() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <JalaliDateTimePicker label="تاریخ و ساعت برگزاری (اختیاری)" value={scheduledAt} onChange={setScheduledAt} />
-                <Input label="حداکثر شرکت‌کنندگان" type="number" min="2" max="500" value={maxParticipants} onChange={(event) => setMaxParticipants(event.target.value)} className="meet-auth-input" />
+                <Input label="حداکثر شرکت‌کنندگان" type="number" min="2" max={participantLimit ?? undefined} value={maxParticipants} onChange={(event) => setMaxParticipants(event.target.value)} className="meet-auth-input" />
               </div>
               <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#e5eaf2] bg-[#f8faff] p-4">
                 <input type="checkbox" checked={isPrivate} onChange={(event) => setIsPrivate(event.target.checked)} className="h-4 w-4 accent-[#4f7cff]" />
@@ -242,17 +267,21 @@ export default function CreateEventPage() {
               ) : (
                 <div className="space-y-3">
                   {availableFeatures.map((feature) => {
-                    const meta = FEATURE_META[feature.key]
+                    const meta = FEATURE_META[feature.key] || { title: feature.title, hint: 'این امکان بر اساس پلن و تنظیمات حساب قابل مدیریت است.', icon: Sparkles }
                     const Icon = meta.icon
                     const enabled = isFeatureEnabled(feature)
+                    const locked = feature.reason === 'not_in_plan'
                     return (
                       <div key={feature.key} className="rounded-xl border border-[#e5eaf2] p-4">
-                        <label className="flex cursor-pointer items-start gap-3">
-                          <input type="checkbox" checked={enabled} onChange={(event) => toggleFeature(feature.key, event.target.checked)} className="mt-1 h-4 w-4 accent-[#4f7cff]" />
-                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#edf2ff] text-[#4f7cff]"><Icon className="h-4 w-4" /></span>
-                          <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-[#101827]">{meta.title}</span><span className="mt-1 block text-xs leading-5 text-[#8d98aa]">{meta.hint}</span></span>
+                        <div className="flex items-start gap-3">
+                          <input id={`feature-${feature.key}`} type="checkbox" checked={enabled} disabled={locked} onChange={(event) => toggleFeature(feature.key, event.target.checked)} className="mt-1 h-4 w-4 accent-[#4f7cff] disabled:opacity-40" />
+                          <label htmlFor={`feature-${feature.key}`} className={`flex min-w-0 flex-1 items-start gap-3 ${locked ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#edf2ff] text-[#4f7cff]"><Icon className="h-4 w-4" /></span>
+                            <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-[#101827]">{meta.title}{locked && <span className="rounded-md bg-[#fff4df] px-2 py-0.5 text-[10px] text-[#a16b13]">نیازمند ارتقا</span>}</span><span className="mt-1 block text-xs leading-5 text-[#8d98aa]">{meta.hint}</span></span>
+                          </label>
                           {enabled && <Check className="h-4 w-4 text-[#2eaf89]" />}
-                        </label>
+                        </div>
+                        {locked && <Link to="/pricing" className="inline-block mr-7 mt-2 text-[11px] text-[#4f7cff] underline">مشاهده پلن‌های دارای این امکان</Link>}
                         {enabled && feature.key === 'whiteboard' && (
                           <label className="mt-3 mr-7 flex cursor-pointer items-center gap-2 rounded-lg bg-[#f8faff] p-3 text-xs text-[#536074]">
                             <input type="checkbox" checked={Boolean(featureDraft.whiteboard?.settings?.students_can_draw ?? feature.settings?.students_can_draw)} onChange={(event) => updateFeatureSetting('whiteboard', 'students_can_draw', event.target.checked, feature)} className="h-4 w-4 accent-[#4f7cff]" />
@@ -305,7 +334,7 @@ export default function CreateEventPage() {
                 ) : (
                   <div className="space-y-2">
                     {availableFeatures.map((feature) => {
-                      const meta = FEATURE_META[feature.key]
+                      const meta = FEATURE_META[feature.key] || { title: feature.title, hint: 'امکان قابل مدیریت در این حساب', icon: Sparkles }
                       const Icon = meta.icon
                       const enabled = isFeatureEnabled(feature)
                       return (
@@ -340,7 +369,7 @@ export default function CreateEventPage() {
                 if (step === 1) {
                   if (!title.trim()) { toast.error('عنوان رویداد الزامی است'); return }
                   if (!slug.trim() || !/^[a-z0-9-]+$/.test(slug)) { toast.error('شناسه لینک معتبر نیست'); return }
-                  if (Number(maxParticipants) < 2 || Number(maxParticipants) > 500) { toast.error('ظرفیت باید بین ۲ تا ۵۰۰ نفر باشد'); return }
+                  if (Number(maxParticipants) < 2 || (participantLimit != null && Number(maxParticipants) > participantLimit)) { toast.error('ظرفیت از سقف مجاز پلن بیشتر است'); return }
                 }
                 if (step === 2 && configureFeatures && featuresError) { setConfigureFeatures(false) }
                 setStep((current) => current + 1)

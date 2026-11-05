@@ -46,7 +46,9 @@ export function useRegister() {
         mutationFn: (data) => authService.register(data).then((r) => r.data),
         onSuccess: () => {
             toast.success('ثبت‌نام با موفقیت انجام شد')
-            navigate('/login')
+            const next = new URLSearchParams(window.location.search).get('next')
+            const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : null
+            navigate(safeNext ? `/login?next=${encodeURIComponent(safeNext)}` : '/login')
         },
         onError: (error) => {
             const data = error.response?.data

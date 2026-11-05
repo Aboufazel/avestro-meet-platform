@@ -65,7 +65,7 @@ export default function RegisterPage() {
               <Button type="submit" fullWidth size="lg" loading={isPending} className="!bg-gradient-to-l !from-[#4f7cff] !to-[#6a8fff] !text-white !border-0 !shadow-[0_12px_28px_rgba(79,124,255,.22)] !rounded-xl !py-3.5">ساخت حساب و ورود</Button>
             </form>
 
-            <p className="text-center text-sm text-[#68758a] mt-6">حساب دارید؟ <Link to={appRoutes.auth.login} className="text-[#4f7cff] font-medium">وارد شوید</Link></p>
+            <p className="text-center text-sm text-[#68758a] mt-6">حساب دارید؟ <Link to={`${appRoutes.auth.login}${window.location.search}`} className="text-[#4f7cff] font-medium">وارد شوید</Link></p>
           </div>
         </div>
 

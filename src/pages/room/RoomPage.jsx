@@ -131,8 +131,41 @@ export default function RoomPage() {
         }
     }, [guardActive])
     const {participants} = useParticipants()
-    const access = useClassAccess(roomName, {enabled: isConnected && (classLayout || moderated || handFeature || canWhiteboard)})
+    const access = useClassAccess(roomName, {enabled: isConnected})
+    // پایان جلسه از سمت میزبان: کلاینت شرکت‌کننده باید Jitsi را ترک کند تا ترک‌های رسانه‌ای
+    // بازِ قبلی در مرورگر/اتاق باقی نمانند.
+    useEffect(() => {
+        const onSessionEnded = () => {
+            toast('جلسه توسط میزبان پایان یافت.')
+            leave()
+        }
+        window.addEventListener('meet:session-ended', onSessionEnded)
+        return () => window.removeEventListener('meet:session-ended', onSessionEnded)
+    }, [leave])
     // صحنه‌ی سند و تخته هم‌زمان نیستند؛ سرور هم همین را تضمین می‌کند.
+    useEffect(() => {
+        if (!access.connected) return
+        const canUseVideo = isHostRole || Boolean(access.me?.video)
+        access.setVideoActive(!isVideoMuted && canUseVideo)
+    }, [access.connected, access.setVideoActive, access.me?.video, isHostRole, isVideoMuted])
+
+    useEffect(() => {
+        const forceMuteVideo = () => {
+            if (!isVideoMuted) toggleVideo()
+            toast.error('سقف تعداد دوربین‌های فعال پلن میزبان تکمیل شده است.')
+        }
+        const forceMuteForPermission = () => {
+            if (!isVideoMuted) toggleVideo()
+            toast.error('اجازه استفاده از دوربین برای شما فعال نیست.')
+        }
+        window.addEventListener('meet:video-limit-reached', forceMuteVideo)
+        window.addEventListener('meet:video-permission-required', forceMuteForPermission)
+        return () => {
+            window.removeEventListener('meet:video-limit-reached', forceMuteVideo)
+            window.removeEventListener('meet:video-permission-required', forceMuteForPermission)
+        }
+    }, [isVideoMuted, toggleVideo])
+
     const docState = access.documentState
     const docOpen = canDocuments && Boolean(docState?.is_open && docState?.document)
     const boardOpen = canWhiteboard && whiteboardOpen && !docOpen

@@ -33,6 +33,7 @@ export function useClassAccess(slug, { enabled = false } = {}) {
   useEffect(() => {
     if (!slug || !enabled) return undefined
     let closed = false
+    let sessionEnded = false
     let retry = 0
     let timer = null
 
@@ -62,11 +63,20 @@ export function useClassAccess(slug, { enabled = false } = {}) {
               ? { ...current, annotations: { ...(current.annotations || {}), [String(msg.page)]: msg.objects || [] } }
               : current))
           } else if (msg.type === 'screenshare_state') onScreenShareStateRef.current?.(msg)
+          else if (msg.type === 'video_limit_reached') window.dispatchEvent(new CustomEvent('meet:video-limit-reached'))
+          else if (msg.type === 'video_permission_required') window.dispatchEvent(new CustomEvent('meet:video-permission-required'))
+          else if (msg.type === 'session_ended') {
+            sessionEnded = true
+            setMe((current) => ({ ...(current || {}), audio: false, video: false, hand: false }))
+            setRoster([])
+            window.dispatchEvent(new CustomEvent('meet:session-ended'))
+            ws.close(4409, 'session ended')
+          }
         } catch { /* پیام نامعتبر */ }
       }
       ws.onclose = (ev) => {
         setConnected(false)
-        if (closed || ev.code === 4403) return
+        if (closed || sessionEnded || ev.code === 4403 || ev.code === 4409) return
         retry += 1
         timer = setTimeout(connect, Math.min(1000 * 2 ** retry, 10000))
       }
@@ -97,6 +107,7 @@ export function useClassAccess(slug, { enabled = false } = {}) {
     roster,
     connected,
     raiseHand: useCallback((raised) => send({ type: 'hand', raised }), [send]),
+    setVideoActive: useCallback((active) => send({ type: 'video_state', active: Boolean(active) }), [send]),
     grant: useCallback((key, audio = true, video = true) => send({ type: 'grant', key, audio, video }), [send]),
     revoke: useCallback((key) => send({ type: 'revoke', key }), [send]),
     lowerHand: useCallback((key) => send({ type: 'lower_hand', key }), [send]),

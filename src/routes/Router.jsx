@@ -14,12 +14,17 @@ import {AppMainPage} from "../components/layout/AppMainPage.jsx";
 import GuestRoute from '../components/shared/GuestRoute'
 import EditEventPage from '../pages/event/EditEventPage'
 import AccountSettingsPage from '../pages/settings/AccountSettingsPage'
+import PricingPage from '../pages/landing/PricingPage'
+import SubscriptionPage from '../pages/dashboard/SubscriptionPage'
+import BillingResultPage from '../pages/landing/BillingResultPage'
 
 const router = createBrowserRouter([
     {
         path: '/',
         element: <LandingPage/>
     },
+    { path: '/pricing', element: <PricingPage/> },
+    { path: '/billing/result', element: <BillingResultPage/> },
     {
         path: appRoutes.auth.login,
         element: (
@@ -60,6 +65,7 @@ const router = createBrowserRouter([
                 path: appRoutes.dashboard.settings,
                 element: <AccountSettingsPage/>
             },
+            { path: appRoutes.dashboard.subscription, element: <SubscriptionPage/> },
         ]
     },
     {

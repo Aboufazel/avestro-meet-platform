@@ -725,6 +725,9 @@ function _startHeartbeat(roomName, externalId) {
             // 410: میزبان کلاس را پایان داده → بقیه‌ی شرکت‌کنندگان هم باید بیرون بروند
             if (res.status === 410) {
                 _stopHeartbeat()
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('meet:session-ended'))
+                }
                 useMeetingStore.getState()._setError({
                     title: 'جلسه پایان یافت',
                     message: 'میزبان جلسه را به پایان رساند. برای جلسه‌ی بعد دوباره از همان لینک وارد شوید.',

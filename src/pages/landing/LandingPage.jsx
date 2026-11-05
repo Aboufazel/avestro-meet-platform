@@ -30,14 +30,15 @@ export default function LandingPage() {
           <nav className="hidden md:flex items-center gap-7 text-sm text-[#68758a]">
             <a href="#features" className="hover:text-[#101827] transition-colors">قابلیت‌ها</a>
             <a href="#security" className="hover:text-[#101827] transition-colors">امنیت</a>
+            <Link to="/pricing" className="hover:text-[#101827] transition-colors">تعرفه‌ها</Link>
           </nav>
 
           <div className="flex items-center gap-2">
             <Link to="/login" className="hidden sm:block px-4 py-2.5 text-sm text-[#68758a] hover:text-[#101827]">
               ورود
             </Link>
-            <Link to="/register" className="meet-primary-btn rounded-xl px-3.5 sm:px-5 py-2.5 text-xs sm:text-sm font-medium inline-flex items-center gap-2 whitespace-nowrap">
-              شروع رایگان <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <Link to="/pricing" className="meet-primary-btn rounded-xl px-3.5 sm:px-5 py-2.5 text-xs sm:text-sm font-medium inline-flex items-center gap-2 whitespace-nowrap">
+              مشاهده تعرفه‌ها <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </Link>
           </div>
         </div>
@@ -66,8 +67,8 @@ export default function LandingPage() {
                 </p>
 
                 <div className="mt-6 sm:mt-8 grid grid-cols-1 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap gap-2.5 sm:gap-3">
-                  <Link to="/register" className="meet-primary-btn inline-flex justify-center items-center gap-2 rounded-xl px-5 py-3.5 text-sm sm:text-base font-medium">
-                    جلسه جدید بسازید <ArrowLeft className="w-5 h-5" />
+                  <Link to="/pricing" className="meet-primary-btn inline-flex justify-center items-center gap-2 rounded-xl px-5 py-3.5 text-sm sm:text-base font-medium">
+                    انتخاب پلن و شروع <ArrowLeft className="w-5 h-5" />
                   </Link>
                   <a href="#product-preview" className="meet-soft-btn inline-flex justify-center items-center gap-2 rounded-xl px-5 py-3.5 text-sm sm:text-base font-medium">
                     <Play className="w-4 h-4 text-[#4f7cff]" />
@@ -192,7 +193,7 @@ export default function LandingPage() {
           <div className="meet-kicker inline-flex rounded-full px-3 py-1.5 text-xs mb-5">آماده شروع هستید؟</div>
           <h2 className="text-2xl sm:text-4xl font-bold">اولین جلسه‌تان را بسازید.</h2>
           <p className="text-[#68758a] mt-4 mb-8">سریع وارد شوید، جلسه را بسازید و لینک را برای شرکت‌کنندگان بفرستید.</p>
-          <Link to="/register" className="meet-primary-btn inline-flex items-center gap-2 rounded-xl px-7 py-3.5 font-medium">شروع رایگان <ArrowLeft className="w-5 h-5" /></Link>
+          <Link to="/pricing" className="meet-primary-btn inline-flex items-center gap-2 rounded-xl px-7 py-3.5 font-medium">مشاهده تعرفه‌ها <ArrowLeft className="w-5 h-5" /></Link>
         </section>
       </main>
 
@@ -206,7 +207,7 @@ export default function LandingPage() {
               </div>
               <p className="text-sm text-white/45 leading-7 max-w-md mt-5">پلتفرم حرفه‌ای برگزاری جلسات، وبینار و کلاس آنلاین با تجربه‌ای فارسی و مدرن.</p>
             </div>
-            <div><p className="text-sm font-medium text-white/80 mb-4">محصول</p><div className="space-y-3 text-xs text-white/45"><a href="#features" className="block hover:text-white">قابلیت‌ها</a><a href="#security" className="block hover:text-white">امنیت</a></div></div>
+            <div><p className="text-sm font-medium text-white/80 mb-4">محصول</p><div className="space-y-3 text-xs text-white/45"><a href="#features" className="block hover:text-white">قابلیت‌ها</a><a href="#security" className="block hover:text-white">امنیت</a><Link to="/pricing" className="block hover:text-white">تعرفه‌ها</Link></div></div>
             <div><p className="text-sm font-medium text-white/80 mb-4">حساب</p><div className="space-y-3 text-xs text-white/45"><Link to="/login" className="block hover:text-white">ورود</Link><Link to="/register" className="block hover:text-white">ثبت‌نام</Link></div></div>
           </div>
           <div className="mt-10 pt-6 border-t border-white/[.08] flex flex-wrap justify-between gap-3 text-xs text-white/30">

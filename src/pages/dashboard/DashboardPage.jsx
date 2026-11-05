@@ -5,6 +5,8 @@ import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { useAuthStore } from '../../store/authStore'
 import { useRooms } from '../../hooks/useRooms'
+import { useQuery } from '@tanstack/react-query'
+import { paymentsService } from '../../services/payments'
 
 const statusLabels = { live: 'در جریان', scheduled: 'زمان‌بندی‌شده', ended: 'پایان یافته' }
 
@@ -29,6 +31,7 @@ function Stat({ icon: Icon, value, label, detail, accent }) {
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user)
   const { data: rooms = [], isLoading } = useRooms()
+  const { data: subscriptionInfo, isLoading: subscriptionLoading } = useQuery({ queryKey: ['my-subscription'], queryFn: () => paymentsService.me().then((r) => r.data) })
   const liveCount = rooms.filter((r) => r.status === 'live').length
   // اتاقی که جلسه‌اش تمام شده (ended_at دارد) «رویداد آینده» نیست؛ لینکش فقط برای جلسه‌ی بعد آماده است
   const scheduledCount = rooms.filter((r) => r.status === 'scheduled' && !r.ended_at).length
@@ -50,6 +53,18 @@ export default function DashboardPage() {
               <Plus className="w-4 h-4" /> جلسه جدید
             </span>
           </Link>
+        </div>
+
+        <div className={`meet-card mb-5 sm:mb-6 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${subscriptionInfo?.active ? '' : 'border-r-4 border-r-[#4f7cff]'}`}>
+          <div className="min-w-0">
+            <p className="text-[11px] text-[#8d98aa]">وضعیت اشتراک</p>
+            <p className="font-bold text-sm mt-1">{subscriptionLoading ? 'در حال بررسی…' : subscriptionInfo?.active ? subscriptionInfo.active.plan?.name : 'اشتراک فعالی ندارید'}</p>
+            <p className="text-[11px] text-[#8d98aa] mt-1">{subscriptionLoading ? 'وضعیت اشتراک در حال دریافت است.' : subscriptionInfo?.active ? `اعتبار تا ${formatIsoJalali(subscriptionInfo.active.expires_at)}` : 'برای ساخت جلسه و برگزاری رویداد، پلن تهیه کنید.'}</p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Link to="/dashboard/subscription" className="rounded-xl border border-[#e5eaf2] px-3 py-2.5 text-xs text-[#68758a]">جزئیات اشتراک</Link>
+            <Link to="/pricing" className="meet-primary-btn rounded-xl px-4 py-2.5 text-xs">{subscriptionInfo?.active ? 'تمدید اشتراک' : 'انتخاب پلن'}</Link>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-5 sm:mb-6">
