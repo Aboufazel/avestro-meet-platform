@@ -4,6 +4,7 @@ import { AlertCircle, ArrowRight, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import { roomsService } from '../../services/rooms'
+import { isPlanFeature } from '../../constants/planFeatures'
 
 // فقط ماژول‌هایی که الان در اتاق پیاده‌سازی شده‌اند؛ بقیه‌ی ماژول‌های بک‌اند هنوز در رابط کاربری نیستند
 const FEATURES = [
@@ -96,10 +97,10 @@ export default function AccountSettingsPage() {
                     </span>
                   </label>
 
-                  {on && !feature.enabled && (
-                    <p className="mt-2 flex items-start gap-1.5 pr-7 text-xs leading-5 text-amber-700">
-                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                      این امکان روشن است ولی به‌خاطر وابستگی به امکان دیگری که خاموش است اعمال نمی‌شود.
+                  {on && !feature.enabled && isPlanFeature(feature.key) && feature.reason === 'not_in_plan' && (
+                    <p className="mt-2 flex items-start gap-1.5 pr-7 text-xs leading-5 text-amber-800">
+                      {/*<AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />*/}
+                      {/*<span>این امکان در پلن فعلی شما نیست، برای همین فعلاً اعمال نمی‌شود. <Link to="/pricing" className="font-bold underline">مشاهده پلن‌ها</Link></span>*/}
                     </p>
                   )}
 

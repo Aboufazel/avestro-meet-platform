@@ -1,5 +1,6 @@
 import { CalendarClock, Check, CheckCircle2, Infinity as InfinityIcon, Minus, ArrowLeft } from 'lucide-react'
 import { formatIsoJalali } from '../../utils/jalali'
+import { onlyPlanFeatures } from '../../constants/planFeatures'
 
 /*
  * کارت پلن مشترک بین «تعرفه‌ها» و «اشتراک‌های داشبورد».
@@ -111,6 +112,7 @@ export function PlanCard({ plan, onSelect, selected = false }) {
     ? `از ${fa(plan.min_days || 1)} روز، مدت را خودتان تعیین می‌کنید`
     : `اعتبار ${fa(plan.duration_days)} روز`
   const isFree = !custom && Number(plan.price) === 0
+  const features = onlyPlanFeatures(plan.features)
   return (
     <article
       aria-labelledby={`${uid}-title`}
@@ -139,9 +141,9 @@ export function PlanCard({ plan, onSelect, selected = false }) {
         <Section id={`${uid}-limits`} title="محدودیت‌ها">
           <LimitList limits={plan.limits} />
         </Section>
-        {plan.features?.length > 0 && (
+        {features.length > 0 && (
           <Section id={`${uid}-features`} title="امکانات">
-            <FeatureList features={plan.features} />
+            <FeatureList features={features} />
           </Section>
         )}
       </div>
@@ -173,7 +175,7 @@ const effectiveLimits = (subscription, usage, reserved) => {
 
 const effectiveFeatures = (subscription) => {
   const snapshot = subscription.features_snapshot || {}
-  return (subscription.plan?.features || []).map((feature) => (
+  return onlyPlanFeatures(subscription.plan?.features).map((feature) => (
     snapshot[feature.key] ? { ...feature, enabled: Boolean(snapshot[feature.key].enabled) } : feature
   ))
 }

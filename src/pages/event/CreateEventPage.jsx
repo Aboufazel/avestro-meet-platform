@@ -10,6 +10,7 @@ import { Card } from '../../components/ui/Card'
 import { JalaliDateTimePicker } from '../../components/ui/JalaliDateTimePicker'
 import { roomsService } from '../../services/rooms'
 import { paymentsService } from '../../services/payments'
+import { isPlanFeature } from '../../constants/planFeatures'
 
 const FEATURE_META = {
   chat: { title: 'گفت‌وگوی متنی', hint: 'امکان ارسال پیام در اتاق', icon: MessageCircle, kinds: ['class', 'meeting'] },
@@ -76,7 +77,7 @@ export default function CreateEventPage() {
   })
 
   const availableFeatures = useMemo(
-    () => accountFeatures.filter((feature) => !feature.applies_to?.length || feature.applies_to.includes(kind)),
+    () => accountFeatures.filter((feature) => isPlanFeature(feature.key) && (!feature.applies_to?.length || feature.applies_to.includes(kind))),
     [accountFeatures, kind],
   )
 
@@ -266,6 +267,9 @@ export default function CreateEventPage() {
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">دریافت تنظیمات با خطا مواجه شد. می‌توانید این مرحله را رد کنید و بعداً از تنظیمات حساب انجام دهید.</div>
               ) : (
                 <div className="space-y-3">
+                  {availableFeatures.length === 0 && (
+                    <div className="rounded-xl border border-dashed border-[#dce3ef] p-6 text-center text-sm leading-7 text-[#68758a]">برای این نوع رویداد، امکان قابل تنظیمی وجود ندارد. می‌توانید مستقیم به مرحله بعد بروید.</div>
+                  )}
                   {availableFeatures.map((feature) => {
                     const meta = FEATURE_META[feature.key] || { title: feature.title, hint: 'این امکان بر اساس پلن و تنظیمات حساب قابل مدیریت است.', icon: Sparkles }
                     const Icon = meta.icon
