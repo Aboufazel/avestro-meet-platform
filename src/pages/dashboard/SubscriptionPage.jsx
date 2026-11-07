@@ -117,6 +117,10 @@ export default function SubscriptionPage() {
                           {order.snapshot?.breakdown && <div className="mt-3 space-y-2 rounded-xl bg-[#f6f8fc] p-3 text-xs">
                             <div className="flex justify-between"><dt>هزینه خام تصاویر</dt><dd>{formatMoney(order.snapshot.breakdown.raw_image_cost)}</dd></div>
                             <div className="flex justify-between"><dt>هزینه هر تصویر</dt><dd>{formatMoney(order.snapshot.breakdown.cost_per_image)}</dd></div>
+                            <div className="flex justify-between"><dt>تعداد کاربران میکروفونی</dt><dd>{fa(order.snapshot.breakdown.microphone_user_count)}</dd></div>
+                            <div className="flex justify-between"><dt>هزینه هر میکروفون</dt><dd>{formatMoney(order.snapshot.breakdown.cost_per_microphone)}</dd></div>
+                            <div className="flex justify-between"><dt>هزینه خام میکروفون‌ها</dt><dd>{formatMoney(order.snapshot.breakdown.raw_microphone_cost)}</dd></div>
+                            <div className="flex justify-between font-bold"><dt>مجموع هزینه خام ظرفیت</dt><dd>{formatMoney(order.snapshot.breakdown.raw_capacity_cost)}</dd></div>
                             <div className="flex justify-between"><dt>درصد افزایش پلکانی</dt><dd>{fa(order.snapshot.breakdown.tier_percent)}٪</dd></div>
                             <div className="flex justify-between"><dt>تخفیف مدت</dt><dd>{formatMoney(order.snapshot.breakdown.duration_discount_amount)}</dd></div>
                             <div className="flex justify-between"><dt>تخفیف مدرسه</dt><dd>{formatMoney(order.snapshot.breakdown.school_discount_amount)}</dd></div>
