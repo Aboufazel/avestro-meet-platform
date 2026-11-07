@@ -102,11 +102,14 @@ export function useJitsi(roomName) {
             return
         }
 
-        const displayName =
-            userName ||
-            sessionStorage.getItem(
-                'guest_name'
-            )
+        // ورود با کد ملی: نام ثبت‌شده‌ی فرد (نه نام حساب) در جلسه نمایش داده می‌شود
+        const usedNationalId = Boolean(sessionStorage.getItem(`national_id:${roomName}`))
+        const displayName = usedNationalId
+            ? sessionStorage.getItem('guest_name')
+            : userName ||
+              sessionStorage.getItem(
+                  'guest_name'
+              )
 
         if (!displayName) {
             navigate(

@@ -404,7 +404,7 @@ export default function RoomPage() {
         <ClassViewportContext.Provider value={viewportValue}>
             <ClassAccessContext.Provider value={access}>
                 <div dir="rtl" className={shellClass} style={classLayout ? viewport.shellStyle : undefined}>
-                    <RoomHeader showFullscreen={compactClass} canRecord={canRecord} slug={roomName}
+                    <RoomHeader showFullscreen={compactClass} canRecord={canRecord} isHostRole={isHostRole} slug={roomName}
                                 isConnected={isConnected} onCopyLink={handleCopyLink} isMeetingMuted={isMeetingMuted}
                                 onToggleMeetingMute={toggleMeetingMute} isRecording={isRecording}
                                 recordingSeconds={recordingSeconds} onToggleRecording={handleToggleRecording}

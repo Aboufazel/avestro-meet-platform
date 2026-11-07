@@ -14,11 +14,12 @@ function RecordingTimer({ seconds }) {
   return <span className="text-[11px] text-[var(--room-danger)] tabular-nums">{format(seconds)}</span>
 }
 
-export const RoomHeader = memo(function RoomHeader({ slug, isConnected, onCopyLink, isMeetingMuted, onToggleMeetingMute, isRecording, recordingSeconds, onToggleRecording, isVoiceRecording, voiceRecordingSeconds, onToggleVoiceRecording, canRecord = true, compact = false }) {
+export const RoomHeader = memo(function RoomHeader({ slug, isConnected, onCopyLink, isMeetingMuted, onToggleMeetingMute, isRecording, recordingSeconds, onToggleRecording, isVoiceRecording, voiceRecordingSeconds, onToggleVoiceRecording, canRecord = true, compact = false, isHostRole }) {
   const [copied, setCopied] = useState(false)
   const { data: room, isLoading, isError } = useRoom(slug)
   const currentUser = useAuthStore((s) => s.user)
-  const isHost = room?.host?.id === currentUser?.id
+  // معلم/مدیر/معاونِ واردشده با کد ملی هم میزبان‌نما هستند (RoomPage نقش را می‌دهد)
+  const isHost = isHostRole ?? (room?.host?.id === currentUser?.id)
   const handleCopy = () => { onCopyLink?.(); setCopied(true); setTimeout(() => setCopied(false), 1500) }
 
   // کلاس موبایل: هدر حداقلی (یک ردیف باریک) تا بیشترین فضا به محتوای کلاس برسد

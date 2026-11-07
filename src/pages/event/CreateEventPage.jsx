@@ -11,6 +11,7 @@ import { JalaliDateTimePicker } from '../../components/ui/JalaliDateTimePicker'
 import { roomsService } from '../../services/rooms'
 import { paymentsService } from '../../services/payments'
 import { isPlanFeature } from '../../constants/planFeatures'
+import { RoomAccessSettings } from '../../components/shared/RoomAccessSettings'
 
 const FEATURE_META = {
   chat: { title: 'گفت‌وگوی متنی', hint: 'امکان ارسال پیام در اتاق', icon: MessageCircle, kinds: ['class', 'meeting'] },
@@ -58,6 +59,8 @@ export default function CreateEventPage() {
     Icon: value === 'class' ? GraduationCap : Presentation,
   })), [allowedKinds, activeSubscription?.plan?.plan_type?.name])
   const [isPrivate, setIsPrivate] = useState(false)
+  const [allowGuests, setAllowGuests] = useState(true)
+  const [invitedPeople, setInvitedPeople] = useState([])
   const [configureFeatures, setConfigureFeatures] = useState(true)
   const [featureDraft, setFeatureDraft] = useState({})
   useEffect(() => {
@@ -111,6 +114,8 @@ export default function CreateEventPage() {
     const capacity = Number(maxParticipants)
     if (!Number.isInteger(capacity) || capacity < 2 || (participantLimit != null && capacity > participantLimit)) { toast.error(participantLimit != null ? `ظرفیت باید بین ۲ تا ${participantLimit} نفر باشد` : 'ظرفیت باید حداقل ۲ نفر باشد'); setStep(1); return }
 
+    if (!allowGuests && invitedPeople.length === 0) { toast.error('با غیرفعال‌بودن ورود مهمان، حداقل یک نفر را برای جلسه انتخاب کنید'); setStep(1); return }
+
     setSaving(true)
     try {
       const payload = {
@@ -121,6 +126,8 @@ export default function CreateEventPage() {
         scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
         max_participants: capacity,
         is_private: isPrivate,
+        allow_guests: allowGuests,
+        invited_people: invitedPeople,
         // Backend currently distinguishes classroom from ordinary meeting.
         kind,
       }
@@ -246,6 +253,7 @@ export default function CreateEventPage() {
                 <input type="checkbox" checked={isPrivate} onChange={(event) => setIsPrivate(event.target.checked)} className="h-4 w-4 accent-[#4f7cff]" />
                 <span className="text-sm text-[#536074]">رویداد خصوصی <span className="text-xs text-[#9aa4b4]">(فقط با لینک مستقیم)</span></span>
               </label>
+              <RoomAccessSettings allowGuests={allowGuests} onAllowGuests={setAllowGuests} selected={invitedPeople} onSelected={setInvitedPeople} />
             </section>
           )}
 
@@ -321,6 +329,8 @@ export default function CreateEventPage() {
                   ['شناسه لینک', slug || '—'],
                   ['ظرفیت', `${maxParticipants} نفر`],
                   ['دسترسی', isPrivate ? 'خصوصی' : 'با لینک'],
+                  ['ورود مهمان', allowGuests ? 'مجاز' : 'غیرمجاز (فقط با کد ملی)'],
+                  ['افراد انتخاب‌شده', `${invitedPeople.length.toLocaleString('fa-IR')} نفر`],
                   ['امکانات', configureFeatures ? 'تنظیم در این مرحله' : 'رد شده؛ تنظیم بعداً'],
                 ].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-4 py-3 text-sm"><span className="text-[#8d98aa]">{label}</span><span className="text-left font-medium text-[#101827]">{value}</span></div>)}
               </div>

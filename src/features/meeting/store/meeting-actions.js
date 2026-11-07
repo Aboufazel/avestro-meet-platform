@@ -639,6 +639,14 @@ async function _refreshJitsiToken(roomName, externalId) {
     return data.jitsi_token || null
 }
 
+function _nationalIdFor(roomName) {
+    try {
+        return sessionStorage.getItem(`national_id:${roomName}`) || ''
+    } catch {
+        return ''
+    }
+}
+
 async function _checkRoomCapacity(roomName, externalId, displayName) {
     try {
         const res = await _postWithAuth(
@@ -646,11 +654,19 @@ async function _checkRoomCapacity(roomName, externalId, displayName) {
             JSON.stringify({
                 external_participant_id: externalId,
                 guest_name: displayName || '',
+                national_id: _nationalIdFor(roomName),
             })
         )
 
         if (res.ok) {
             const data = await res.json().catch(() => ({}))
+            // شناسه‌ی این شرکت‌کننده برای عملیات REST داخل جلسه (معلم/مدیر/معاونِ بدون حساب)
+            try {
+                sessionStorage.setItem('participant_id', externalId)
+                window.dispatchEvent(new Event('meet:participant-ready'))
+            } catch {
+                // ignore
+            }
             // null = سرور Jitsi هنوز بدون JWT است (ورود آزاد)
             return {ok: true, token: data.jitsi_token || null}
         }

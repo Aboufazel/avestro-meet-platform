@@ -1,5 +1,6 @@
 import {Link, useNavigate, useParams} from 'react-router-dom'
-import {useEffect} from 'react'
+import {useEffect, useState} from 'react'
+import toast from 'react-hot-toast'
 import {useForm, Controller} from 'react-hook-form'
 import {yupResolver} from '@hookform/resolvers/yup'
 import * as yup from 'yup'
@@ -11,6 +12,7 @@ import {Card} from '../../components/ui/Card'
 import {JalaliDateTimePicker} from '../../components/ui/JalaliDateTimePicker'
 import {isoToLocalValue} from '../../utils/jalali'
 import {useRoom, useUpdateRoom} from '../../hooks/useRooms'
+import {RoomAccessSettings} from '../../components/shared/RoomAccessSettings'
 import ClassFeatureSettings from './ClassFeatureSettings'
 
 
@@ -89,8 +91,13 @@ export default function EditEventPage() {
     })
 
 
+    const [allowGuests, setAllowGuests] = useState(true)
+    const [invitedPeople, setInvitedPeople] = useState([])
+
     useEffect(() => {
         if (!room) return
+        setAllowGuests(room.allow_guests !== false)
+        setInvitedPeople(room.invited_people || [])
 
         reset({
             slug: room.slug || '',
@@ -107,6 +114,10 @@ export default function EditEventPage() {
 
 
     function onSubmit(data) {
+        if (!allowGuests && invitedPeople.length === 0) {
+            toast.error('با غیرفعال‌بودن ورود مهمان، حداقل یک نفر را برای جلسه انتخاب کنید')
+            return
+        }
         updateRoom(
             {
                 slug: data.slug,
@@ -115,6 +126,8 @@ export default function EditEventPage() {
                 teacher_name: (data.teacher_name || '').trim(),
                 max_participants: Number(data.max_participants),
                 is_private: Boolean(data.is_private),
+                allow_guests: allowGuests,
+                invited_people: invitedPeople,
                 scheduled_at: data.scheduled_at
                     ? new Date(data.scheduled_at).toISOString()
                     : null,
@@ -352,6 +365,13 @@ export default function EditEventPage() {
 
                         </div>
 
+
+                        <RoomAccessSettings
+                            allowGuests={allowGuests}
+                            onAllowGuests={setAllowGuests}
+                            selected={invitedPeople}
+                            onSelected={setInvitedPeople}
+                        />
 
                         {/* Actions */}
                         <div className="flex gap-3 pt-2">

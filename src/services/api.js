@@ -74,6 +74,15 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  // معلم/مدیر/معاونِ واردشده با کد ملی (بدون حساب): هویت داخل جلسه با شناسه‌ی شرکت‌کننده
+  try {
+    const participantId = sessionStorage.getItem('participant_id')
+    if (participantId && (config.url || '').startsWith('/rooms/')) {
+      config.headers['X-Participant-Id'] = participantId
+    }
+  } catch {
+    // sessionStorage در دسترس نیست
+  }
   return config
 })
 

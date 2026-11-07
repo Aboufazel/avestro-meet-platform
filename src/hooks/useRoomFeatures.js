@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { roomsService } from '../services/rooms'
 
@@ -25,6 +25,14 @@ export function useRoomFeatures(slug) {
     staleTime: 5000,
     retry: 1,
   })
+
+  // بعد از ورود، نقش (مثلاً معلمِ واردشده با کد ملی = میزبان) فوراً دوباره خوانده شود
+  const { refetch } = query
+  useEffect(() => {
+    const onReady = () => refetch()
+    window.addEventListener('meet:participant-ready', onReady)
+    return () => window.removeEventListener('meet:participant-ready', onReady)
+  }, [refetch])
 
   const me = query.data?.me
   const features = query.data?.features

@@ -5,6 +5,7 @@ export const roomsService = {
   create: (data) => api.post('/rooms/', data),
   detail: (slug) => api.get(`/rooms/${slug}/`),
   join: (slug, data) => api.post(`/rooms/${slug}/join/`, data),
+  verifyNationalId: (slug, nationalId) => api.post(`/rooms/${slug}/verify-national-id/`, { national_id: nationalId }),
   leave: (slug) => api.post(`/rooms/${slug}/leave/`),
   end: (slug) => api.post(`/rooms/${slug}/end/`),
   update: (slug, data) => api.patch(`/rooms/${slug}/edit/`, data),

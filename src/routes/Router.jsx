@@ -17,6 +17,7 @@ import AccountSettingsPage from '../pages/settings/AccountSettingsPage'
 import PricingPage from '../pages/landing/PricingPage'
 import SubscriptionPage from '../pages/dashboard/SubscriptionPage'
 import BillingResultPage from '../pages/landing/BillingResultPage'
+import PeoplePage from '../pages/people/PeoplePage'
 
 const router = createBrowserRouter([
     {
@@ -66,6 +67,7 @@ const router = createBrowserRouter([
                 element: <AccountSettingsPage/>
             },
             { path: appRoutes.dashboard.subscription, element: <SubscriptionPage/> },
+            { path: appRoutes.dashboard.people, element: <PeoplePage/> },
         ]
     },
     {

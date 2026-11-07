@@ -12,6 +12,7 @@ export const appRoutes = {
     editEvent: '/dashboard/edit/:slug',
     settings: '/dashboard/settings',
     subscription: '/dashboard/subscription',
+    people: '/dashboard/people',
   },
   event: {
     join: '/join/:slug',
