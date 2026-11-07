@@ -44,13 +44,15 @@ export default function CreateEventPage() {
   const [teacherName, setTeacherName] = useState('')
   const [scheduledAt, setScheduledAt] = useState('')
   const [maxParticipants, setMaxParticipants] = useState('100')
+  const [allocatedVideoStreams, setAllocatedVideoStreams] = useState('1')
   const { data: subscriptionInfo, isLoading: subscriptionLoading } = useQuery({
     queryKey: ['my-subscription'],
     queryFn: () => paymentsService.me().then((response) => response.data),
   })
   const activeSubscription = subscriptionInfo?.active
   const allowedKinds = subscriptionInfo?.allowed_room_kinds || []
-  const participantLimit = subscriptionInfo?.limits?.max_participants?.value ?? null
+  const participantLimit = subscriptionInfo?.room_allocations?.users_remaining ?? subscriptionInfo?.limits?.max_participants?.value ?? null
+  const imageLimit = subscriptionInfo?.room_allocations?.images_remaining ?? subscriptionInfo?.limits?.max_video_streams?.value ?? 1
   const kindOptions = useMemo(() => allowedKinds.map((value) => ({
     value,
     title: allowedKinds.length === 1 ? (activeSubscription?.plan?.plan_type?.name || (value === 'class' ? 'کلاس آموزشی' : 'جلسه آنلاین')) : (value === 'class' ? 'کلاس آموزشی' : 'جلسه آنلاین'),
@@ -105,7 +107,7 @@ export default function CreateEventPage() {
 
   function isFeatureEnabled(feature) {
     if (feature.reason === 'not_in_plan') return false
-    return featureDraft[feature.key]?.enabled ?? Boolean(feature.configured_enabled)
+    return featureDraft[feature.key]?.enabled ?? (feature.reason !== 'not_in_plan')
   }
 
   async function handleCreate() {
@@ -114,6 +116,8 @@ export default function CreateEventPage() {
     const capacity = Number(maxParticipants)
     if (!Number.isInteger(capacity) || capacity < 2 || (participantLimit != null && capacity > participantLimit)) { toast.error(participantLimit != null ? `ظرفیت باید بین ۲ تا ${participantLimit} نفر باشد` : 'ظرفیت باید حداقل ۲ نفر باشد'); setStep(1); return }
 
+    const imageAllocation = Number(allocatedVideoStreams)
+    if (!Number.isInteger(imageAllocation) || imageAllocation < 1 || imageAllocation > imageLimit) { toast.error(`سهم تصاویر باید بین ۱ تا ${imageLimit} باشد`); setStep(1); return }
     if (!allowGuests && invitedPeople.length === 0) { toast.error('با غیرفعال‌بودن ورود مهمان، حداقل یک نفر را برای جلسه انتخاب کنید'); setStep(1); return }
 
     setSaving(true)
@@ -125,6 +129,8 @@ export default function CreateEventPage() {
         ...(kind === 'class' ? { teacher_name: teacherName.trim() } : {}),
         scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
         max_participants: capacity,
+        allocated_video_streams: imageAllocation,
+        feature_selection: configureFeatures ? Object.fromEntries(availableFeatures.filter((feature) => feature.reason !== 'not_in_plan').map((feature) => [feature.key, { enabled: isFeatureEnabled(feature), settings: { ...(feature.settings || {}), ...(featureDraft[feature.key]?.settings || {}) } }])) : {},
         is_private: isPrivate,
         allow_guests: allowGuests,
         invited_people: invitedPeople,
@@ -135,29 +141,8 @@ export default function CreateEventPage() {
       const room = response.data
 
       await queryClient.invalidateQueries({ queryKey: ['rooms'] })
-      if (configureFeatures) {
-        try {
-          const updates = availableFeatures.filter((feature) => feature.reason !== 'not_in_plan').map((feature) => {
-            const draft = featureDraft[feature.key] || {}
-            const enabled = draft.enabled ?? Boolean(feature.configured_enabled)
-            const settings = { ...(feature.settings || {}), ...(draft.settings || {}) }
-            return roomsService.updateAccountFeature(feature.key, { enabled, settings })
-          })
-          await Promise.all(updates)
-          if (kind === 'class') {
-            const whiteboard = availableFeatures.find((item) => item.key === 'whiteboard')
-            const whiteboardEnabled = whiteboard ? isFeatureEnabled(whiteboard) : false
-            await roomsService.updateRoomFeature(room.slug, 'whiteboard', { mode: whiteboardEnabled ? 'enabled' : 'disabled' })
-          }
-          await queryClient.invalidateQueries({ queryKey: ['account-features'] })
-          toast.success('رویداد و تنظیمات آن با موفقیت ذخیره شد')
-        } catch {
-          await queryClient.invalidateQueries({ queryKey: ['account-features'] })
-          toast.error('رویداد ساخته شد، اما ذخیره بعضی تنظیمات ناموفق بود؛ می‌توانید آن‌ها را بعداً تنظیم کنید.')
-        }
-      } else {
-        toast.success('رویداد با موفقیت ایجاد شد')
-      }
+      toast.success('اتاق و تنظیمات اختصاصی آن با موفقیت ذخیره شد')
+      await queryClient.invalidateQueries({ queryKey: ['my-subscription'] })
       navigate(`/join/${room.slug}`)
     } catch (error) {
       const detail = error.response?.data?.detail
@@ -248,6 +233,7 @@ export default function CreateEventPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <JalaliDateTimePicker label="تاریخ و ساعت برگزاری (اختیاری)" value={scheduledAt} onChange={setScheduledAt} />
                 <Input label="حداکثر شرکت‌کنندگان" type="number" min="2" max={participantLimit ?? undefined} value={maxParticipants} onChange={(event) => setMaxParticipants(event.target.value)} className="meet-auth-input" />
+                <Input label="سهم تصاویر هم‌زمان این اتاق" type="number" min="1" max={imageLimit} value={allocatedVideoStreams} onChange={(event) => setAllocatedVideoStreams(event.target.value)} className="meet-auth-input" />
               </div>
               <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#e5eaf2] bg-[#f8faff] p-4">
                 <input type="checkbox" checked={isPrivate} onChange={(event) => setIsPrivate(event.target.checked)} className="h-4 w-4 accent-[#4f7cff]" />

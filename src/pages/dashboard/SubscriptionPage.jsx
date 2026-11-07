@@ -113,7 +113,16 @@ export default function SubscriptionPage() {
                       <details className="mt-3 text-sm">
                         <summary className={`inline-flex min-h-11 cursor-pointer items-center rounded-lg font-bold text-[#2347b4] ${focusRing}`}>مشاهده جزئیات پیش‌فاکتور</summary>
                         <dl className="mt-2 space-y-2">
-                          {(order.snapshot?.rows || []).map((row, i) => <div key={i} className="flex justify-between gap-3"><dt className="text-[#34415a]">{row.title} × {fa(row.quantity)}</dt><dd>{formatMoney(row.total)}</dd></div>)}
+                          {(order.snapshot?.rows || []).map((row, i) => <div key={i} className="flex justify-between gap-3"><dt className="text-[#34415a]">{row.title}{row.quantity ? ` × ${fa(row.quantity)}` : ''}{row.percent ? ` (${fa(row.percent)}٪)` : ''}</dt><dd>{formatMoney(row.total)}</dd></div>)}
+                          {order.snapshot?.breakdown && <div className="mt-3 space-y-2 rounded-xl bg-[#f6f8fc] p-3 text-xs">
+                            <div className="flex justify-between"><dt>هزینه خام تصاویر</dt><dd>{formatMoney(order.snapshot.breakdown.raw_image_cost)}</dd></div>
+                            <div className="flex justify-between"><dt>هزینه هر تصویر</dt><dd>{formatMoney(order.snapshot.breakdown.cost_per_image)}</dd></div>
+                            <div className="flex justify-between"><dt>درصد افزایش پلکانی</dt><dd>{fa(order.snapshot.breakdown.tier_percent)}٪</dd></div>
+                            <div className="flex justify-between"><dt>تخفیف مدت</dt><dd>{formatMoney(order.snapshot.breakdown.duration_discount_amount)}</dd></div>
+                            <div className="flex justify-between"><dt>تخفیف مدرسه</dt><dd>{formatMoney(order.snapshot.breakdown.school_discount_amount)}</dd></div>
+                            <div className="flex justify-between"><dt>تخفیف کد</dt><dd>{formatMoney(order.snapshot.breakdown.code_discount_amount)}</dd></div>
+                            <div className="flex justify-between"><dt>هزینه قبل از مالیات</dt><dd>{formatMoney(order.snapshot.breakdown.cost_before_tax)}</dd></div>
+                          </div>}
                           <div className="flex justify-between border-t-2 border-[#eef1f5] pt-2"><dt>جمع جزء</dt><dd>{formatMoney(order.subtotal)}</dd></div>
                           {Number(order.tax_amount) > 0 && <div className="flex justify-between"><dt>مالیات ({fa(order.tax_percent)}٪)</dt><dd>{formatMoney(order.tax_amount)}</dd></div>}
                           <div className="flex justify-between font-extrabold"><dt>مبلغ نهایی</dt><dd>{formatMoney(order.total)}</dd></div>

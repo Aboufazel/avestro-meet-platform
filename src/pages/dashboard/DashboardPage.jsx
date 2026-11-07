@@ -6,6 +6,7 @@ import { Badge } from '../../components/ui/Badge'
 import { useAuthStore } from '../../store/authStore'
 import { useRooms } from '../../hooks/useRooms'
 import { useQuery } from '@tanstack/react-query'
+import GovernmentDocumentCard from '../../components/shared/GovernmentDocumentCard'
 import { paymentsService } from '../../services/payments'
 
 const statusLabels = { live: 'در جریان', scheduled: 'زمان‌بندی‌شده', ended: 'پایان یافته' }
@@ -67,6 +68,20 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        <div className="mb-5 sm:mb-6 space-y-4">
+          <GovernmentDocumentCard documentInfo={subscriptionInfo?.government_document} />
+          {subscriptionInfo?.room_allocations && <section className="meet-card p-4 sm:p-5" aria-labelledby="allocation-title">
+            <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"><div><h2 id="allocation-title" className="font-bold text-sm">سهمیه پلن بین اتاق‌ها</h2><p className="mt-1 text-[11px] text-[#8d98aa]">اتاق‌های پایان‌یافته سهم خود را آزاد می‌کنند.</p></div><Link to="/dashboard/create" className="text-xs font-bold text-[#4f7cff]">ساخت اتاق جدید</Link></div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {[{label:'کاربران اختصاص‌یافته',used:subscriptionInfo.room_allocations.users_used,total:subscriptionInfo.room_allocations.users_total,left:subscriptionInfo.room_allocations.users_remaining},{label:'تصاویر اختصاص‌یافته',used:subscriptionInfo.room_allocations.images_used,total:subscriptionInfo.room_allocations.images_total,left:subscriptionInfo.room_allocations.images_remaining}].map((item) => <div key={item.label}>
+                <div className="mb-2 flex justify-between gap-2 text-xs"><span className="text-[#68758a]">{item.label}</span><b>{Number(item.used).toLocaleString('fa-IR')} از {Number(item.total).toLocaleString('fa-IR')}</b></div>
+                <div className="h-2 overflow-hidden rounded-full bg-[#edf1f7]"><div className="h-full rounded-full bg-[#4f7cff]" style={{width:`${item.total ? Math.min(100,item.used/item.total*100) : 0}%`}}/></div>
+                <p className="mt-1 text-[11px] text-[#8d98aa]">باقی‌مانده: {Number(item.left).toLocaleString('fa-IR')}</p>
+              </div>)}
+            </div>
+          </section>}
+        </div>
+
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-5 sm:mb-6">
           <Stat icon={Video} value={liveCount} label="جلسه زنده" detail="در حال برگزاری" />
           <Stat icon={Calendar} value={scheduledCount} label="جلسه زمان‌بندی‌شده" detail="رویدادهای آینده" accent="mint" />
@@ -117,7 +132,7 @@ export default function DashboardPage() {
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 text-[11px] text-[#8d98aa]">
                           {room.scheduled_at && <span className="inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />{formatIsoJalali(room.scheduled_at)}</span>}
                           {room.scheduled_at && <span className="inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />{formatIsoTime(room.scheduled_at)}</span>}
-                          <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />{room.active_participants_count || 0}/{room.max_participants}</span>
+                          <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />{room.active_participants_count || 0}/{room.max_participants} نفر</span><span className="inline-flex items-center gap-1.5"><Video className="w-3.5 h-3.5" />سهم تصویر: {room.allocated_video_streams || 0}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 self-stretch sm:self-auto">

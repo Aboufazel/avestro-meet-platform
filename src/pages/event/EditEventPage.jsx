@@ -46,8 +46,9 @@ const schema = yup.object({
         .number()
         .typeError('عدد وارد کنید')
         .min(2, 'حداقل ۲ نفر')
-        .max(500, 'حداکثر ۵۰۰ نفر')
+        .max(3000, 'حداکثر ۳۰۰۰ نفر')
         .required('ظرفیت الزامی است'),
+    allocated_video_streams: yup.number().typeError('عدد وارد کنید').min(1, 'حداقل یک تصویر').max(500, 'حداکثر ۵۰۰ تصویر').required('سهم تصاویر الزامی است'),
 
     is_private: yup
         .boolean(),
@@ -86,6 +87,7 @@ export default function EditEventPage() {
             teacher_name: '',
             scheduled_at: '',
             max_participants: 100,
+            allocated_video_streams: 1,
             is_private: false,
         },
     })
@@ -108,6 +110,7 @@ export default function EditEventPage() {
                 ? isoToLocalValue(room.scheduled_at)
                 : '',
             max_participants: room.max_participants || 100,
+            allocated_video_streams: room.allocated_video_streams || 1,
             is_private: Boolean(room.is_private),
         })
     }, [room, reset])
@@ -125,6 +128,7 @@ export default function EditEventPage() {
                 description: data.description || '',
                 teacher_name: (data.teacher_name || '').trim(),
                 max_participants: Number(data.max_participants),
+                allocated_video_streams: Number(data.allocated_video_streams),
                 is_private: Boolean(data.is_private),
                 allow_guests: allowGuests,
                 invited_people: invitedPeople,
@@ -332,6 +336,13 @@ export default function EditEventPage() {
                                 type="number"
                                 error={errors.max_participants?.message}
                                 {...register('max_participants')}
+                            />
+                            <Input
+                                className="meet-auth-input"
+                                label="سهم تصاویر هم‌زمان اتاق"
+                                type="number"
+                                error={errors.allocated_video_streams?.message}
+                                {...register('allocated_video_streams')}
                             />
 
                         </div>
