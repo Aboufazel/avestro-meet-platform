@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import toast from 'react-hot-toast'
 import { CalendarClock, CreditCard, History, Loader2, RefreshCw } from 'lucide-react'
 import { paymentsService } from '../../services/payments'
 import { formatIsoJalali } from '../../utils/jalali'
@@ -47,6 +48,11 @@ export default function SubscriptionPage() {
     { id: 'history', label: 'سوابق پرداخت', icon: History, count: orders.length },
     { id: 'reserved', label: 'رزروشده‌ها', icon: CalendarClock, count: reserved.length },
   ]
+  const startReserved = useMutation({
+    mutationFn: (id) => paymentsService.startReserved(id),
+    onSuccess: () => { toast.success('پلن با موفقیت شروع شد.'); refetch() },
+    onError: (error) => toast.error(error.response?.data?.detail || 'شروع پلن انجام نشد.'),
+  })
   const refresh = () => { refetch() }
 
   return <div className="meet-light-page min-h-full p-4 sm:p-6 lg:p-8" dir="rtl">
@@ -82,7 +88,10 @@ export default function SubscriptionPage() {
             <Tabs tabs={tabs} value={tab} onChange={setTab} />
             <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} tabIndex={0} className={`p-4 sm:p-6 ${focusRing}`}>
               {tab === 'reserved' && (reserved.length
-                ? <ul className="grid gap-4 md:grid-cols-2">{reserved.map((item) => <li key={item.id}><SubscriptionPlanCard subscription={item} reserved /></li>)}</ul>
+                ? <ul className="grid gap-4 md:grid-cols-2">{reserved.map((item) => <li key={item.id}>
+                  <SubscriptionPlanCard subscription={item} reserved />
+                  {item.status === 'reserved' && <button type="button" disabled={startReserved.isPending} onClick={() => startReserved.mutate(item.id)} className={`mt-2 min-h-11 w-full rounded-xl bg-[#2c55d4] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#2347b4] disabled:opacity-50 ${focusRing}`}>شروع این پلن</button>}
+                </li>)}</ul>
                 : <div className="py-10 text-center"><CalendarClock aria-hidden="true" className="mx-auto text-[#6b778c]" /><p className="mt-3 text-base font-bold">اشتراک رزروشده‌ای ندارید</p><p className="mt-2 text-sm text-[#46536b]">خرید بعدی در صورت داشتن اشتراک فعال، پس از پایان آن شروع می‌شود.</p></div>)}
 
               {tab === 'history' && (loadingOrders

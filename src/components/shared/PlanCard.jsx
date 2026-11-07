@@ -119,7 +119,7 @@ export function PlanCard({ plan, onSelect, selected = false }) {
       className={`flex h-full flex-col rounded-2xl border-2 bg-white p-5 sm:p-6 ${selected ? 'border-[#2c55d4] shadow-[0_0_0_4px_rgba(44,85,212,.14)]' : 'border-[#d9e1ee]'}`}
     >
       <header>
-        <p className="text-[13px] font-bold text-[#2347b4]">{plan.plan_type?.name || 'پلن'}</p>
+        <p className="text-[13px] font-bold text-[#2347b4]">{customTitle || plan.plan_type?.name || 'پلن'}</p>
         <h3 id={`${uid}-title`} className="mt-1 text-xl font-extrabold leading-8 text-[#101827]">{plan.name}</h3>
         {plan.description && <p className="mt-2 text-sm leading-7 text-[#46536b]">{plan.description}</p>}
       </header>
@@ -192,7 +192,10 @@ const daysLeft = (iso) => {
  */
 export function SubscriptionPlanCard({ subscription, reserved = false, usage = {} }) {
   const plan = subscription.plan || {}
+  const customSnapshot = subscription.custom_plan_snapshot || {}
+  const customTitle = customSnapshot.plan_kind === 'webinar' ? 'وبینار اختصاصی' : customSnapshot.plan_kind === 'class' ? 'کلاس آموزشی اختصاصی' : null
   const uid = `sub-${subscription.id}`
+  const manualReserved = subscription.status === 'reserved'
   const remaining = reserved ? null : daysLeft(subscription.expires_at)
   const limits = effectiveLimits(subscription, usage, reserved)
   const features = effectiveFeatures(subscription)
@@ -201,8 +204,8 @@ export function SubscriptionPlanCard({ subscription, reserved = false, usage = {
     <article aria-labelledby={`${uid}-title`} className="rounded-2xl border-2 border-[#d9e1ee] bg-white p-5 sm:p-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-[13px] font-bold text-[#2347b4]">{plan.plan_type?.name || 'پلن'}</p>
-          <h3 id={`${uid}-title`} className="mt-1 text-xl font-extrabold leading-8 text-[#101827]">{plan.name || 'پلن'}</h3>
+          <p className="text-[13px] font-bold text-[#2347b4]">{customTitle || plan.plan_type?.name || 'پلن'}</p>
+          <h3 id={`${uid}-title`} className="mt-1 text-xl font-extrabold leading-8 text-[#101827]">{customTitle || plan.name || 'پلن'}</h3>
         </div>
         <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-bold ${reserved ? 'bg-[#e6edff] text-[#1f3f9c]' : 'bg-[#dcf6ec] text-[#0b5f47]'}`}>
           {reserved ? <CalendarClock size={16} aria-hidden="true" /> : <CheckCircle2 size={16} aria-hidden="true" />}
@@ -213,11 +216,11 @@ export function SubscriptionPlanCard({ subscription, reserved = false, usage = {
       <dl className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded-xl bg-[#f3f6fc] p-3.5">
           <dt className="text-[13px] text-[#46536b]">شروع</dt>
-          <dd className="mt-1 text-sm font-extrabold text-[#101827]">{date(subscription.starts_at)}</dd>
+          <dd className="mt-1 text-sm font-extrabold text-[#101827]">{manualReserved ? 'پس از انتخاب شما' : date(subscription.starts_at)}</dd>
         </div>
         <div className="rounded-xl bg-[#f3f6fc] p-3.5">
           <dt className="text-[13px] text-[#46536b]">پایان</dt>
-          <dd className="mt-1 text-sm font-extrabold text-[#101827]">{date(subscription.expires_at)}</dd>
+          <dd className="mt-1 text-sm font-extrabold text-[#101827]">{manualReserved ? 'پس از شروع محاسبه می‌شود' : date(subscription.expires_at)}</dd>
         </div>
         {!reserved && remaining != null && (
           <div className="rounded-xl bg-[#f3f6fc] p-3.5">
