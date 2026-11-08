@@ -82,6 +82,16 @@ export function prefersH264() {
   return isAppleDevice() && !isFirefoxBrowser()
 }
 
+/**
+ * سقف فریم‌ریت اشتراک صفحه. اسلاید/متن با ۵fps کامل خوانا است و مصرف bridge
+ * (و بیت‌ریت اشتراک) را به‌شدت کم می‌کند. برای نمایش ویدیو/انیمیشن در .env:
+ * VITE_SCREEN_SHARE_FPS=15
+ */
+export const SCREEN_SHARE_MAX_FPS = (() => {
+  const v = Number(import.meta.env.VITE_SCREEN_SHARE_FPS)
+  return Number.isFinite(v) && v >= 1 && v <= 30 ? v : 5
+})()
+
 const IS_MOBILE = isMobileDevice()
 const IS_LOW_END = isLowEndDevice()
 
@@ -134,7 +144,7 @@ export const PERF = {
 // =============================================================================
 export const JITSI_INIT_OPTIONS = {
   disableAudioLevels: false,
-  desktopSharingFrameRate: { min: 5, max: 15 },
+  desktopSharingFrameRate: { min: Math.min(5, SCREEN_SHARE_MAX_FPS), max: SCREEN_SHARE_MAX_FPS },
   audioLevelsInterval: PERF.audioLevelsInterval,
   disableThirdPartyRequests: true,
 }
@@ -179,7 +189,7 @@ export const CONFERENCE_CONFIG = {
     : {}),
 
   // اشتراک صفحه: پیش‌فرض lib فقط ۵fps است
-  desktopSharingFrameRate: { min: 5, max: 15 },
+  desktopSharingFrameRate: { min: Math.min(5, SCREEN_SHARE_MAX_FPS), max: SCREEN_SHARE_MAX_FPS },
 
   // این دو تشخیص هیچ‌جای اپ استفاده نشده‌اند ولی هرکدام یک پردازش صوتی
   // دائمی روی میکروفون اجرا می‌کنند.
@@ -218,4 +228,4 @@ export const RECONNECT_CONFIG = {
   maxDelayMs: 15000, // سقف فاصله بین تلاش‌ها
 }
 // فریم‌ریت اشتراک صفحه (برای createLocalTracks({devices:['desktop']}))
-export const DESKTOP_SHARING_FRAME_RATE = { min: 1, max: 15 }
+export const DESKTOP_SHARING_FRAME_RATE = { min: 1, max: SCREEN_SHARE_MAX_FPS }

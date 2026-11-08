@@ -953,11 +953,14 @@ export class JitsiController {
                             onStageIds = [],
                             visibleIds = [],
                             paused = false,
+                            gridHeight = null,
                         } = {}) {
         this._receiverIntent = {
             onStageIds: [...new Set(onStageIds.filter(Boolean).map(String))],
             visibleIds: [...new Set(visibleIds.filter(Boolean).map(String))],
             paused: Boolean(paused),
+            // ارتفاع مجاز تایل‌های غیر on-stage (پیش‌فرض: کوچک)
+            gridHeight: Number(gridHeight) > 0 ? Number(gridHeight) : null,
         }
 
         return this._applyReceiverConstraints()
@@ -1062,7 +1065,9 @@ export class JitsiController {
                 onStageSources: onStageSources.filter((s) =>
                     selectedSources.includes(s)
                 ),
-                defaultConstraints: {maxHeight: RECEIVER_QUALITY.SMALL},
+                defaultConstraints: {
+                    maxHeight: intent.gridHeight || RECEIVER_QUALITY.SMALL,
+                },
                 constraints,
             }
         }
