@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Settings, LogOut, X, ChevronLeft, Sparkles, CreditCard, Tags, Users, CalendarDays } from 'lucide-react'
+import { LayoutDashboard, Settings, LogOut, X, ChevronLeft, Sparkles, CreditCard, Tags, Users, CalendarDays, ClipboardList } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { Avatar } from '../ui/Avatar'
 import toast from 'react-hot-toast'
@@ -7,9 +7,10 @@ import toast from 'react-hot-toast'
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'نمای کلی', end: true },
   { to: '/dashboard/rooms', icon: CalendarDays, label: 'لیست اتاق‌ها' },
+  { to: '/dashboard/reports', icon: ClipboardList, label: 'گزارش برگزاری کلاس‌ها' },
   { to: '/dashboard/people', icon: Users, label: 'تعریف کاربران' },
   { to: '/dashboard/subscription', icon: CreditCard, label: 'اشتراک و پرداخت' },
-  { to: '/dashboard/pricing', icon: Tags, label: 'تعرفه‌ها' },
+  { to: '/dashboard/pricing', icon: Tags, label: 'ساخت پلن' },
   { to: '/dashboard/settings', icon: Settings, label: 'تنظیمات حساب' },
 ]
 export function Sidebar({ onClose }) {

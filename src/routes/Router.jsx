@@ -19,6 +19,8 @@ import PricingPage from '../pages/landing/PricingPage'
 import SubscriptionPage from '../pages/dashboard/SubscriptionPage'
 import BillingResultPage from '../pages/landing/BillingResultPage'
 import PeoplePage from '../pages/people/PeoplePage'
+import ClassReportsPage from '../pages/dashboard/ClassReportsPage'
+import ClassReportDetailPage from '../pages/dashboard/ClassReportDetailPage'
 
 const router = createBrowserRouter([
     {
@@ -59,6 +61,8 @@ const router = createBrowserRouter([
                 path: appRoutes.dashboard.rooms,
                 element: <RoomsPage/>
             },
+            { path: appRoutes.dashboard.reports, element: <ClassReportsPage/> },
+            { path: appRoutes.dashboard.reportClass, element: <ClassReportDetailPage/> },
             {
                 path: appRoutes.dashboard.createEvent,
                 element: <CreateEventPage/>

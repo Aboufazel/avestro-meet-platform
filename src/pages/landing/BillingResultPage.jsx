@@ -111,11 +111,11 @@ export default function BillingResultPage() {
         {needLogin
           ? <Link to={`/login?next=${encodeURIComponent(`/billing/result?order=${orderId}`)}`} className={primaryButtonClass}>ورود و دیدن نتیجه</Link>
           : key === 'paid' ? <Link to="/dashboard/subscription" className={primaryButtonClass}>مشاهده اشتراک</Link>
-          : key === 'failed' || key === 'unknown' ? <Link to="/pricing" className={primaryButtonClass}>بازگشت به تعرفه‌ها</Link>
+          : key === 'failed' || key === 'unknown' ? <Link to="/pricing" className={primaryButtonClass}>بازگشت به ساخت پلن</Link>
           : <Link to="/dashboard/subscription" className={primaryButtonClass}>رفتن به اشتراک و پرداخت</Link>}
         {key === 'paid' ? <Link to="/dashboard" className={secondaryButtonClass}>رفتن به داشبورد</Link>
           : key === 'failed' || key === 'unknown' ? <Link to="/dashboard/subscription" className={secondaryButtonClass}>اشتراک و پرداخت</Link>
-          : <Link to="/pricing" className={secondaryButtonClass}>بازگشت به تعرفه‌ها</Link>}
+          : <Link to="/pricing" className={secondaryButtonClass}>بازگشت به ساخت پلن</Link>}
       </div>
 
       {(key === 'pending' || key === 'stalled' || key === 'error') && <button type="button" onClick={() => { setStalled(false); refetch() }} disabled={isFetching}

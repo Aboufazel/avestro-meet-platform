@@ -10,6 +10,8 @@ export const appRoutes = {
     indexPage: '/dashboard',
     createEvent: '/dashboard/create',
     rooms: '/dashboard/rooms',
+    reports: '/dashboard/reports',
+    reportClass: '/dashboard/reports/:slug',
     pricing: '/dashboard/pricing',
     editEvent: '/dashboard/edit/:slug',
     settings: '/dashboard/settings',
