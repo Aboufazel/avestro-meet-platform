@@ -8,7 +8,7 @@ import { paymentsService } from '../../services/payments'
 
 const fa = (value) => Number(value || 0).toLocaleString('fa-IR')
 const money = (value) => `${fa(value)} ریال`
-const ring = 'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#2c55d4]/30'
+const ring = 'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#4f7cff]/30'
 
 function Stepper({ label, value, min = 10, max, stepUntil100 = 10, stepOver100 = 50, onChange, hint }) {
   const update = (next) => onChange(Math.max(min, Math.min(max, next)))
@@ -17,7 +17,7 @@ function Stepper({ label, value, min = 10, max, stepUntil100 = 10, stepOver100 =
   return <div className="rounded-2xl border border-[#dce4f1] bg-white p-4">
     <div className="flex items-center justify-between gap-3">
       <div><p className="font-extrabold">{label}</p>{hint && <p className="mt-1 text-xs text-[#68758a]">{hint}</p>}</div>
-      <output aria-live="polite" className="text-2xl font-black tabular-nums text-[#2347b4]">{fa(value)}</output>
+      <output aria-live="polite" className="text-2xl font-black tabular-nums text-[#3d66e8]">{fa(value)}</output>
     </div>
     <div className="mt-4 flex items-center gap-2">
       <button type="button" aria-label={`کاهش ${label}`} disabled={value <= min} onClick={() => update(value - decrease)} className={`flex h-11 w-11 items-center justify-center rounded-xl border border-[#c8d3e5] disabled:opacity-40 ${ring}`}><Minus size={17}/></button>
@@ -119,8 +119,8 @@ export default function CustomPlanBuilder() {
         {planKind === 'class' && <div className="rounded-2xl border border-[#dce4f1] p-4">
           <p className="mb-3 text-sm font-extrabold">نوع مرکز آموزشی</p>
           <div className="grid gap-2 sm:grid-cols-2">
-            <button type="button" onClick={() => setInstitutionKind('government')} aria-pressed={institutionKind === 'government'} className={`min-h-12 rounded-xl border-2 px-3 text-sm font-bold ${ring} ${institutionKind === 'government' ? 'border-[#315bd5] bg-[#f1f5ff] text-[#2347b4]' : 'border-[#e1e7f0]'}`}>مدرسه دولتی</button>
-            <button type="button" onClick={() => setInstitutionKind('nonprofit')} aria-pressed={institutionKind === 'nonprofit'} className={`min-h-12 rounded-xl border-2 px-3 text-sm font-bold ${ring} ${institutionKind === 'nonprofit' ? 'border-[#315bd5] bg-[#f1f5ff] text-[#2347b4]' : 'border-[#e1e7f0]'}`}>مؤسسه غیرانتفاعی / آموزشی</button>
+            <button type="button" onClick={() => setInstitutionKind('government')} aria-pressed={institutionKind === 'government'} className={`min-h-12 rounded-xl border-2 px-3 text-sm font-bold ${ring} ${institutionKind === 'government' ? 'border-[#315bd5] bg-[#f1f5ff] text-[#3d66e8]' : 'border-[#e1e7f0]'}`}>مدرسه دولتی</button>
+            <button type="button" onClick={() => setInstitutionKind('nonprofit')} aria-pressed={institutionKind === 'nonprofit'} className={`min-h-12 rounded-xl border-2 px-3 text-sm font-bold ${ring} ${institutionKind === 'nonprofit' ? 'border-[#315bd5] bg-[#f1f5ff] text-[#3d66e8]' : 'border-[#e1e7f0]'}`}>مؤسسه غیرانتفاعی / آموزشی</button>
           </div>
           {institutionKind === 'government' && <p className="mt-3 rounded-xl bg-[#fff8e8] p-3 text-xs leading-6 text-[#77551b]">تخفیف مدارس دولتی در محاسبه لحاظ می‌شود. پس از خرید، یادآوری بارگذاری مدارک در داشبورد نمایش داده خواهد شد.</p>}
         </div>}
@@ -189,9 +189,9 @@ export default function CustomPlanBuilder() {
             <div className="rounded-xl bg-[#101d3b] p-4 text-white"><p className="text-xs text-[#d3ddf5]">مبلغ قابل پرداخت</p><p className="mt-2 text-2xl font-black tabular-nums">{money(quote.total)}</p><p className="mt-1 text-[10px] text-[#c4d0eb]">قیمت نهایی بر اساس تنظیمات سامانه</p></div>
           </> : <p className="text-xs text-[#68758a]">برای محاسبه پیش‌فاکتور ظرفیت را انتخاب کنید.</p>}
         <button type="button" disabled={!quote || quoteLoading || checkout.isPending || quoteError} onClick={() => {
-          if (!authenticated) { navigate(`/login?next=${encodeURIComponent('/pricing')}`); return }
+          if (!authenticated) { navigate(`/login?next=${encodeURIComponent('/dashboard/pricing')}`); return }
           checkout.mutate()
-        }} className={`mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#315bd5] px-4 py-3 text-sm font-extrabold text-white hover:bg-[#2347b4] disabled:cursor-not-allowed disabled:opacity-50 ${ring}`}>
+        }} className={`mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#315bd5] px-4 py-3 text-sm font-extrabold text-white hover:bg-[#3d66e8] disabled:cursor-not-allowed disabled:opacity-50 ${ring}`}>
           {checkout.isPending ? <Loader2 size={17} className="animate-spin"/> : <><ShieldCheck size={17}/> ادامه و پرداخت <ArrowLeft size={16}/></>}
         </button>
         {!authenticated && <p className="mt-2 text-center text-[11px] text-[#68758a]">برای ادامه خرید ابتدا وارد حساب شوید.</p>}

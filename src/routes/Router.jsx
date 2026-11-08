@@ -6,6 +6,7 @@ import AuthProvider from '../providers/AuthProvider'
 import LoginPage from '../pages/auth/LoginPage'
 import RegisterPage from '../pages/auth/RegisterPage'
 import DashboardPage from '../pages/dashboard/DashboardPage'
+import RoomsPage from '../pages/dashboard/RoomsPage'
 import CreateEventPage from '../pages/event/CreateEventPage'
 import JoinPage from '../pages/event/JoinPage'
 import RoomPage from '../pages/room/RoomPage'
@@ -55,6 +56,10 @@ const router = createBrowserRouter([
                 element: <DashboardPage/>
             },
             {
+                path: appRoutes.dashboard.rooms,
+                element: <RoomsPage/>
+            },
+            {
                 path: appRoutes.dashboard.createEvent,
                 element: <CreateEventPage/>
             },
@@ -67,6 +72,7 @@ const router = createBrowserRouter([
                 element: <AccountSettingsPage/>
             },
             { path: appRoutes.dashboard.subscription, element: <SubscriptionPage/> },
+            { path: appRoutes.dashboard.pricing, element: <PricingPage/> },
             { path: appRoutes.dashboard.people, element: <PeoplePage/> },
         ]
     },

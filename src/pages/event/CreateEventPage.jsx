@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, ArrowLeft, GraduationCap, Presentation, CalendarDays, Users, ShieldCheck, PenTool, MessageCircle, ScreenShare, Video, Hand, ClipboardCheck, Mic, Check, Loader2, Settings2, FileText, Sparkles } from 'lucide-react'
+import { ArrowRight, ArrowLeft, CalendarDays, ShieldCheck, GraduationCap, PenTool, Hand, ClipboardCheck, Mic, Check, Loader2, Settings2, FileText, Sparkles, Lock, Users } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import { Button } from '../../components/ui/Button'
@@ -10,22 +10,18 @@ import { Card } from '../../components/ui/Card'
 import { JalaliDateTimePicker } from '../../components/ui/JalaliDateTimePicker'
 import { roomsService } from '../../services/rooms'
 import { paymentsService } from '../../services/payments'
-import { isPlanFeature } from '../../constants/planFeatures'
 import { RoomAccessSettings } from '../../components/shared/RoomAccessSettings'
 
 const FEATURE_META = {
-  chat: { title: 'گفت‌وگوی متنی', hint: 'امکان ارسال پیام در اتاق', icon: MessageCircle, kinds: ['class', 'meeting'] },
-  participants_list: { title: 'فهرست شرکت‌کنندگان', hint: 'نمایش افراد حاضر در جلسه', icon: Users, kinds: ['class', 'meeting'] },
-  screen_share: { title: 'اشتراک‌گذاری صفحه', hint: 'ارائه محتوا و نمایش صفحه', icon: ScreenShare, kinds: ['class', 'meeting'] },
-  recording: { title: 'ضبط جلسه', hint: 'امکان ضبط جلسه', icon: Video, kinds: ['class', 'meeting'] },
-  speak_permission: { title: 'مدیریت دسترسی میکروفون و دوربین', hint: 'کنترل باز شدن میکروفون و دوربین شرکت‌کنندگان', icon: Mic, kinds: ['class', 'meeting'] },
-  raise_hand: { title: 'دست بلند کردن', hint: 'ارسال درخواست صحبت و مدیریت صف', icon: Hand, kinds: ['class', 'meeting'] },
-  attendance: { title: 'حضور و غیاب', hint: 'ثبت وضعیت حضور شرکت‌کنندگان', icon: ClipboardCheck, kinds: ['class', 'meeting'] },
-  documents: { title: 'اشتراک فایل در کلاس', hint: 'نمایش عکس، PDF، Word و PowerPoint داخل خود کلاس و نوشتن روی آن', icon: FileText, kinds: ['class'] },
-  whiteboard: { title: 'تخته تعاملی', hint: 'فضای نوشتن و ترسیم هم‌زمان؛ مخصوص کلاس آموزشی', icon: PenTool, kinds: ['class'] },
+  whiteboard: { title: 'تخته تعاملی', hint: 'نوشتن و ترسیم هم‌زمان روی یک فضای مشترک', icon: PenTool },
+  documents: { title: 'اشتراک فایل در کلاس', hint: 'نمایش و بررسی فایل‌های آموزشی در محیط کلاس', icon: FileText },
+  speak_permission: { title: 'کنترل اجازه صحبت و تصویر', hint: 'مدیریت دسترسی شرکت‌کنندگان به میکروفون و دوربین', icon: Mic },
+  raise_hand: { title: 'بلندکردن دست', hint: 'ارسال درخواست صحبت و مدیریت مشارکت‌کنندگان', icon: Hand },
+  attendance: { title: 'حضور و غیاب', hint: 'ثبت و پیگیری وضعیت حضور شرکت‌کنندگان', icon: ClipboardCheck },
 }
 
-const STEPS = ['نوع رویداد', 'اطلاعات اصلی', 'امکانات جلسه', 'بازبینی']
+const FEATURE_ORDER = ['whiteboard', 'documents', 'speak_permission', 'raise_hand', 'attendance']
+const STEPS = ['اطلاعات اصلی', 'امکانات کلاس', 'بازبینی']
 
 function slugify(value) {
   return value.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]/g, '').replace(/--+/g, '-')
@@ -35,7 +31,8 @@ export default function CreateEventPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [step, setStep] = useState(0)
-  const [kind, setKind] = useState('')
+  // نوع اتاق در این جریان ثابت است؛ انتخاب نوع رویداد دیگر مرحله‌ای از فرم نیست.
+  const kind = 'class'
   const [saving, setSaving] = useState(false)
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
@@ -50,16 +47,14 @@ export default function CreateEventPage() {
     queryFn: () => paymentsService.me().then((response) => response.data),
   })
   const activeSubscription = subscriptionInfo?.active
-  const allowedKinds = subscriptionInfo?.allowed_room_kinds || []
-  const participantLimit = subscriptionInfo?.room_allocations?.users_remaining ?? subscriptionInfo?.limits?.max_participants?.value ?? null
-  const imageLimit = subscriptionInfo?.room_allocations?.images_remaining ?? subscriptionInfo?.limits?.max_video_streams?.value ?? 1
-  const kindOptions = useMemo(() => allowedKinds.map((value) => ({
-    value,
-    title: allowedKinds.length === 1 ? (activeSubscription?.plan?.plan_type?.name || (value === 'class' ? 'کلاس آموزشی' : 'جلسه آنلاین')) : (value === 'class' ? 'کلاس آموزشی' : 'جلسه آنلاین'),
-    text: value === 'class' ? 'برای آموزش تعاملی و مدیریت کلاس' : 'برای جلسه آنلاین، ارائه و وبینار',
-    hint: value === 'class' ? 'تخته تعاملی، حضور و غیاب و مدیریت مشارکت' : 'ارتباط با شرکت‌کنندگان و ارائه محتوا',
-    Icon: value === 'class' ? GraduationCap : Presentation,
-  })), [allowedKinds, activeSubscription?.plan?.plan_type?.name])
+  // سقف ظرفیت هر اتاق از محدودیت خود اتاق خوانده می‌شود، نه سهمیه‌ی باقیمانده‌ی حساب.
+  const participantLimit = subscriptionInfo?.limits?.max_participants?.value
+    ?? activeSubscription?.plan?.limits?.find((item) => item.key === 'max_participants')?.value
+    ?? null
+  const imageLimit = subscriptionInfo?.room_allocations?.images_remaining
+    ?? subscriptionInfo?.limits?.max_video_streams?.value
+    ?? activeSubscription?.plan?.limits?.find((item) => item.key === 'max_video_streams')?.value
+    ?? 1
   const [isPrivate, setIsPrivate] = useState(false)
   const [allowGuests, setAllowGuests] = useState(true)
   const [invitedPeople, setInvitedPeople] = useState([])
@@ -78,18 +73,24 @@ export default function CreateEventPage() {
   const { data: accountFeatures = [], isLoading: featuresLoading, isError: featuresError } = useQuery({
     queryKey: ['account-features'],
     queryFn: () => roomsService.accountFeatures().then((response) => response.data),
-    enabled: step >= 2,
+    enabled: step >= 1,
   })
 
-  const availableFeatures = useMemo(
-    () => accountFeatures.filter((feature) => isPlanFeature(feature.key) && (!feature.applies_to?.length || feature.applies_to.includes(kind))),
-    [accountFeatures, kind],
-  )
+  // پاسخ سرویس ممکن است آرایه‌ی مستقیم یا شیء دارای features/results باشد.
+  // این مرحله فقط بر اساس کلیدهای موردنیاز کاربر رندر می‌شود؛ applies_to و نوع رویداد فیلتر نمی‌شوند.
+  const featurePayload = accountFeatures?.data ?? accountFeatures
+  const featureSource = Array.isArray(featurePayload)
+    ? featurePayload
+    : Array.isArray(featurePayload?.features)
+      ? featurePayload.features
+      : Array.isArray(featurePayload?.results)
+        ? featurePayload.results
+        : []
 
-  function chooseKind(value) {
-    setKind(value)
-    setStep(1)
-  }
+  const availableFeatures = useMemo(() => {
+    const byKey = new Map(featureSource.filter(Boolean).map((feature) => [feature.key, feature]))
+    return FEATURE_ORDER.map((key) => byKey.get(key)).filter(Boolean)
+  }, [featureSource])
 
   function toggleFeature(key, enabled) {
     setFeatureDraft((current) => ({ ...current, [key]: { ...(current[key] || {}), enabled } }))
@@ -107,18 +108,18 @@ export default function CreateEventPage() {
 
   function isFeatureEnabled(feature) {
     if (feature.reason === 'not_in_plan') return false
-    return featureDraft[feature.key]?.enabled ?? (feature.reason !== 'not_in_plan')
+    return featureDraft[feature.key]?.enabled ?? Boolean(feature.enabled)
   }
 
   async function handleCreate() {
-    if (!title.trim()) { toast.error('عنوان رویداد را وارد کنید'); setStep(1); return }
-    if (!slug.trim() || !/^[a-z0-9-]+$/.test(slug)) { toast.error('شناسه لینک معتبر نیست'); setStep(1); return }
+    if (!title.trim()) { toast.error('عنوان کلاس را وارد کنید'); setStep(0); return }
+    if (!slug.trim() || !/^[a-z0-9-]+$/.test(slug)) { toast.error('شناسه لینک معتبر نیست'); setStep(0); return }
     const capacity = Number(maxParticipants)
-    if (!Number.isInteger(capacity) || capacity < 2 || (participantLimit != null && capacity > participantLimit)) { toast.error(participantLimit != null ? `ظرفیت باید بین ۲ تا ${participantLimit} نفر باشد` : 'ظرفیت باید حداقل ۲ نفر باشد'); setStep(1); return }
+    if (!Number.isInteger(capacity) || capacity < 2 || (participantLimit != null && capacity > participantLimit)) { toast.error(participantLimit != null ? `ظرفیت باید بین ۲ تا ${participantLimit} نفر باشد` : 'ظرفیت باید حداقل ۲ نفر باشد'); setStep(0); return }
 
     const imageAllocation = Number(allocatedVideoStreams)
-    if (!Number.isInteger(imageAllocation) || imageAllocation < 1 || imageAllocation > imageLimit) { toast.error(`سهم تصاویر باید بین ۱ تا ${imageLimit} باشد`); setStep(1); return }
-    if (!allowGuests && invitedPeople.length === 0) { toast.error('با غیرفعال‌بودن ورود مهمان، حداقل یک نفر را برای جلسه انتخاب کنید'); setStep(1); return }
+    if (!Number.isInteger(imageAllocation) || imageAllocation < 1 || imageAllocation > imageLimit) { toast.error(`سهم تصاویر باید بین ۱ تا ${imageLimit} باشد`); setStep(0); return }
+    if (!allowGuests && invitedPeople.length === 0) { toast.error('با غیرفعال‌بودن ورود مهمان، حداقل یک نفر را برای جلسه انتخاب کنید'); setStep(0); return }
 
     setSaving(true)
     try {
@@ -152,11 +153,11 @@ export default function CreateEventPage() {
     }
   }
 
-  const selectedKind = kindOptions.find((item) => item.value === kind) || { title: 'رویداد', description: '', Icon: Presentation }
+  const selectedKind = { title: 'کلاس آموزشی', text: 'اطلاعات کلاس و امکانات آموزشی را تنظیم کنید' }
 
   if (subscriptionLoading) return <div className="min-h-full p-6 flex justify-center items-center"><Card className="!p-10 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-[#4f7cff]"/><p className="mt-3 text-sm text-[#68758a]">در حال بررسی اشتراک شما…</p></Card></div>
-  if (!activeSubscription) return <div className="min-h-full p-4 sm:p-8 flex items-center justify-center"><Card className="!p-6 sm:!p-10 max-w-lg text-center"><ShieldCheck className="mx-auto h-10 w-10 text-[#4f7cff]"/><h1 className="mt-4 text-xl font-bold text-[#101827]">برای ساخت جلسه به اشتراک فعال نیاز دارید</h1><p className="mt-2 text-sm leading-7 text-[#68758a]">جلسات و لینک‌های قبلی شما باقی می‌مانند؛ برای ساخت رویداد جدید، ابتدا یک پلن انتخاب کنید.</p><Link to="/pricing" className="meet-primary-btn inline-flex mt-5 rounded-xl px-5 py-3 text-sm">مشاهده تعرفه‌ها</Link></Card></div>
-  if (kindOptions.length === 0) return <div className="min-h-full p-4 sm:p-8 flex items-center justify-center"><Card className="!p-6 max-w-lg text-center"><h1 className="font-bold">نوع رویدادی برای پلن شما تعریف نشده است</h1><p className="text-sm text-[#68758a] mt-2">برای اصلاح دسترسی نوع رویداد با پشتیبانی تماس بگیرید یا پلن دیگری انتخاب کنید.</p><Link to="/pricing" className="text-[#4f7cff] text-sm inline-block mt-4">مشاهده تعرفه‌ها</Link></Card></div>
+  if (!activeSubscription) return <div className="min-h-full p-4 sm:p-8 flex items-center justify-center"><Card className="!p-6 sm:!p-10 max-w-lg text-center"><ShieldCheck className="mx-auto h-10 w-10 text-[#4f7cff]"/><h1 className="mt-4 text-xl font-bold text-[#101827]">برای ساخت جلسه به اشتراک فعال نیاز دارید</h1><p className="mt-2 text-sm leading-7 text-[#68758a]">جلسات و لینک‌های قبلی شما باقی می‌مانند؛ برای ساخت کلاس جدید، ابتدا یک پلن انتخاب کنید.</p><Link to="/pricing" className="meet-primary-btn inline-flex mt-5 rounded-xl px-5 py-3 text-sm">مشاهده تعرفه‌ها</Link></Card></div>
+
 
   return (
     <div className="min-h-full bg-[#f4f7fb] p-4 sm:p-6 lg:p-8">
@@ -166,8 +167,8 @@ export default function CreateEventPage() {
             <ArrowRight className="h-5 w-5" />
           </Link>
           <div>
-            <h1 className="text-lg font-bold text-[#101827]">ساخت رویداد جدید</h1>
-            <p className="mt-1 text-sm text-[#8d98aa]">نوع رویداد را انتخاب کنید و مرحله‌به‌مرحله آن را بسازید.</p>
+            <h1 className="text-lg font-bold text-[#101827]">ساخت کلاس جدید</h1>
+            <p className="mt-1 text-sm text-[#8d98aa]">اطلاعات کلاس را وارد کنید و امکانات موردنیاز را تنظیم کنید.</p>
           </div>
         </div>
 
@@ -176,7 +177,7 @@ export default function CreateEventPage() {
             <span className="text-xs font-semibold text-[#536074]">مرحله {step + 1} از {STEPS.length}</span>
             <span className="text-xs text-[#8d98aa]">{STEPS[step]}</span>
           </div>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {STEPS.map((label, index) => (
               <div key={label} className="min-w-0">
                 <div className={`h-1.5 rounded-full ${index <= step ? 'bg-[#4f7cff]' : 'bg-[#e9edf4]'}`} />
@@ -188,36 +189,14 @@ export default function CreateEventPage() {
 
         <Card className="!p-5 sm:!p-8">
           {step === 0 && (
-            <section>
-              <div className="mb-6 text-center">
-                <h2 className="text-xl font-bold text-[#101827]">چه نوع رویدادی می‌خواهید بسازید؟</h2>
-                <p className="mt-2 text-sm text-[#8d98aa]">با انتخاب نوع رویداد، تنظیمات مناسب همان تجربه نمایش داده می‌شود.</p>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {kindOptions.map(({ value, title: cardTitle, text, hint, Icon }) => (
-                  <button key={value} type="button" onClick={() => chooseKind(value)} className={`group relative isolate min-h-[260px] overflow-hidden rounded-3xl border p-5 text-right transition duration-300 hover:-translate-y-1 hover:shadow-[0_22px_55px_rgba(30,55,100,.14)] focus:outline-none focus:ring-2 focus:ring-[#4f7cff]/25 sm:p-6 ${value === 'class' ? 'border-[#cbd8ff] bg-gradient-to-br from-[#f1f5ff] via-white to-[#e7edff] hover:border-[#9db4ff]' : 'border-[#bfeadd] bg-gradient-to-br from-[#eafaf4] via-white to-[#dcf6ec] hover:border-[#8ed9bd]'}`}>
-                    <span aria-hidden="true" className={`pointer-events-none absolute -left-10 -top-12 h-44 w-44 rounded-full opacity-60 blur-2xl transition duration-500 group-hover:scale-125 ${value === 'class' ? 'bg-[#cbd8ff]' : 'bg-[#b8eed9]'}`} />
-                    <span aria-hidden="true" className={`pointer-events-none absolute -bottom-12 right-24 h-32 w-32 rounded-full border-[18px] opacity-30 ${value === 'class' ? 'border-[#9eb5ff]' : 'border-[#8ed9bd]'}`} />
-                    <span className={`relative mb-6 flex h-[76px] w-[76px] items-center justify-center rounded-[26px] shadow-lg ring-1 ring-white/80 ${value === 'class' ? 'bg-gradient-to-br from-[#668cff] to-[#4568d9] text-white shadow-[#668cff]/25' : 'bg-gradient-to-br from-[#45c99a] to-[#229c78] text-white shadow-[#45c99a]/25'}`}><Icon className="h-9 w-9" strokeWidth={1.8} /></span>
-                    <span className="relative block text-xl font-extrabold text-[#101827]">{cardTitle}</span>
-                    <span className="relative mt-2 block text-sm leading-6 text-[#536074]">{text}</span>
-                    <span className="relative mt-4 block max-w-[90%] text-xs leading-6 text-[#7c899d]">{hint}</span>
-                    <span className={`relative mt-6 inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold text-white shadow-md transition group-hover:gap-3 ${value === 'class' ? 'bg-[#4f70df] shadow-[#4f70df]/20' : 'bg-[#2da982] shadow-[#2da982]/20'}`}>انتخاب و ادامه <ArrowLeft className="h-4 w-4 transition group-hover:-translate-x-1" /></span>
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {step === 1 && (
             <section className="space-y-5">
               <div className="mb-2 flex items-center gap-3">
-                <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${kind === 'class' ? 'bg-[#edf2ff] text-[#4f7cff]' : 'bg-[#e8faf4] text-[#2eaf89]'}`}>{kind === 'class' ? <GraduationCap className="h-5 w-5" /> : <Presentation className="h-5 w-5" />}</span>
-                <div><h2 className="font-bold text-[#101827]">اطلاعات {selectedKind.title}</h2><p className="mt-1 text-xs text-[#8d98aa]">{selectedKind.text}</p></div>
+                <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${kind === 'class' ? 'bg-[#edf2ff] text-[#4f7cff]' : 'bg-[#e8faf4] text-[#2eaf89]'}`}><GraduationCap className="h-5 w-5" /></span>
+                <div><h2 className="font-bold text-[#101827]">اطلاعات کلاس آموزشی</h2><p className="mt-1 text-xs text-[#8d98aa]">{selectedKind.text}</p></div>
               </div>
-              <Input label="عنوان رویداد" placeholder={kind === 'class' ? 'مثلاً آموزش طراحی رابط کاربری' : 'مثلاً سمینار تحول دیجیتال'} value={title} onChange={(event) => { setTitle(event.target.value); if (!slugTouched) setSlug(slugify(event.target.value)) }} className="meet-auth-input" />
+              <Input label="عنوان کلاس" placeholder='مثلاً آموزش طراحی رابط کاربری' value={title} onChange={(event) => { setTitle(event.target.value); if (!slugTouched) setSlug(slugify(event.target.value)) }} className="meet-auth-input" />
               <div>
-                <Input label="شناسه رویداد (لینک)" placeholder="project-management" value={slug} onChange={(event) => { setSlugTouched(true); setSlug(slugify(event.target.value)) }} className="meet-auth-input" />
+                <Input label="شناسه کلاس (لینک)" placeholder="project-management" value={slug} onChange={(event) => { setSlugTouched(true); setSlug(slugify(event.target.value)) }} className="meet-auth-input" />
                 <p className="mt-1.5 text-xs text-[#8d98aa]">لینک ورود: meet.avestro.ir/join/{slug || 'your-event'}</p>
               </div>
               {kind === 'class' && (
@@ -237,17 +216,17 @@ export default function CreateEventPage() {
               </div>
               <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#e5eaf2] bg-[#f8faff] p-4">
                 <input type="checkbox" checked={isPrivate} onChange={(event) => setIsPrivate(event.target.checked)} className="h-4 w-4 accent-[#4f7cff]" />
-                <span className="text-sm text-[#536074]">رویداد خصوصی <span className="text-xs text-[#9aa4b4]">(فقط با لینک مستقیم)</span></span>
+                <span className="text-sm text-[#536074]">کلاس خصوصی <span className="text-xs text-[#9aa4b4]">(فقط با لینک مستقیم)</span></span>
               </label>
               <RoomAccessSettings allowGuests={allowGuests} onAllowGuests={setAllowGuests} selected={invitedPeople} onSelected={setInvitedPeople} />
             </section>
           )}
 
-          {step === 2 && (
+          {step === 1 && (
             <section>
               <div className="mb-5 flex items-center gap-3">
                 <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#edf2ff] text-[#4f7cff]"><Settings2 className="h-5 w-5" /></span>
-                <div><h2 className="font-bold text-[#101827]">امکانات و تنظیمات جلسه</h2><p className="mt-1 text-xs text-[#8d98aa]">امکانات موردنیاز را فعال کنید؛ می‌توانید این مرحله را رد کنید و بعداً از تنظیمات حساب تغییر دهید.</p></div>
+                <div><h2 className="font-bold text-[#101827]">امکانات و تنظیمات کلاس</h2><p className="mt-1 text-xs text-[#8d98aa]">فقط پنج قابلیت آموزشی مرتبط نمایش داده شده‌اند. وضعیت هر قابلیت مطابق پاسخ سرویس و پلن حساب شماست.</p></div>
               </div>
               <label className="mb-5 flex cursor-pointer items-start gap-3 rounded-xl border border-[#dfe7f5] bg-[#f8faff] p-4">
                 <input type="checkbox" checked={configureFeatures} onChange={(event) => setConfigureFeatures(event.target.checked)} className="mt-1 h-4 w-4 accent-[#4f7cff]" />
@@ -262,7 +241,7 @@ export default function CreateEventPage() {
               ) : (
                 <div className="space-y-3">
                   {availableFeatures.length === 0 && (
-                    <div className="rounded-xl border border-dashed border-[#dce3ef] p-6 text-center text-sm leading-7 text-[#68758a]">برای این نوع رویداد، امکان قابل تنظیمی وجود ندارد. می‌توانید مستقیم به مرحله بعد بروید.</div>
+                    <div className="rounded-xl border border-dashed border-[#dce3ef] p-6 text-center text-sm leading-7 text-[#68758a]">پاسخ سرویس دریافت شد، اما هیچ‌کدام از پنج قابلیت موردنیاز در فهرست آن وجود ندارد. کلیدهای whiteboard، documents، speak_permission، raise_hand و attendance را در پاسخ API بررسی کنید.</div>
                   )}
                   {availableFeatures.map((feature) => {
                     const meta = FEATURE_META[feature.key] || { title: feature.title, hint: 'این امکان بر اساس پلن و تنظیمات حساب قابل مدیریت است.', icon: Sparkles }
@@ -270,12 +249,12 @@ export default function CreateEventPage() {
                     const enabled = isFeatureEnabled(feature)
                     const locked = feature.reason === 'not_in_plan'
                     return (
-                      <div key={feature.key} className="rounded-xl border border-[#e5eaf2] p-4">
+                      <div key={feature.key} className={`group rounded-2xl border p-4 sm:p-5 transition-all ${enabled ? 'border-[#cfe9df] bg-gradient-to-l from-[#f0fbf6] to-white shadow-[0_8px_24px_rgba(35,155,114,.06)]' : locked ? 'border-[#e8eaf0] bg-[#fafbfe]' : 'border-[#e5eaf2] bg-white hover:border-[#cbd8ff] hover:shadow-sm'}`}>
                         <div className="flex items-start gap-3">
                           <input id={`feature-${feature.key}`} type="checkbox" checked={enabled} disabled={locked} onChange={(event) => toggleFeature(feature.key, event.target.checked)} className="mt-1 h-4 w-4 accent-[#4f7cff] disabled:opacity-40" />
                           <label htmlFor={`feature-${feature.key}`} className={`flex min-w-0 flex-1 items-start gap-3 ${locked ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#edf2ff] text-[#4f7cff]"><Icon className="h-4 w-4" /></span>
-                            <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-[#101827]">{meta.title}{locked && <span className="rounded-md bg-[#fff4df] px-2 py-0.5 text-[10px] text-[#a16b13]">نیازمند ارتقا</span>}</span><span className="mt-1 block text-xs leading-5 text-[#8d98aa]">{meta.hint}</span></span>
+                            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${enabled ? 'bg-[#def5eb] text-[#21966e]' : 'bg-[#edf2ff] text-[#4f7cff]'}`}><Icon className="h-4 w-4" /></span>
+                            <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-[#101827]">{meta.title}{locked && <span className="inline-flex items-center gap-1 rounded-full bg-[#fff4df] px-2.5 py-1 text-[10px] font-medium text-[#9b681b]"><Lock className="h-3 w-3" /> خارج از پلن</span>}</span><span className="mt-1 block text-xs leading-5 text-[#8d98aa]">{meta.hint}</span></span>
                           </label>
                           {enabled && <Check className="h-4 w-4 text-[#2eaf89]" />}
                         </div>
@@ -305,12 +284,12 @@ export default function CreateEventPage() {
             </section>
           )}
 
-          {step === 3 && (
+          {step === 2 && (
             <section>
-              <div className="mb-5 flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#e8faf4] text-[#2eaf89]"><ShieldCheck className="h-5 w-5" /></span><div><h2 className="font-bold text-[#101827]">بازبینی و ساخت رویداد</h2><p className="mt-1 text-xs text-[#8d98aa]">قبل از ساخت، اطلاعات را بررسی کنید.</p></div></div>
+              <div className="mb-5 flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#e8faf4] text-[#2eaf89]"><ShieldCheck className="h-5 w-5" /></span><div><h2 className="font-bold text-[#101827]">بازبینی و ساخت کلاس</h2><p className="mt-1 text-xs text-[#8d98aa]">قبل از ساخت، اطلاعات را بررسی کنید.</p></div></div>
               <div className="divide-y divide-[#eef1f5] rounded-xl border border-[#e5eaf2] px-4">
                 {[
-                  ['نوع رویداد', selectedKind.title],
+                  ['نوع اتاق', 'کلاس آموزشی'],
                   ['عنوان', title || '—'],
                   ['شناسه لینک', slug || '—'],
                   ['ظرفیت', `${maxParticipants} نفر`],
@@ -322,7 +301,7 @@ export default function CreateEventPage() {
               </div>
               <div className="mt-5 rounded-2xl border border-[#e5eaf2] bg-white p-4 sm:p-5">
                 <div className="mb-4 flex items-center justify-between gap-3">
-                  <div><h3 className="text-sm font-bold text-[#101827]">خلاصه امکانات و تنظیمات</h3><p className="mt-1 text-xs text-[#8d98aa]">وضعیتی که برای این رویداد انتخاب کرده‌اید</p></div>
+                  <div><h3 className="text-sm font-bold text-[#101827]">خلاصه امکانات و تنظیمات</h3><p className="mt-1 text-xs text-[#8d98aa]">وضعیتی که برای این کلاس انتخاب کرده‌اید</p></div>
                   <span className="rounded-full bg-[#edf2ff] px-3 py-1 text-[11px] font-semibold text-[#4f7cff]">مرحله ۳</span>
                 </div>
                 {!configureFeatures ? (
@@ -351,7 +330,7 @@ export default function CreateEventPage() {
                   </div>
                 )}
               </div>
-              <p className="mt-4 rounded-xl bg-[#f8faff] p-4 text-xs leading-6 text-[#68758a]"><CalendarDays className="ml-1 inline h-4 w-4 text-[#4f7cff]" /> پس از ساخت، لینک ورود رویداد در اختیار شما قرار می‌گیرد و می‌توانید آن را با شرکت‌کنندگان به اشتراک بگذارید.</p>
+              <p className="mt-4 rounded-xl bg-[#f8faff] p-4 text-xs leading-6 text-[#68758a]"><CalendarDays className="ml-1 inline h-4 w-4 text-[#4f7cff]" /> پس از ساخت، لینک ورود کلاس در اختیار شما قرار می‌گیرد و می‌توانید آن را با شرکت‌کنندگان به اشتراک بگذارید.</p>
             </section>
           )}
 
@@ -361,21 +340,18 @@ export default function CreateEventPage() {
               <Link to="/dashboard"><Button type="button" variant="ghost">انصراف</Button></Link>
             </div>
             {
-              step === 0 ?
-                  ''
-                      :
-              (step < 3 ) ? (
-              <Button type="button" size="lg" disabled={step === 2 && configureFeatures && featuresLoading} onClick={() => {
-                if (step === 1) {
-                  if (!title.trim()) { toast.error('عنوان رویداد الزامی است'); return }
+              (step < 2) ? (
+              <Button type="button" size="lg" disabled={step === 1 && configureFeatures && featuresLoading} onClick={() => {
+                if (step === 0) {
+                  if (!title.trim()) { toast.error('عنوان کلاس الزامی است'); return }
                   if (!slug.trim() || !/^[a-z0-9-]+$/.test(slug)) { toast.error('شناسه لینک معتبر نیست'); return }
                   if (Number(maxParticipants) < 2 || (participantLimit != null && Number(maxParticipants) > participantLimit)) { toast.error('ظرفیت از سقف مجاز پلن بیشتر است'); return }
                 }
-                if (step === 2 && configureFeatures && featuresError) { setConfigureFeatures(false) }
+                if (step === 1 && configureFeatures && featuresError) { setConfigureFeatures(false) }
                 setStep((current) => current + 1)
               }}>ادامه <ArrowLeft className="mr-1 h-4 w-4" /></Button>
             ) : (
-              <Button type="button" size="lg" loading={saving} disabled={saving} onClick={handleCreate}><Check className="ml-1 h-4 w-4" /> ساخت {selectedKind.title}</Button>
+              <Button type="button" size="lg" loading={saving} disabled={saving} onClick={handleCreate}><Check className="ml-1 h-4 w-4" /> ساخت کلاس</Button>
             )}
           </div>
         </Card>

@@ -7,9 +7,9 @@ import { useDialogFocus } from '../../hooks/useDialogFocus'
 import { primaryButtonClass, secondaryButtonClass } from '../../components/shared/PlanCard'
 
 const fa = (value) => Number(value || 0).toLocaleString('fa-IR')
-const focusRing = 'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#2c55d4]/35'
-const fieldClass = `min-h-11 w-full rounded-xl border-2 border-[#c3cee2] bg-white px-3 py-2 text-base text-[#101827] ${focusRing}`
-const iconButton = `inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-xl border-2 border-[#c3cee2] bg-white px-3 text-sm font-bold text-[#34415a] hover:bg-[#eef3ff] ${focusRing}`
+const focusRing = 'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#4f7cff]/35'
+const fieldClass = `min-h-11 w-full rounded-xl border border-[#e5eaf2] bg-white px-3 py-2 text-base text-[#101827] ${focusRing}`
+const iconButton = `inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-xl border border-[#e5eaf2] bg-white px-3 text-sm font-bold text-[#34415a] hover:bg-[#eef3ff] ${focusRing}`
 const PAGE_SIZE = 50
 const MAX_FILE_BYTES = 10 * 1024 * 1024
 
@@ -114,7 +114,7 @@ function ImportReport({ report, onManualAdd, onClose }) {
   ].sort((a, b) => a.row - b.row)
   const ok = problems.length === 0
   return (
-    <section aria-labelledby="import-report-title" className="mb-6 rounded-2xl border-2 border-[#d9e1ee] bg-white p-5 sm:p-6">
+    <section aria-labelledby="import-report-title" className="mb-6 rounded-2xl border border-[#e5eaf2] bg-white p-5 sm:p-6">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           {ok ? <CheckCircle2 aria-hidden="true" className="mt-1 shrink-0 text-[#0f7a5c]" /> : <AlertCircle aria-hidden="true" className="mt-1 shrink-0 text-[#7a4a05]" />}
@@ -132,10 +132,10 @@ function ImportReport({ report, onManualAdd, onClose }) {
       {!ok && (
         <>
           <p className="mt-4 text-sm leading-7 text-[#34415a]">
-            کدهای زیر ثبت نشدند. می‌توانید ایراد را در فایل اصلاح کنید یا همان افراد را <button type="button" onClick={onManualAdd} className={`font-bold text-[#2347b4] underline ${focusRing}`}>دستی وارد کنید</button>.
+            کدهای زیر ثبت نشدند. می‌توانید ایراد را در فایل اصلاح کنید یا همان افراد را <button type="button" onClick={onManualAdd} className={`font-bold text-[#3d66e8] underline ${focusRing}`}>دستی وارد کنید</button>.
             {report.truncated && ' (فقط بخشی از ردیف‌ها نمایش داده شده است.)'}
           </p>
-          <div className="mt-3 max-h-80 overflow-auto rounded-xl border-2 border-[#e5eaf2]">
+          <div className="mt-3 max-h-80 overflow-auto rounded-xl border border-[#e5eaf2]">
             <table className="w-full text-sm">
               <caption className="sr-only">فهرست ردیف‌های ثبت‌نشده</caption>
               <thead className="sticky top-0 bg-[#f3f6fc] text-start">
@@ -242,28 +242,31 @@ export default function PeoplePage() {
   return (
     <div className="meet-light-page min-h-full p-4 sm:p-6 lg:p-8" dir="rtl">
       <div className="mx-auto max-w-[1100px]">
-        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="mb-2 text-sm font-bold text-[#2347b4]">دفترچه‌ی حساب</p>
-            <h1 className="text-2xl font-extrabold sm:text-3xl">تعریف کاربران</h1>
-            <p className="mt-2 max-w-2xl text-base leading-8 text-[#46536b]">دانش‌آموزان، معلمان و کادر مدرسه را یک‌بار تعریف کنید و هنگام ساخت جلسه از همین فهرست انتخاب کنید.</p>
+        <header className="mb-5 rounded-[24px] border border-white/80 bg-white/85 p-5 shadow-[0_12px_36px_rgba(20,35,65,.045)] sm:p-7">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+            <div className="min-w-0">
+              <p className="mb-1 text-xs font-bold text-[#3d66e8]">دفترچه‌ی حساب</p>
+              <h1 className="text-xl font-extrabold text-[#101827] sm:text-2xl">تعریف کاربران</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-7 text-[#68758a]">افراد را یک‌بار ثبت کنید و هنگام ساخت جلسه از همین فهرست انتخاب کنید.</p>
+              {!isLoading && !isError && <p className="mt-3 inline-flex min-h-8 items-center rounded-full bg-[#edf2ff] px-3 text-xs font-bold text-[#3d66e8]">{fa(total)} کاربر در دفترچه</p>}
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+              <button type="button" onClick={() => setEditing({})} className={`${primaryButtonClass} col-span-2 sm:col-span-1 sm:w-auto`}><Plus size={18} aria-hidden="true" />افزودن کاربر</button>
+              <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading} className={`${secondaryButtonClass} sm:w-auto`}>
+                {uploading ? <Loader2 size={18} className="animate-spin" aria-hidden="true" /> : <Upload size={18} aria-hidden="true" />}
+                {uploading ? 'در حال خواندن…' : 'بارگذاری اکسل'}
+              </button>
+              <button type="button" onClick={downloadTemplate} className={`${secondaryButtonClass} col-span-2 sm:col-span-1 sm:w-auto`}><Download size={18} aria-hidden="true" />دانلود فایل نمونه</button>
+              <input ref={fileInput} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={onFile} className="sr-only" tabIndex={-1} aria-label="انتخاب فایل اکسل" />
+            </div>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            <button type="button" onClick={() => setEditing({})} className={`${primaryButtonClass} sm:w-auto`}><Plus size={18} aria-hidden="true" />افزودن کاربر</button>
-            <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading} className={`${secondaryButtonClass} sm:w-auto`}>
-              {uploading ? <Loader2 size={18} className="animate-spin" aria-hidden="true" /> : <Upload size={18} aria-hidden="true" />}
-              {uploading ? 'در حال خواندن فایل…' : 'بارگذاری اکسل'}
-            </button>
-            <button type="button" onClick={downloadTemplate} className={`${secondaryButtonClass} sm:w-auto`}><Download size={18} aria-hidden="true" />دانلود فایل نمونه</button>
-            <input ref={fileInput} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={onFile} className="sr-only" tabIndex={-1} aria-label="انتخاب فایل اکسل" />
-          </div>
-        </div>
+        </header>
 
         {report && <ImportReport report={report} onClose={() => setReport(null)} onManualAdd={() => setEditing({})} />}
 
         {empty ? (
-          <div className="rounded-2xl border-2 border-dashed border-[#c3cee2] bg-white p-8 text-center sm:p-12">
-            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e6edff] text-[#2347b4]"><Users aria-hidden="true" /></span>
+          <div className="rounded-2xl border-2 border-dashed border-[#e5eaf2] bg-white p-8 text-center sm:p-12">
+            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#edf2ff] text-[#3d66e8]"><Users aria-hidden="true" /></span>
             <h2 className="mt-4 text-lg font-extrabold">هنوز کاربری تعریف نکرده‌اید</h2>
             <p className="mx-auto mt-2 max-w-md text-sm leading-7 text-[#46536b]">می‌توانید هر نفر را با فرم اضافه کنید، یا فایل نمونه‌ی اکسل را دانلود، پر و بارگذاری کنید.</p>
             <div className="mt-5 flex flex-col justify-center gap-3 sm:flex-row">
@@ -272,7 +275,7 @@ export default function PeoplePage() {
             </div>
           </div>
         ) : (
-          <section aria-label="فهرست کاربران" className="overflow-hidden rounded-2xl border-2 border-[#d9e1ee] bg-white">
+          <section aria-label="فهرست کاربران" className="overflow-hidden rounded-[22px] border border-[#e5eaf2] bg-white shadow-[0_8px_24px_rgba(20,35,65,.035)]">
             <div className="grid gap-3 border-b-2 border-[#e5eaf2] p-4 sm:grid-cols-[1fr_220px]">
               <div>
                 <label htmlFor="people-search" className="sr-only">جستجو در نام یا کد ملی</label>
@@ -295,7 +298,7 @@ export default function PeoplePage() {
             </p>
 
             {isLoading ? (
-              <div role="status" className="flex justify-center py-16"><Loader2 className="animate-spin text-[#2c55d4]" aria-hidden="true" /><span className="sr-only">در حال دریافت فهرست</span></div>
+              <div role="status" className="flex justify-center py-16"><Loader2 className="animate-spin text-[#4f7cff]" aria-hidden="true" /><span className="sr-only">در حال دریافت فهرست</span></div>
             ) : isError ? (
               <div role="alert" className="p-6">
                 <p className="font-bold">دریافت فهرست ممکن نشد.</p>
@@ -306,12 +309,12 @@ export default function PeoplePage() {
             ) : (
               <ul className="divide-y divide-[#eef1f5]">
                 {people.map((p) => (
-                  <li key={p.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <li key={p.id} className="flex flex-col gap-3 p-4 transition-colors hover:bg-[#fbfcff] sm:flex-row sm:items-center sm:justify-between sm:px-5">
                     <div className="min-w-0">
                       <p className="text-base font-extrabold">{p.full_name}</p>
                       <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[#46536b]">
                         <span><span className="sr-only">کد ملی: </span><span dir="ltr">{p.national_id}</span></span>
-                        <span className="rounded-full bg-[#e6edff] px-3 py-0.5 text-[13px] font-bold text-[#1f3f9c]"><span className="sr-only">سمت: </span>{p.role_label}</span>
+                        <span className="rounded-full bg-[#edf2ff] px-3 py-0.5 text-[13px] font-bold text-[#3d66e8]"><span className="sr-only">سمت: </span>{p.role_label}</span>
                       </p>
                     </div>
                     <div className="flex gap-2">

@@ -19,10 +19,10 @@ export const formatLimitValue = (limit) => {
   return limit.unit === 'mb' ? `${fa(limit.value)} مگابایت` : fa(limit.value)
 }
 
-const focusRing = 'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#2c55d4]/35'
+const focusRing = 'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#4f7cff]/35'
 
-export const primaryButtonClass = `inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#2c55d4] px-4 py-3 text-sm font-bold text-white hover:bg-[#2347b4] disabled:cursor-not-allowed disabled:opacity-60 ${focusRing}`
-export const secondaryButtonClass = `inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border-2 border-[#2c55d4] bg-white px-4 py-3 text-sm font-bold text-[#2347b4] hover:bg-[#eef3ff] disabled:cursor-not-allowed disabled:opacity-60 ${focusRing}`
+export const primaryButtonClass = `inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#4f7cff] px-4 py-3 text-sm font-bold text-white hover:bg-[#3d66e8] disabled:cursor-not-allowed disabled:opacity-60 ${focusRing}`
+export const secondaryButtonClass = `inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border-2 border-[#4f7cff] bg-white px-4 py-3 text-sm font-bold text-[#3d66e8] hover:bg-[#eef3ff] disabled:cursor-not-allowed disabled:opacity-60 ${focusRing}`
 
 function LimitList({ limits, usage = {} }) {
   if (!limits?.length) return null
@@ -53,7 +53,7 @@ function LimitList({ limits, usage = {} }) {
                     aria-valuetext={`${fa(used.used)} از ${fa(used.value)}`}
                     className="h-2 overflow-hidden rounded-full bg-[#dfe6f3]"
                   >
-                    <div className={`h-full rounded-full ${percent >= 100 ? 'bg-[#b42335]' : 'bg-[#2c55d4]'}`} style={{ width: `${percent}%` }} />
+                    <div className={`h-full rounded-full ${percent >= 100 ? 'bg-[#b42335]' : 'bg-[#4f7cff]'}`} style={{ width: `${percent}%` }} />
                   </div>
                 )}
                 <p className="mt-1.5 text-[13px] leading-5 text-[#46536b]">
@@ -116,10 +116,10 @@ export function PlanCard({ plan, onSelect, selected = false }) {
   return (
     <article
       aria-labelledby={`${uid}-title`}
-      className={`flex h-full flex-col rounded-2xl border-2 bg-white p-5 sm:p-6 ${selected ? 'border-[#2c55d4] shadow-[0_0_0_4px_rgba(44,85,212,.14)]' : 'border-[#d9e1ee]'}`}
+      className={`flex h-full flex-col rounded-2xl border-2 bg-white p-5 sm:p-6 ${selected ? 'border-[#4f7cff] shadow-[0_0_0_4px_rgba(44,85,212,.14)]' : 'border-[#e5eaf2]'}`}
     >
       <header>
-        <p className="text-[13px] font-bold text-[#2347b4]">{customTitle || plan.plan_type?.name || 'پلن'}</p>
+        <p className="text-[13px] font-bold text-[#3d66e8]">{customTitle || plan.plan_type?.name || 'پلن'}</p>
         <h3 id={`${uid}-title`} className="mt-1 text-xl font-extrabold leading-8 text-[#101827]">{plan.name}</h3>
         {plan.description && <p className="mt-2 text-sm leading-7 text-[#46536b]">{plan.description}</p>}
       </header>
@@ -201,13 +201,13 @@ export function SubscriptionPlanCard({ subscription, reserved = false, usage = {
   const features = effectiveFeatures(subscription)
   const date = (iso) => (iso ? formatIsoJalali(iso) : '—')
   return (
-    <article aria-labelledby={`${uid}-title`} className="rounded-2xl border-2 border-[#d9e1ee] bg-white p-5 sm:p-6">
+    <article aria-labelledby={`${uid}-title`} className="rounded-2xl border border-[#e5eaf2] bg-white p-5 sm:p-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-[13px] font-bold text-[#2347b4]">{customTitle || plan.plan_type?.name || 'پلن'}</p>
+          <p className="text-[13px] font-bold text-[#3d66e8]">{customTitle || plan.plan_type?.name || 'پلن'}</p>
           <h3 id={`${uid}-title`} className="mt-1 text-xl font-extrabold leading-8 text-[#101827]">{customTitle || plan.name || 'پلن'}</h3>
         </div>
-        <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-bold ${reserved ? 'bg-[#e6edff] text-[#1f3f9c]' : 'bg-[#dcf6ec] text-[#0b5f47]'}`}>
+        <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-bold ${reserved ? 'bg-[#edf2ff] text-[#3d66e8]' : 'bg-[#dcf6ec] text-[#0b5f47]'}`}>
           {reserved ? <CalendarClock size={16} aria-hidden="true" /> : <CheckCircle2 size={16} aria-hidden="true" />}
           {reserved ? 'رزروشده · شروع در آینده' : 'فعال'}
         </span>

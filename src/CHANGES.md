@@ -155,3 +155,12 @@
 | `features/whiteboard/whiteboard.css` | استایل‌های پاپ‌آور و نوار متن؛ نسخه موبایل فشرده |
 | جدید: `components/HandRaiseAlert.jsx`، `components/MobileClassSheets.jsx`، `hooks/useForcedLandscape.js`، `hooks/useHandRaiseAlerts.js`، `hooks/useKeyboardInset.js` | — |
 | حذف‌شده: `components/DraggablePip.jsx`، `components/MobileChatSheet.jsx`، `pages/room/classroom-stage.css` | جایگزین شدند (CSS مرده و ساختار شناور حذف شد) |
+
+
+## اصلاحات داشبورد، اشتراک و امکانات ساخت اتاق — 2026-11-08
+
+- `pages/dashboard/DashboardPage.jsx`: کارت یکپارچه وضعیت پلن با حالت فعال/رزروشده، شمارش روزهای باقی‌مانده و نوار مصرف کاربران و تصاویر؛ اعداد فقط از داده‌های API خوانده می‌شوند و در نبود داده، مقدار نامشخص نمایش داده می‌شود.
+- `pages/dashboard/SubscriptionPage.jsx`: اضافه‌شدن خلاصه وضعیت اشتراک، اعتبار باقی‌مانده و تعداد سفارش/رزرو؛ در صورت وجود پلن رزروشده و نبود سفارش قابل نمایش، تب رزروها به‌صورت پیش‌فرض انتخاب می‌شود.
+- `pages/event/CreateEventPage.jsx`: نمایش محدود به پنج قابلیت آموزشی موردنیاز (تخته تعاملی، اشتراک فایل، کنترل میکروفون/دوربین، بلندکردن دست و حضور و غیاب)، پشتیبانی از پاسخ مستقیم آرایه‌ای یا پاسخ دارای کلید `features` و انتخاب پیش‌فرض کلاس در صورت مجاز بودن آن. وضعیت فعال‌بودن قابلیت از `enabled` و `configured_enabled` خوانده می‌شود و محدودیت پلن همچنان رعایت می‌شود.
+
+Build نهایی در این محیط اجرا نشد؛ وابستگی‌های npm در بسته موجود نبودند. فایل `.env` نیز عمداً از خروجی حذف شده و باید از نسخه فعلی پروژه حفظ شود.

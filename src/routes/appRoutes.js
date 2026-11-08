@@ -9,6 +9,8 @@ export const appRoutes = {
   dashboard: {
     indexPage: '/dashboard',
     createEvent: '/dashboard/create',
+    rooms: '/dashboard/rooms',
+    pricing: '/dashboard/pricing',
     editEvent: '/dashboard/edit/:slug',
     settings: '/dashboard/settings',
     subscription: '/dashboard/subscription',
