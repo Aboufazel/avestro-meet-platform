@@ -22,7 +22,11 @@ const FEATURE_META = {
 }
 
 const FEATURE_ORDER = ['whiteboard', 'documents', 'speak_permission', 'raise_hand', 'attendance']
-const STEPS = ['اطلاعات اصلی', 'امکانات کلاس', 'بازبینی']
+const ROOM_KIND_META = {
+  meeting: { title: 'وبینار / جلسه آنلاین', heading: 'اطلاعات جلسه آنلاین', shortTitle: 'جلسه آنلاین', description: 'اطلاعات جلسه آنلاین و امکانات موردنیاز را تنظیم کنید.' },
+  class: { title: 'کلاس آموزشی', heading: 'اطلاعات کلاس آموزشی', shortTitle: 'کلاس آموزشی', description: 'اطلاعات کلاس و امکانات آموزشی را تنظیم کنید.' },
+}
+const STEPS = ['اطلاعات اصلی', 'امکانات رویداد', 'بازبینی']
 
 function slugify(value) {
   return value.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]/g, '').replace(/--+/g, '-')
@@ -32,8 +36,7 @@ export default function CreateEventPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [step, setStep] = useState(0)
-  // نوع اتاق در این جریان ثابت است؛ انتخاب نوع رویداد دیگر مرحله‌ای از فرم نیست.
-  const kind = 'class'
+  const [selectedKind, setSelectedKind] = useState('')
   const [saving, setSaving] = useState(false)
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
@@ -48,6 +51,36 @@ export default function CreateEventPage() {
     queryFn: () => paymentsService.me().then((response) => response.data),
   })
   const activeSubscription = subscriptionInfo?.active
+  // نوع رویداد فقط از Snapshot اشتراک فعال خوانده می‌شود؛ plan_kind صرفاً fallback
+  // برای پاسخ‌هایی است که هنوز room_kinds_snapshot را در API ارائه نمی‌کنند.
+  const allowedRoomKinds = useMemo(() => {
+    const snapshotKinds = activeSubscription?.room_kinds_snapshot
+    if (Array.isArray(snapshotKinds) && snapshotKinds.length) {
+      return [...new Set(snapshotKinds.filter((value) => typeof value === 'string' && value.trim()))]
+    }
+
+    const planKind = activeSubscription?.custom_plan_snapshot?.plan_kind
+    if (planKind === 'webinar') return ['meeting']
+    if (planKind === 'class') return ['class']
+    return []
+  }, [activeSubscription])
+
+  const kind = allowedRoomKinds.includes(selectedKind)
+    ? selectedKind
+    : (allowedRoomKinds[0] || '')
+  const kindMeta = ROOM_KIND_META[kind] || {
+    title: kind || 'رویداد',
+    heading: 'اطلاعات رویداد',
+    shortTitle: 'رویداد',
+    description: 'اطلاعات رویداد و امکانات موردنیاز را تنظیم کنید.',
+  }
+
+  useEffect(() => {
+    setSelectedKind((current) => (
+      allowedRoomKinds.includes(current) ? current : (allowedRoomKinds[0] || '')
+    ))
+  }, [allowedRoomKinds])
+
   // بودجه‌ی پلن: سقف هر اتاق = باقی‌مانده‌ی کاربر/تصویر پلن (مجموع اتاق‌ها از پلن بیشتر نمی‌شود). null = نامحدود.
   const budget = readRoomBudget(subscriptionInfo)
   const participantLimit = budget.usersRemaining
@@ -110,7 +143,7 @@ export default function CreateEventPage() {
   }
 
   async function handleCreate() {
-    if (!title.trim()) { toast.error('عنوان کلاس را وارد کنید'); setStep(0); return }
+    if (!title.trim()) { toast.error(`عنوان ${kindMeta.shortTitle} را وارد کنید`); setStep(0); return }
     if (!slug.trim() || !/^[a-z0-9-]+$/.test(slug)) { toast.error('شناسه لینک معتبر نیست'); setStep(0); return }
     const capacity = Number(maxParticipants)
     if (!Number.isInteger(capacity) || capacity < 2 || (participantLimit != null && capacity > participantLimit)) { toast.error(participantLimit != null ? `ظرفیت باید بین ۲ تا ${faNumber(participantLimit)} نفر باشد (باقی‌مانده‌ی پلن)` : 'ظرفیت باید حداقل ۲ نفر باشد'); setStep(0); return }
@@ -118,6 +151,10 @@ export default function CreateEventPage() {
     const imageAllocation = Number(allocatedVideoStreams)
     if (!Number.isInteger(imageAllocation) || imageAllocation < 1 || (imageLimit != null && imageAllocation > imageLimit)) { toast.error(imageLimit != null ? `سهم تصاویر باید بین ۱ تا ${faNumber(imageLimit)} باشد (باقی‌مانده‌ی پلن)` : 'سهم تصاویر باید حداقل ۱ باشد'); setStep(0); return }
     if (!allowGuests && invitedPeople.length === 0) { toast.error('با غیرفعال‌بودن ورود مهمان، حداقل یک نفر را برای جلسه انتخاب کنید'); setStep(0); return }
+    if (!kind || !allowedRoomKinds.includes(kind)) {
+      toast.error('نوع رویداد در پلن فعال شما مشخص نیست')
+      return
+    }
 
     setSaving(true)
     try {
@@ -140,7 +177,7 @@ export default function CreateEventPage() {
       const room = response.data
 
       await queryClient.invalidateQueries({ queryKey: ['rooms'] })
-      toast.success('اتاق و تنظیمات اختصاصی آن با موفقیت ذخیره شد')
+      toast.success(`${kindMeta.shortTitle} و تنظیمات آن با موفقیت ساخته شد`)
       await queryClient.invalidateQueries({ queryKey: ['my-subscription'] })
       navigate(`/join/${room.slug}`)
     } catch (error) {
@@ -153,10 +190,9 @@ export default function CreateEventPage() {
     }
   }
 
-  const selectedKind = { title: 'کلاس آموزشی', text: 'اطلاعات کلاس و امکانات آموزشی را تنظیم کنید' }
-
   if (subscriptionLoading) return <div className="min-h-full p-6 flex justify-center items-center"><Card className="!p-10 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-[#4f7cff]"/><p className="mt-3 text-sm text-[#68758a]">در حال بررسی اشتراک شما…</p></Card></div>
-  if (!activeSubscription) return <div className="min-h-full p-4 sm:p-8 flex items-center justify-center"><Card className="!p-6 sm:!p-10 max-w-lg text-center"><ShieldCheck className="mx-auto h-10 w-10 text-[#4f7cff]"/><h1 className="mt-4 text-xl font-bold text-[#101827]">برای ساخت جلسه به اشتراک فعال نیاز دارید</h1><p className="mt-2 text-sm leading-7 text-[#68758a]">جلسات و لینک‌های قبلی شما باقی می‌مانند؛ برای ساخت کلاس جدید، ابتدا یک پلن انتخاب کنید.</p><Link to="/pricing" className="meet-primary-btn inline-flex mt-5 rounded-xl px-5 py-3 text-sm">مشاهده تعرفه‌ها</Link></Card></div>
+  if (!activeSubscription) return <div className="min-h-full p-4 sm:p-8 flex items-center justify-center"><Card className="!p-6 sm:!p-10 max-w-lg text-center"><ShieldCheck className="mx-auto h-10 w-10 text-[#4f7cff]"/><h1 className="mt-4 text-xl font-bold text-[#101827]">برای ساخت جلسه به اشتراک فعال نیاز دارید</h1><p className="mt-2 text-sm leading-7 text-[#68758a]">جلسات و لینک‌های قبلی شما باقی می‌مانند؛ برای ساخت رویداد جدید، ابتدا یک پلن انتخاب کنید.</p><Link to="/pricing" className="meet-primary-btn inline-flex mt-5 rounded-xl px-5 py-3 text-sm">مشاهده تعرفه‌ها</Link></Card></div>
+  if (!kind) return <div className="min-h-full p-4 sm:p-8 flex items-center justify-center"><Card className="!p-6 sm:!p-10 max-w-lg text-center"><ShieldCheck className="mx-auto h-10 w-10 text-[#4f7cff]"/><h1 className="mt-4 text-xl font-bold text-[#101827]">نوع رویدادی برای پلن شما تعریف نشده است</h1><p className="mt-2 text-sm leading-7 text-[#68758a]">اطلاعات نوع رویداد در اشتراک فعال دریافت نشد. لطفاً تنظیمات پلن را بررسی کنید یا با پشتیبانی تماس بگیرید.</p></Card></div>
 
 
   return (
@@ -167,8 +203,8 @@ export default function CreateEventPage() {
             <ArrowRight className="h-5 w-5" />
           </Link>
           <div>
-            <h1 className="text-lg font-bold text-[#101827]">ساخت کلاس جدید</h1>
-            <p className="mt-1 text-sm text-[#8d98aa]">اطلاعات کلاس را وارد کنید و امکانات موردنیاز را تنظیم کنید.</p>
+            <h1 className="text-lg font-bold text-[#101827]">ساخت {kindMeta.shortTitle} جدید</h1>
+            <p className="mt-1 text-sm text-[#8d98aa]">{kindMeta.description}</p>
           </div>
         </div>
 
@@ -191,12 +227,26 @@ export default function CreateEventPage() {
           {step === 0 && (
             <section className="space-y-5">
               <div className="mb-2 flex items-center gap-3">
-                <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${kind === 'class' ? 'bg-[#edf2ff] text-[#4f7cff]' : 'bg-[#e8faf4] text-[#2eaf89]'}`}><GraduationCap className="h-5 w-5" /></span>
-                <div><h2 className="font-bold text-[#101827]">اطلاعات کلاس آموزشی</h2><p className="mt-1 text-xs text-[#8d98aa]">{selectedKind.text}</p></div>
+                <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${kind === 'class' ? 'bg-[#edf2ff] text-[#4f7cff]' : 'bg-[#e8faf4] text-[#2eaf89]'}`}>{kind === 'class' ? <GraduationCap className="h-5 w-5" /> : <Users className="h-5 w-5" />}</span>
+                <div><h2 className="font-bold text-[#101827]">{kindMeta.heading}</h2><p className="mt-1 text-xs text-[#8d98aa]">{kindMeta.description}</p></div>
               </div>
-              <Input label="عنوان کلاس" placeholder='مثلاً آموزش طراحی رابط کاربری' value={title} onChange={(event) => { setTitle(event.target.value); if (!slugTouched) setSlug(slugify(event.target.value)) }} className="meet-auth-input" />
+              {allowedRoomKinds.length > 1 && (
+                <div className="rounded-xl border border-[#e5eaf2] bg-[#f8faff] p-4">
+                  <p className="mb-3 text-sm font-semibold text-[#536074]">نوع رویداد مجاز در پلن فعال</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {allowedRoomKinds.map((roomKind) => (
+                      <button key={roomKind} type="button" aria-pressed={kind === roomKind}
+                        onClick={() => setSelectedKind(roomKind)}
+                        className={`min-h-11 rounded-xl border px-3 py-2 text-sm font-semibold transition ${kind === roomKind ? 'border-[#4f7cff] bg-[#edf2ff] text-[#315bd5]' : 'border-[#e1e6ef] bg-white text-[#536074]'}`}>
+                        {ROOM_KIND_META[roomKind]?.title || roomKind}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <Input label={`عنوان ${kindMeta.shortTitle}`} placeholder={kind === 'class' ? 'مثلاً آموزش طراحی رابط کاربری' : 'مثلاً وبینار معرفی محصول'} value={title} onChange={(event) => { setTitle(event.target.value); if (!slugTouched) setSlug(slugify(event.target.value)) }} className="meet-auth-input" />
               <div>
-                <Input label="شناسه کلاس (لینک)" placeholder="project-management" value={slug} onChange={(event) => { setSlugTouched(true); setSlug(slugify(event.target.value)) }} className="meet-auth-input" />
+                <Input label={`شناسه ${kindMeta.shortTitle} (لینک)`} placeholder="project-management" value={slug} onChange={(event) => { setSlugTouched(true); setSlug(slugify(event.target.value)) }} className="meet-auth-input" />
                 <p className="mt-1.5 text-xs text-[#8d98aa]">لینک ورود: meet.avestro.ir/join/{slug || 'your-event'}</p>
               </div>
               {kind === 'class' && (
@@ -225,7 +275,7 @@ export default function CreateEventPage() {
               </div>
               <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#e5eaf2] bg-[#f8faff] p-4">
                 <input type="checkbox" checked={isPrivate} onChange={(event) => setIsPrivate(event.target.checked)} className="h-4 w-4 accent-[#4f7cff]" />
-                <span className="text-sm text-[#536074]">کلاس خصوصی <span className="text-xs text-[#9aa4b4]">(فقط با لینک مستقیم)</span></span>
+                <span className="text-sm text-[#536074]">{kindMeta.shortTitle} خصوصی <span className="text-xs text-[#9aa4b4]">(فقط با لینک مستقیم)</span></span>
               </label>
               <RoomAccessSettings allowGuests={allowGuests} onAllowGuests={setAllowGuests} selected={invitedPeople} onSelected={setInvitedPeople} />
             </section>
@@ -235,7 +285,7 @@ export default function CreateEventPage() {
             <section>
               <div className="mb-5 flex items-center gap-3">
                 <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#edf2ff] text-[#4f7cff]"><Settings2 className="h-5 w-5" /></span>
-                <div><h2 className="font-bold text-[#101827]">امکانات و تنظیمات کلاس</h2><p className="mt-1 text-xs text-[#8d98aa]">فقط پنج قابلیت آموزشی مرتبط نمایش داده شده‌اند. وضعیت هر قابلیت مطابق پاسخ سرویس و پلن حساب شماست.</p></div>
+                <div><h2 className="font-bold text-[#101827]">امکانات و تنظیمات {kindMeta.shortTitle}</h2><p className="mt-1 text-xs text-[#8d98aa]">قابلیت‌های قابل تنظیم این رویداد نمایش داده شده‌اند. وضعیت هر قابلیت مطابق پاسخ سرویس و پلن حساب شماست.</p></div>
               </div>
               <label className="mb-5 flex cursor-pointer items-start gap-3 rounded-xl border border-[#dfe7f5] bg-[#f8faff] p-4">
                 <input type="checkbox" checked={configureFeatures} onChange={(event) => setConfigureFeatures(event.target.checked)} className="mt-1 h-4 w-4 accent-[#4f7cff]" />
@@ -298,7 +348,7 @@ export default function CreateEventPage() {
               <div className="mb-5 flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#e8faf4] text-[#2eaf89]"><ShieldCheck className="h-5 w-5" /></span><div><h2 className="font-bold text-[#101827]">بازبینی و ساخت کلاس</h2><p className="mt-1 text-xs text-[#8d98aa]">قبل از ساخت، اطلاعات را بررسی کنید.</p></div></div>
               <div className="divide-y divide-[#eef1f5] rounded-xl border border-[#e5eaf2] px-4">
                 {[
-                  ['نوع اتاق', 'کلاس آموزشی'],
+                  ['نوع رویداد', kindMeta.title],
                   ['عنوان', title || '—'],
                   ['شناسه لینک', slug || '—'],
                   ['ظرفیت', `${maxParticipants} نفر`],
@@ -310,7 +360,7 @@ export default function CreateEventPage() {
               </div>
               <div className="mt-5 rounded-2xl border border-[#e5eaf2] bg-white p-4 sm:p-5">
                 <div className="mb-4 flex items-center justify-between gap-3">
-                  <div><h3 className="text-sm font-bold text-[#101827]">خلاصه امکانات و تنظیمات</h3><p className="mt-1 text-xs text-[#8d98aa]">وضعیتی که برای این کلاس انتخاب کرده‌اید</p></div>
+                  <div><h3 className="text-sm font-bold text-[#101827]">خلاصه امکانات و تنظیمات</h3><p className="mt-1 text-xs text-[#8d98aa]">وضعیتی که برای این رویداد انتخاب کرده‌اید</p></div>
                   <span className="rounded-full bg-[#edf2ff] px-3 py-1 text-[11px] font-semibold text-[#4f7cff]">مرحله ۳</span>
                 </div>
                 {!configureFeatures ? (
@@ -339,7 +389,7 @@ export default function CreateEventPage() {
                   </div>
                 )}
               </div>
-              <p className="mt-4 rounded-xl bg-[#f8faff] p-4 text-xs leading-6 text-[#68758a]"><CalendarDays className="ml-1 inline h-4 w-4 text-[#4f7cff]" /> پس از ساخت، لینک ورود کلاس در اختیار شما قرار می‌گیرد و می‌توانید آن را با شرکت‌کنندگان به اشتراک بگذارید.</p>
+              <p className="mt-4 rounded-xl bg-[#f8faff] p-4 text-xs leading-6 text-[#68758a]"><CalendarDays className="ml-1 inline h-4 w-4 text-[#4f7cff]" /> پس از ساخت، لینک ورود رویداد در اختیار شما قرار می‌گیرد و می‌توانید آن را با شرکت‌کنندگان به اشتراک بگذارید.</p>
             </section>
           )}
 
@@ -352,7 +402,7 @@ export default function CreateEventPage() {
               (step < 2) ? (
               <Button type="button" size="lg" disabled={step === 1 && configureFeatures && featuresLoading} onClick={() => {
                 if (step === 0) {
-                  if (!title.trim()) { toast.error('عنوان کلاس الزامی است'); return }
+                  if (!title.trim()) { toast.error(`عنوان ${kindMeta.shortTitle} الزامی است`); return }
                   if (!slug.trim() || !/^[a-z0-9-]+$/.test(slug)) { toast.error('شناسه لینک معتبر نیست'); return }
                   if (budgetExhausted) { toast.error('سهم کاربران یا تصاویر پلن تمام شده است'); return }
                   if (Number(maxParticipants) < 2 || (participantLimit != null && Number(maxParticipants) > participantLimit)) { toast.error('ظرفیت از باقی‌مانده‌ی پلن بیشتر است'); return }
@@ -362,7 +412,7 @@ export default function CreateEventPage() {
                 setStep((current) => current + 1)
               }}>ادامه <ArrowLeft className="mr-1 h-4 w-4" /></Button>
             ) : (
-              <Button type="button" size="lg" loading={saving} disabled={saving} onClick={handleCreate}><Check className="ml-1 h-4 w-4" /> ساخت کلاس</Button>
+              <Button type="button" size="lg" loading={saving} disabled={saving} onClick={handleCreate}><Check className="ml-1 h-4 w-4" /> ساخت {kindMeta.shortTitle}</Button>
             )}
           </div>
         </Card>

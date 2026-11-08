@@ -130,8 +130,7 @@ export default function CustomPlanBuilder() {
             <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div><span
                     className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-bold"><Check
-                    size={14}/> پلن‌ساز اختصاصی</span>
-                    <h2 className="mt-4 text-2xl font-black sm:text-3xl">ظرفیت موردنیازت را خودت بساز</h2>
+                    size={14}/> ساخت پلن اختصاصی</span>
                     <p className="mt-2 max-w-2xl text-sm leading-7 text-[#d3ddf5]">تعداد کاربران و تصاویر را مشخص کن؛
                         قیمت و جزئیات پلن به‌صورت لحظه‌ای محاسبه می‌شود.</p>
                 </div>
@@ -144,7 +143,7 @@ export default function CustomPlanBuilder() {
         <div className="grid gap-6 p-4 sm:p-7 lg:grid-cols-[1fr_340px]">
             <div className="space-y-6">
                 <div>
-                    <p className="mb-3 text-sm font-extrabold">نوع پلن را انتخاب کن</p>
+                    <p className="mb-3 text-md font-extrabold">۱- نوع پلن را انتخاب کن</p>
                     <div className="grid grid-cols-2 gap-3">
                         {[{
                             id: 'webinar',
@@ -182,13 +181,15 @@ export default function CustomPlanBuilder() {
                         </button>
                     </div>
                     {institutionKind === 'government' &&
-                        <p className="mt-3 rounded-xl bg-[#fff8e8] p-3 text-xs leading-6 text-[#77551b]">تخفیف مدارس
-                            دولتی در محاسبه لحاظ می‌شود. پس از خرید، یادآوری بارگذاری مدارک در داشبورد نمایش داده خواهد
-                            شد.</p>}
+                        <p className="mt-3 rounded-xl bg-[#fff8e8] p-3 text-xs leading-6 text-[#77551b]">
+                            در صورت انتخاب این گزینه تخفیف مدارس
+                            دولتی در محاسبه لحاظ می‌شود. پس از خرید، نیاز است که مدارک در اسرع وقت در کارتابل شما بارگزاری شود
+                        </p>
+                    }
                 </div>}
 
                 <div>
-                    <p className="mb-3 text-sm font-extrabold">ظرفیت پلن</p>
+                    <p className="mb-3 text-md font-extrabold">۲- ظرفیت پلن</p>
                     <div className="grid gap-3 sm:grid-cols-2">
                         <Stepper label="تعداد کاربران" value={users} max={config.max_users}
                                  stepUntil100={config.step_until_100} stepOver100={config.step_over_100}
@@ -204,7 +205,7 @@ export default function CustomPlanBuilder() {
                 </div>
 
                 <div>
-                    <p className="mb-3 text-sm font-extrabold">مدت اعتبار پلن</p>
+                    <p className="mb-3 text-md font-extrabold">۳- بازه اشتراک</p>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                         {durations.map((item) => <button key={item.id} type="button"
                                                          onClick={() => changeDuration(item.id)}
@@ -220,7 +221,7 @@ export default function CustomPlanBuilder() {
                 </div>
 
                 <div className="rounded-2xl border border-[#dce4f1] p-4">
-                    <p className="mb-3 text-sm font-extrabold">کد تخفیف یا کد معرف</p>
+                    <p className="mb-3 text-md font-extrabold">کد تخفیف یا کد معرف</p>
                     <div className="grid gap-3 sm:grid-cols-2">
                         <label className="block text-xs font-bold text-[#46536b]">کد تخفیف
                             <input value={promoCode} onChange={(e) => {
@@ -242,7 +243,7 @@ export default function CustomPlanBuilder() {
                 </div>
 
                 <div className="rounded-2xl border border-[#dce4f1] p-4">
-                    <p className="mb-3 text-sm font-extrabold">زمان شروع پلن</p>
+                    <p className="mb-3 text-md font-extrabold">زمان شروع پلن</p>
                     <div className="grid grid-cols-2 gap-2">
                         <button type="button" onClick={() => setStartMode('now')} aria-pressed={startMode === 'now'}
                                 className={`min-h-11 rounded-xl border-2 px-3 text-sm font-bold ${ring} ${startMode === 'now' ? 'border-[#315bd5] bg-[#f1f5ff]' : 'border-[#e1e7f0]'}`}>شروع
@@ -289,15 +290,6 @@ export default function CustomPlanBuilder() {
                             {quote.government_discount_amount > 0 &&
                                 <div className="mb-3 flex justify-between text-sm text-[#176447]"><span>تخفیف مدارس دولتی ({fa(quote.government_discount_percent)}٪)</span><b>{money(quote.government_discount_amount)}</b>
                                 </div>}
-                            {/*<div className="mb-2 flex justify-between text-xs"><span className="text-[#68758a]">هزینه تصاویر ({fa(images)} تصویر)</span><b>{money(quote.breakdown?.raw_image_cost)}</b>*/}
-                            {/*</div>*/}
-                            {/*<div className="mb-2 flex justify-between text-xs"><span className="text-[#68758a]">هزینه میکروفون‌ها ({fa(quote.breakdown?.microphone_user_count)} کاربر)</span><b>{money(quote.breakdown?.raw_microphone_cost)}</b>*/}
-                            {/*</div>*/}
-                            {/*<div className="mb-2 flex justify-between text-xs font-bold"><span*/}
-                            {/*    className="text-[#46536b]">مجموع هزینه خام ظرفیت</span><b>{money(quote.breakdown?.raw_capacity_cost)}</b>*/}
-                            {/*</div>*/}
-                            {/*<div className="mb-2 flex justify-between text-xs"><span className="text-[#68758a]">افزایش پلکانی ({fa(quote.breakdown?.tier_percent)}٪)</span><b>{money(quote.breakdown?.tier_amount)}</b>*/}
-                            {/*</div>*/}
                             {quote.tax_enabled &&
                                 <div className="mb-3 flex justify-between text-xs"><span className="text-[#68758a]">مالیات ({fa(quote.tax_percent)}٪)</span><b>{money(quote.tax_amount)}</b>
                                 </div>}

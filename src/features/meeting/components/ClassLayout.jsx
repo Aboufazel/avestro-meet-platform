@@ -48,11 +48,23 @@ export const ClassLayout = memo(function ClassLayout({ board = null, contentMode
     }
   }, [participants, board])
 
-  const paused = typeof document !== 'undefined' && document.hidden && !isRecording
+  // hidden باید state باشد: قبلاً از document.hidden موقع رندر خوانده می‌شد و با
+  // تغییر دید تب رندری نمی‌آمد (pause اعمال نمی‌شد یا بعد از برگشت باقی می‌ماند).
+  const [pageHidden, setPageHidden] = useState(
+    typeof document !== 'undefined' ? document.hidden : false
+  )
   useEffect(() => {
+    const onVisibility = () => setPageHidden(document.hidden)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [])
+
+  const paused = pageHidden && !isRecording
+  useEffect(() => {
+    // قطع ویدیو با ۳ ثانیه تأخیر (جابه‌جایی کوتاه بین تب‌ها لگ نزند)؛ برگشت سریع.
     const timer = window.setTimeout(() => {
       jitsiController.setReceiverPriority({ onStageIds, visibleIds: [...allowed], paused })
-    }, 400)
+    }, paused ? 3000 : 400)
     return () => window.clearTimeout(timer)
   }, [onStageIds, allowed, paused])
 

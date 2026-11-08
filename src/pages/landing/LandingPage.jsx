@@ -19,8 +19,8 @@ const features = [
     },
     {
         icon: Globe,
-        title: 'کاملاً فارسی و RTL',
-        desc: 'رابط فارسی، تاریخ و اعداد شمسی و جزئیاتی که با کاربران فارسی‌زبان هماهنگ است.',
+        title: 'کاملاً پارسی',
+        desc: 'رابط پارسی، تاریخ و اعداد شمسی و جزئیاتی که با کاربران پارسی‌زبان هماهنگ است.',
         tone: 'blue'
     },
     {
@@ -31,8 +31,8 @@ const features = [
     },
     {
         icon: Calendar,
-        title: 'برنامه‌ریزی جلسات',
-        desc: 'جلسات آینده را منظم کنید و اطلاعات مهم را از همان داشبورد ببینید.',
+        title: 'جلسه زمان‌بندی شده',
+        desc: 'جلسات آینده را منظم کنید',
         tone: 'blue'
     },
     {
@@ -60,7 +60,7 @@ export default function LandingPage() {
 
                     <nav className="hidden md:flex items-center gap-7 text-sm text-[#68758a]">
                         <a href="#features" className="hover:text-[#101827] transition-colors">قابلیت‌ها</a>
-                        <a href="#security" className="hover:text-[#101827] transition-colors">امنیت</a>
+                        {/*<a href="#security" className="hover:text-[#101827] transition-colors">امنیت</a>*/}
                         <Link to="/pricing" className="hover:text-[#101827] transition-colors">ساخت پلن</Link>
                     </nav>
 
@@ -87,18 +87,19 @@ export default function LandingPage() {
                                     className="meet-kicker inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs mb-6">
                                     <span
                                         className="w-1.5 h-1.5 rounded-full bg-[#54d9b0] shadow-[0_0_0_4px_rgba(84,217,176,.12)]"/>
-                                    جلسات آنلاین، با تجربه‌ای حرفه‌ای
+                                    اَوسترو میت
                                 </div>
 
-                                <h1 className="text-[2.15rem] sm:text-5xl lg:text-[58px] leading-[1.2] font-bold tracking-tight text-[#101827]">
-                                    جلسه حرفه‌ای،
+                                <h1 className="text-[2.15rem] sm:text-5xl lg:text-[35px] leading-[1.5] font-bold tracking-tight text-[#101827]">
+                                    ارتباطی حرفه‌ای
                                     <br/>
-                                    <span className="meet-gradient-text">بدون پیچیدگی</span>
+                                    <span className="meet-gradient-text">
+                                        با مدرن‌ترین تکنولوژی‌های جهانی
+                                    </span>
                                 </h1>
 
                                 <p className="mt-4 sm:mt-6 text-sm sm:text-lg leading-7 sm:leading-8 text-[#68758a] max-w-xl">
-                                    اَوسترو میت برای برگزاری جلسه، وبینار و کلاس آنلاین ساخته شده؛
-                                    ساده برای شروع، قدرتمند برای مدیریت.
+                                    اَوسترو همراه امن و ماندگار شما
                                 </p>
 
                                 <div
@@ -133,7 +134,7 @@ export default function LandingPage() {
                                         className="flex items-center justify-between px-3 py-2.5 mb-3 rounded-2xl bg-white/[.045] border border-white/[.07]">
                                         <div className="flex items-center gap-2">
                                             <img src="/avestro-logo.png" className="w-7 h-7" alt=""/>
-                                            <span className="text-xs text-white/85">سمینار تستی</span>
+                                            <span className="text-xs text-white/85">جلسه مدیران</span>
                                         </div>
                                         <span className="inline-flex items-center gap-1.5 text-[10px] text-white/60">
                       <span className="w-1.5 h-1.5 rounded-full bg-[#54d9b0]"/> متصل
@@ -291,7 +292,7 @@ export default function LandingPage() {
                                     className="text-[10px] text-white/35 mt-1">AVESTRO MEET</p></div>
                             </div>
                             <p className="text-sm text-white/45 leading-7 max-w-md mt-5">پلتفرم حرفه‌ای برگزاری جلسات،
-                                وبینار و کلاس آنلاین با تجربه‌ای فارسی و مدرن.</p>
+                                وبینار و کلاس آنلاین با تجربه‌ای پارسی و مدرن.</p>
                         </div>
                         <div><p className="text-sm font-medium text-white/80 mb-4">محصول</p>
                             <div className="space-y-3 text-xs text-white/45"><a href="#features"
