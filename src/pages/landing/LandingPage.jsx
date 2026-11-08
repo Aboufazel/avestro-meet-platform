@@ -94,7 +94,7 @@ export default function LandingPage() {
                                     ارتباطی حرفه‌ای
                                     <br/>
                                     <span className="meet-gradient-text">
-                                        با مدرن‌ترین تکنولوژی‌های جهانی
+                                        با مدرن‌ترین تکنولوژی‌های جهان
                                     </span>
                                 </h1>
 
@@ -108,11 +108,11 @@ export default function LandingPage() {
                                           className="meet-primary-btn inline-flex justify-center items-center gap-2 rounded-xl px-5 py-3.5 text-sm sm:text-base font-medium">
                                         ساخت پلن اختصاصی <ArrowLeft className="w-5 h-5"/>
                                     </Link>
-                                    <a href="#product-preview"
-                                       className="meet-soft-btn inline-flex justify-center items-center gap-2 rounded-xl px-5 py-3.5 text-sm sm:text-base font-medium">
-                                        <Play className="w-4 h-4 text-[#4f7cff]"/>
-                                        مشاهده محصول
-                                    </a>
+                                    {/*<a href="#product-preview"*/}
+                                    {/*   className="meet-soft-btn inline-flex justify-center items-center gap-2 rounded-xl px-5 py-3.5 text-sm sm:text-base font-medium">*/}
+                                    {/*    <Play className="w-4 h-4 text-[#4f7cff]"/>*/}
+                                    {/*    مشاهده محصول*/}
+                                    {/*</a>*/}
                                 </div>
 
                                 <div
