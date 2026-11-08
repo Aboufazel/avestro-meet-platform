@@ -18,12 +18,11 @@ export default function PricingPage() {
     </header>
     <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
       <section className="mx-auto mb-8 max-w-3xl text-center sm:mb-10">
-        <p className="mb-3 inline-flex rounded-full bg-[#edf2ff] px-3.5 py-1.5 text-sm font-bold text-[#3d66e8]">تعرفه‌های اَوسترو میت</p>
+        {/*<p className="mb-3 inline-flex rounded-full bg-[#edf2ff] px-3.5 py-1.5 text-sm font-bold text-[#3d66e8]">تعرفه‌های اَوسترو میت</p>*/}
         <h1 className="text-2xl font-extrabold tracking-tight sm:text-4xl">پلن متناسب با شیوه برگزاری شما</h1>
         <p className="mt-3 text-sm leading-8 text-[#46536b]">ظرفیت موردنیاز را انتخاب کنید و جزئیات قیمت را پیش از پرداخت ببینید.</p>
       </section>
       <CustomPlanBuilder/>
-      <p className="mx-auto mt-6 flex max-w-4xl items-start gap-3 text-sm leading-7 text-[#46536b]"><span className="mt-1 shrink-0">●</span>قیمت نهایی در سمت سرور محاسبه می‌شود. پلن‌های قدیمی برای سوابق و اشتراک‌های قبلی حفظ شده‌اند و در مسیر فروش جدید نمایش داده نمی‌شوند.</p>
     </main>
   </div>
 }

@@ -11,6 +11,7 @@ import { JalaliDateTimePicker } from '../../components/ui/JalaliDateTimePicker'
 import { roomsService } from '../../services/rooms'
 import { paymentsService } from '../../services/payments'
 import { RoomAccessSettings } from '../../components/shared/RoomAccessSettings'
+import { readRoomBudget, budgetHint, faNumber } from '../../utils/roomBudget'
 
 const FEATURE_META = {
   whiteboard: { title: 'تخته تعاملی', hint: 'نوشتن و ترسیم هم‌زمان روی یک فضای مشترک', icon: PenTool },
@@ -47,14 +48,11 @@ export default function CreateEventPage() {
     queryFn: () => paymentsService.me().then((response) => response.data),
   })
   const activeSubscription = subscriptionInfo?.active
-  // سقف ظرفیت هر اتاق از محدودیت خود اتاق خوانده می‌شود، نه سهمیه‌ی باقیمانده‌ی حساب.
-  const participantLimit = subscriptionInfo?.limits?.max_participants?.value
-    ?? activeSubscription?.plan?.limits?.find((item) => item.key === 'max_participants')?.value
-    ?? null
-  const imageLimit = subscriptionInfo?.room_allocations?.images_remaining
-    ?? subscriptionInfo?.limits?.max_video_streams?.value
-    ?? activeSubscription?.plan?.limits?.find((item) => item.key === 'max_video_streams')?.value
-    ?? 1
+  // بودجه‌ی پلن: سقف هر اتاق = باقی‌مانده‌ی کاربر/تصویر پلن (مجموع اتاق‌ها از پلن بیشتر نمی‌شود). null = نامحدود.
+  const budget = readRoomBudget(subscriptionInfo)
+  const participantLimit = budget.usersRemaining
+  const imageLimit = budget.imagesRemaining
+  const budgetExhausted = Boolean(activeSubscription) && ((participantLimit != null && participantLimit < 2) || (imageLimit != null && imageLimit < 1))
   const [isPrivate, setIsPrivate] = useState(false)
   const [allowGuests, setAllowGuests] = useState(true)
   const [invitedPeople, setInvitedPeople] = useState([])
@@ -115,10 +113,10 @@ export default function CreateEventPage() {
     if (!title.trim()) { toast.error('عنوان کلاس را وارد کنید'); setStep(0); return }
     if (!slug.trim() || !/^[a-z0-9-]+$/.test(slug)) { toast.error('شناسه لینک معتبر نیست'); setStep(0); return }
     const capacity = Number(maxParticipants)
-    if (!Number.isInteger(capacity) || capacity < 2 || (participantLimit != null && capacity > participantLimit)) { toast.error(participantLimit != null ? `ظرفیت باید بین ۲ تا ${participantLimit} نفر باشد` : 'ظرفیت باید حداقل ۲ نفر باشد'); setStep(0); return }
+    if (!Number.isInteger(capacity) || capacity < 2 || (participantLimit != null && capacity > participantLimit)) { toast.error(participantLimit != null ? `ظرفیت باید بین ۲ تا ${faNumber(participantLimit)} نفر باشد (باقی‌مانده‌ی پلن)` : 'ظرفیت باید حداقل ۲ نفر باشد'); setStep(0); return }
 
     const imageAllocation = Number(allocatedVideoStreams)
-    if (!Number.isInteger(imageAllocation) || imageAllocation < 1 || imageAllocation > imageLimit) { toast.error(`سهم تصاویر باید بین ۱ تا ${imageLimit} باشد`); setStep(0); return }
+    if (!Number.isInteger(imageAllocation) || imageAllocation < 1 || (imageLimit != null && imageAllocation > imageLimit)) { toast.error(imageLimit != null ? `سهم تصاویر باید بین ۱ تا ${faNumber(imageLimit)} باشد (باقی‌مانده‌ی پلن)` : 'سهم تصاویر باید حداقل ۱ باشد'); setStep(0); return }
     if (!allowGuests && invitedPeople.length === 0) { toast.error('با غیرفعال‌بودن ورود مهمان، حداقل یک نفر را برای جلسه انتخاب کنید'); setStep(0); return }
 
     setSaving(true)
@@ -146,8 +144,10 @@ export default function CreateEventPage() {
       await queryClient.invalidateQueries({ queryKey: ['my-subscription'] })
       navigate(`/join/${room.slug}`)
     } catch (error) {
-      const detail = error.response?.data?.detail
-      toast.error(detail || (error.response?.data?.slug ? 'این شناسه قبلاً استفاده شده است' : 'ایجاد رویداد با خطا مواجه شد'))
+      const data = error.response?.data
+      const detail = data?.detail || data?.max_participants?.[0] || data?.allocated_video_streams?.[0]
+      toast.error(detail || (data?.slug ? 'این شناسه قبلاً استفاده شده است' : 'ایجاد رویداد با خطا مواجه شد'))
+      queryClient.invalidateQueries({ queryKey: ['my-subscription'] })
     } finally {
       setSaving(false)
     }
@@ -209,10 +209,19 @@ export default function CreateEventPage() {
                 <label className="text-sm text-[#536074]">توضیحات (اختیاری)</label>
                 <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} placeholder="توضیح کوتاهی درباره رویداد..." className="w-full resize-none rounded-xl border border-[#e1e6ef] bg-[#f8faff] px-4 py-3 text-sm text-[#101827] outline-none transition focus:border-[#9eb6ff] focus:ring-2 focus:ring-[#4f7cff]/15" />
               </div>
+              {budgetExhausted && (
+                <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-800">
+                  سهم کاربران یا تصاویر پلن شما تمام شده است و اتاق جدید نمی‌توان ساخت. برای آزادشدن سهم، <Link to="/dashboard/rooms" className="font-bold underline">یک اتاق را حذف</Link> یا ظرفیت اتاقی را کم کنید.
+                </div>
+              )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <JalaliDateTimePicker label="تاریخ و ساعت برگزاری (اختیاری)" value={scheduledAt} onChange={setScheduledAt} />
                 <Input label="حداکثر شرکت‌کنندگان" type="number" min="2" max={participantLimit ?? undefined} value={maxParticipants} onChange={(event) => setMaxParticipants(event.target.value)} className="meet-auth-input" />
-                <Input label="سهم تصاویر هم‌زمان این اتاق" type="number" min="1" max={imageLimit} value={allocatedVideoStreams} onChange={(event) => setAllocatedVideoStreams(event.target.value)} className="meet-auth-input" />
+                <Input label="سهم تصاویر هم‌زمان این اتاق" type="number" min="1" max={imageLimit ?? undefined} value={allocatedVideoStreams} onChange={(event) => setAllocatedVideoStreams(event.target.value)} className="meet-auth-input" />
+              </div>
+              <div className="space-y-1 text-xs leading-6 text-[#8d98aa]">
+                <p>{budgetHint({ total: budget.usersTotal, used: budget.usersUsed, remaining: budget.usersRemaining, unit: 'نفر' })}</p>
+                <p>{budgetHint({ total: budget.imagesTotal, used: budget.imagesUsed, remaining: budget.imagesRemaining, unit: 'تصویر' })}</p>
               </div>
               <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#e5eaf2] bg-[#f8faff] p-4">
                 <input type="checkbox" checked={isPrivate} onChange={(event) => setIsPrivate(event.target.checked)} className="h-4 w-4 accent-[#4f7cff]" />
@@ -345,7 +354,9 @@ export default function CreateEventPage() {
                 if (step === 0) {
                   if (!title.trim()) { toast.error('عنوان کلاس الزامی است'); return }
                   if (!slug.trim() || !/^[a-z0-9-]+$/.test(slug)) { toast.error('شناسه لینک معتبر نیست'); return }
-                  if (Number(maxParticipants) < 2 || (participantLimit != null && Number(maxParticipants) > participantLimit)) { toast.error('ظرفیت از سقف مجاز پلن بیشتر است'); return }
+                  if (budgetExhausted) { toast.error('سهم کاربران یا تصاویر پلن تمام شده است'); return }
+                  if (Number(maxParticipants) < 2 || (participantLimit != null && Number(maxParticipants) > participantLimit)) { toast.error('ظرفیت از باقی‌مانده‌ی پلن بیشتر است'); return }
+                  if (Number(allocatedVideoStreams) < 1 || (imageLimit != null && Number(allocatedVideoStreams) > imageLimit)) { toast.error('سهم تصاویر از باقی‌مانده‌ی پلن بیشتر است'); return }
                 }
                 if (step === 1 && configureFeatures && featuresError) { setConfigureFeatures(false) }
                 setStep((current) => current + 1)

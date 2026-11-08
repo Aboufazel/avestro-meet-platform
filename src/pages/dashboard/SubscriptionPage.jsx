@@ -11,6 +11,8 @@ const fa = (value) => Number(value || 0).toLocaleString('fa-IR')
 const statuses = { pending: 'در انتظار پرداخت', paid: 'پرداخت‌شده', failed: 'ناموفق', canceled: 'لغوشده' }
 const statusStyle = { paid: 'bg-[#dcf6ec] text-[#0b5f47]', pending: 'bg-[#fff0cf] text-[#7a4a05]', failed: 'bg-[#fde4e8] text-[#8f1627]', canceled: 'bg-[#e9edf4] text-[#34415a]' }
 const date = (value) => (value ? formatIsoJalali(value) : '—')
+// جزئیات محاسبه‌ی قیمت (هزینه‌ی خام، افزایش پلکانی) فقط در ادمین دیده می‌شود، نه برای مشتری
+const INTERNAL_ROW_KINDS = ['image_base', 'microphone_base', 'base_total', 'tier']
 const focusRing = 'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#4f7cff]/35'
 
 function Tabs({ tabs, value, onChange }) {
@@ -136,15 +138,8 @@ export default function SubscriptionPage() {
                       <details className="mt-3 text-sm">
                         <summary className={`inline-flex min-h-11 cursor-pointer items-center rounded-lg font-bold text-[#3d66e8] ${focusRing}`}>مشاهده جزئیات پیش‌فاکتور</summary>
                         <dl className="mt-2 space-y-2">
-                          {(order.snapshot?.rows || []).map((row, i) => <div key={i} className="flex justify-between gap-3"><dt className="text-[#34415a]">{row.title}{row.quantity ? ` × ${fa(row.quantity)}` : ''}{row.percent ? ` (${fa(row.percent)}٪)` : ''}</dt><dd>{formatMoney(row.total)}</dd></div>)}
+                          {(order.snapshot?.rows || []).filter((row) => !INTERNAL_ROW_KINDS.includes(row.kind)).map((row, i) => <div key={i} className="flex justify-between gap-3"><dt className="text-[#34415a]">{row.title}{row.quantity ? ` × ${fa(row.quantity)}` : ''}{row.percent ? ` (${fa(row.percent)}٪)` : ''}</dt><dd>{formatMoney(row.total)}</dd></div>)}
                           {order.snapshot?.breakdown && <div className="mt-3 space-y-2 rounded-xl bg-[#f6f8fc] p-3 text-xs">
-                            <div className="flex justify-between"><dt>هزینه خام تصاویر</dt><dd>{formatMoney(order.snapshot.breakdown.raw_image_cost)}</dd></div>
-                            <div className="flex justify-between"><dt>هزینه هر تصویر</dt><dd>{formatMoney(order.snapshot.breakdown.cost_per_image)}</dd></div>
-                            <div className="flex justify-between"><dt>تعداد کاربران میکروفونی</dt><dd>{fa(order.snapshot.breakdown.microphone_user_count)}</dd></div>
-                            <div className="flex justify-between"><dt>هزینه هر میکروفون</dt><dd>{formatMoney(order.snapshot.breakdown.cost_per_microphone)}</dd></div>
-                            <div className="flex justify-between"><dt>هزینه خام میکروفون‌ها</dt><dd>{formatMoney(order.snapshot.breakdown.raw_microphone_cost)}</dd></div>
-                            <div className="flex justify-between font-bold"><dt>مجموع هزینه خام ظرفیت</dt><dd>{formatMoney(order.snapshot.breakdown.raw_capacity_cost)}</dd></div>
-                            <div className="flex justify-between"><dt>درصد افزایش پلکانی</dt><dd>{fa(order.snapshot.breakdown.tier_percent)}٪</dd></div>
                             <div className="flex justify-between"><dt>تخفیف مدت</dt><dd>{formatMoney(order.snapshot.breakdown.duration_discount_amount)}</dd></div>
                             <div className="flex justify-between"><dt>تخفیف مدرسه</dt><dd>{formatMoney(order.snapshot.breakdown.school_discount_amount)}</dd></div>
                             <div className="flex justify-between"><dt>تخفیف کد</dt><dd>{formatMoney(order.snapshot.breakdown.code_discount_amount)}</dd></div>

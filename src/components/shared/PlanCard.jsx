@@ -24,8 +24,12 @@ const focusRing = 'focus-visible:outline-none focus-visible:ring-4 focus-visible
 export const primaryButtonClass = `inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#4f7cff] px-4 py-3 text-sm font-bold text-white hover:bg-[#3d66e8] disabled:cursor-not-allowed disabled:opacity-60 ${focusRing}`
 export const secondaryButtonClass = `inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border-2 border-[#4f7cff] bg-white px-4 py-3 text-sm font-bold text-[#3d66e8] hover:bg-[#eef3ff] disabled:cursor-not-allowed disabled:opacity-60 ${focusRing}`
 
-function LimitList({ limits, usage = {} }) {
-  if (!limits?.length) return null
+// سقف‌هایی که دیگر در محصول معنا ندارند (جلسه‌ی لایو هم‌زمان محدودیت ندارد)
+const HIDDEN_LIMIT_KEYS = ['max_live_sessions']
+
+function LimitList({ limits: allLimits, usage = {} }) {
+  const limits = (allLimits || []).filter((limit) => !HIDDEN_LIMIT_KEYS.includes(limit.key))
+  if (!limits.length) return null
   return (
     <dl className="divide-y divide-[#e5eaf2] rounded-xl border border-[#e5eaf2] bg-[#f8faff]">
       {limits.map((limit) => {

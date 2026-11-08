@@ -1,5 +1,6 @@
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {useEffect, useState} from 'react'
+import {useQuery} from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import {useForm, Controller} from 'react-hook-form'
 import {yupResolver} from '@hookform/resolvers/yup'
@@ -12,6 +13,8 @@ import {Card} from '../../components/ui/Card'
 import {JalaliDateTimePicker} from '../../components/ui/JalaliDateTimePicker'
 import {isoToLocalValue} from '../../utils/jalali'
 import {useRoom, useUpdateRoom} from '../../hooks/useRooms'
+import {paymentsService} from '../../services/payments'
+import {readRoomBudget, budgetHint, faNumber} from '../../utils/roomBudget'
 import {RoomAccessSettings} from '../../components/shared/RoomAccessSettings'
 import ClassFeatureSettings from './ClassFeatureSettings'
 
@@ -70,6 +73,17 @@ export default function EditEventPage() {
         isPending: isUpdating,
     } = useUpdateRoom(slug)
 
+    // بودجه‌ی پلن: سقف این اتاق = باقی‌مانده‌ی پلن + سهم فعلی خودِ همین اتاق
+    const {data: subscriptionInfo} = useQuery({
+        queryKey: ['my-subscription'],
+        queryFn: () => paymentsService.me().then((response) => response.data),
+    })
+    const budget = readRoomBudget(subscriptionInfo)
+    const ownUsers = Number(room?.max_participants || 0)
+    const ownImages = Number(room?.allocated_video_streams || 0)
+    const usersCap = budget.usersRemaining == null ? null : budget.usersRemaining + ownUsers
+    const imagesCap = budget.imagesRemaining == null ? null : budget.imagesRemaining + ownImages
+
 
     const {
         register,
@@ -119,6 +133,14 @@ export default function EditEventPage() {
     function onSubmit(data) {
         if (!allowGuests && invitedPeople.length === 0) {
             toast.error('با غیرفعال‌بودن ورود مهمان، حداقل یک نفر را برای جلسه انتخاب کنید')
+            return
+        }
+        if (usersCap != null && Number(data.max_participants) > usersCap) {
+            toast.error(`ظرفیت این اتاق حداکثر ${faNumber(usersCap)} نفر می‌تواند باشد (باقی‌مانده‌ی پلن)`)
+            return
+        }
+        if (imagesCap != null && Number(data.allocated_video_streams) > imagesCap) {
+            toast.error(`سهم تصاویر این اتاق حداکثر ${faNumber(imagesCap)} می‌تواند باشد (باقی‌مانده‌ی پلن)`)
             return
         }
         updateRoom(
@@ -344,6 +366,10 @@ export default function EditEventPage() {
                                 error={errors.allocated_video_streams?.message}
                                 {...register('allocated_video_streams')}
                             />
+                            <div className="space-y-1 text-xs leading-6 text-[#8d98aa] sm:col-span-2">
+                                <p>{budgetHint({total: budget.usersTotal, used: budget.usersUsed, remaining: budget.usersRemaining, unit: 'نفر', ownShare: ownUsers})}</p>
+                                <p>{budgetHint({total: budget.imagesTotal, used: budget.imagesUsed, remaining: budget.imagesRemaining, unit: 'تصویر', ownShare: ownImages})}</p>
+                            </div>
 
                         </div>
 

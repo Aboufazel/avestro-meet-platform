@@ -8,6 +8,7 @@ export const roomsService = {
   verifyNationalId: (slug, nationalId) => api.post(`/rooms/${slug}/verify-national-id/`, { national_id: nationalId }),
   leave: (slug) => api.post(`/rooms/${slug}/leave/`),
   end: (slug) => api.post(`/rooms/${slug}/end/`),
+  remove: (slug) => api.delete(`/rooms/${slug}/`),
   update: (slug, data) => api.patch(`/rooms/${slug}/edit/`, data),
   features: (slug) => api.get(`/rooms/${slug}/features/`),
   accountFeatures: () => api.get('/features/account/'),
