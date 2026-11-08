@@ -59,9 +59,19 @@ export default function CustomPlanBuilder() {
     const [users, setUsers] = useState(100)
     const [images, setImages] = useState(50)
     const [duration, setDuration] = useState('month')
-    const [startMode, setStartMode] = useState('now')
+    const [requestedStartMode, setStartMode] = useState('now')
     const [promoCode, setPromoCode] = useState('')
     const [referralCode, setReferralCode] = useState('')
+
+    // با اشتراک فعال فقط «رزرو» ممکن است؛ بدون اشتراک فعال، شروع از امروز هم مجاز است.
+    const {data: subscriptionInfo, isLoading: subscriptionLoading} = useQuery({
+        queryKey: ['my-subscription'],
+        queryFn: () => paymentsService.me().then((r) => r.data),
+        enabled: authenticated,
+    })
+    const hasActivePlan = Boolean(subscriptionInfo?.active)
+    const startMode = hasActivePlan ? 'reserved' : requestedStartMode
+    const waitingForSubscription = authenticated && subscriptionLoading
 
     const {data: config, isLoading, isError} = useQuery({
         queryKey: ['custom-plan-config'],
@@ -80,7 +90,7 @@ export default function CustomPlanBuilder() {
     const {data: quote, isFetching: quoteLoading, isError: quoteError, error: quoteErrorData} = useQuery({
         queryKey: ['custom-plan-quote', payload],
         queryFn: () => paymentsService.customQuote(payload).then((r) => r.data),
-        enabled: Boolean(config?.enabled && users && images),
+        enabled: Boolean(config?.enabled && users && images && !waitingForSubscription),
         staleTime: 0,
     })
     const checkout = useMutation({
@@ -244,7 +254,13 @@ export default function CustomPlanBuilder() {
 
                 <div className="rounded-2xl border border-[#dce4f1] p-4">
                     <p className="mb-3 text-md font-extrabold">زمان شروع پلن</p>
-                    <div className="grid grid-cols-2 gap-2">
+                    {hasActivePlan ? <>
+                        <button type="button" aria-pressed="true" disabled
+                                className={`min-h-11 w-full rounded-xl border-2 border-[#315bd5] bg-[#f1f5ff] px-3 text-sm font-bold ${ring}`}>رزرو
+                            برای شروع بعدی
+                        </button>
+                        <p className="mt-3 text-xs leading-6 text-[#68758a]">اشتراک فعال دارید؛ پلن جدید رزرو می‌شود و پس از پایان اشتراک فعلی از بخش «اشتراک و پرداخت» شروع می‌کنید.</p>
+                    </> : <div className="grid grid-cols-2 gap-2">
                         <button type="button" onClick={() => setStartMode('now')} aria-pressed={startMode === 'now'}
                                 className={`min-h-11 rounded-xl border-2 px-3 text-sm font-bold ${ring} ${startMode === 'now' ? 'border-[#315bd5] bg-[#f1f5ff]' : 'border-[#e1e7f0]'}`}>شروع
                             از امروز
@@ -254,7 +270,7 @@ export default function CustomPlanBuilder() {
                                 className={`min-h-11 rounded-xl border-2 px-3 text-sm font-bold ${ring} ${startMode === 'reserved' ? 'border-[#315bd5] bg-[#f1f5ff]' : 'border-[#e1e7f0]'}`}>رزرو
                             برای شروع بعدی
                         </button>
-                    </div>
+                    </div>}
                 </div>
             </div>
 
