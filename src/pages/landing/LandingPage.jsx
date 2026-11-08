@@ -71,7 +71,7 @@ export default function LandingPage() {
                         </Link>
                         <Link to="/pricing"
                               className="meet-primary-btn rounded-xl px-3.5 sm:px-5 py-2.5 text-xs sm:text-sm font-medium inline-flex items-center gap-2 whitespace-nowrap">
-                            مشاهده ساخت پلن <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4"/>
+                            ساخت پلن اختصاصی<ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4"/>
                         </Link>
                     </div>
                 </div>
@@ -105,7 +105,7 @@ export default function LandingPage() {
                                     className="mt-6 sm:mt-8 grid grid-cols-1 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap gap-2.5 sm:gap-3">
                                     <Link to="/pricing"
                                           className="meet-primary-btn inline-flex justify-center items-center gap-2 rounded-xl px-5 py-3.5 text-sm sm:text-base font-medium">
-                                        انتخاب پلن و شروع <ArrowLeft className="w-5 h-5"/>
+                                        ساخت پلن اختصاصی <ArrowLeft className="w-5 h-5"/>
                                     </Link>
                                     <a href="#product-preview"
                                        className="meet-soft-btn inline-flex justify-center items-center gap-2 rounded-xl px-5 py-3.5 text-sm sm:text-base font-medium">
@@ -276,8 +276,8 @@ export default function LandingPage() {
                     <p className="text-[#68758a] mt-4 mb-8">سریع وارد شوید، جلسه را بسازید و لینک را برای شرکت‌کنندگان
                         بفرستید.</p>
                     <Link to="/pricing"
-                          className="meet-primary-btn inline-flex items-center gap-2 rounded-xl px-7 py-3.5 font-medium">مشاهده
-                        ساخت پلن<ArrowLeft className="w-5 h-5"/></Link>
+                          className="meet-primary-btn inline-flex items-center gap-2 rounded-xl px-7 py-3.5 font-medium">
+                        ساخت پلن اختصاصی<ArrowLeft className="w-5 h-5"/></Link>
                 </section>
             </main>
 
