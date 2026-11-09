@@ -8,9 +8,7 @@ import {
     Loader2,
     Minus,
     Plus,
-    ShieldCheck,
-    Users,
-    Video
+    ShieldCheck
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {useNavigate} from 'react-router-dom'
@@ -76,8 +74,7 @@ export default function CustomPlanBuilder() {
     const navigate = useNavigate()
     const queryClient = useQueryClient()
     const authenticated = useAuthStore((s) => Boolean(s.token))
-    const [planKind, setPlanKind] = useState('webinar')
-    const [institutionKind, setInstitutionKind] = useState('government')
+    const [governmentSchool, setGovernmentSchool] = useState(false)
     const [rawUsers, setUsers] = useState(100)
     const [rawImages, setImages] = useState(50)
     const [otpOpen, setOtpOpen] = useState(false)
@@ -109,15 +106,14 @@ export default function CustomPlanBuilder() {
     const imageOptions = useMemo(() => buildOptions(minImages, Math.min(cfg.max_images || 500, users), cfg), [config, users]) // eslint-disable-line react-hooks/exhaustive-deps
     const images = imageOptions.includes(rawImages) ? rawImages : snapDown(imageOptions, rawImages)
     const payload = useMemo(() => ({
-        plan_kind: planKind,
-        institution_kind: planKind === 'class' ? institutionKind : null,
+        government_school: governmentSchool,
         users,
         images,
         duration,
         start_mode: startMode,
         promo_code: promoCode.trim(),
         referral_code: referralCode.trim(),
-    }), [planKind, institutionKind, users, images, duration, startMode, promoCode, referralCode])
+    }), [governmentSchool, users, images, duration, startMode, promoCode, referralCode])
     const {data: quote, isFetching: quoteLoading, isError: quoteError, error: quoteErrorData} = useQuery({
         queryKey: ['custom-plan-quote', payload],
         queryFn: () => paymentsService.customQuote(payload).then((r) => r.data),
@@ -185,54 +181,33 @@ export default function CustomPlanBuilder() {
 
         <div className="grid gap-6 p-4 sm:p-7 lg:grid-cols-[1fr_340px]">
             <div className="space-y-6">
-                <div>
-                    <p className="mb-3 text-md font-extrabold">۱- نوع پلن را انتخاب کن</p>
-                    <div className="grid grid-cols-2 gap-3">
-                        {[{
-                            id: 'webinar',
-                            title: 'وبینار',
-                            desc: 'برای رویدادها و ارائه آنلاین',
-                            Icon: Video
-                        }, {
-                            id: 'class',
-                            title: 'کلاس آموزشی',
-                            desc: 'برای مدارس و مراکز آموزشی',
-                            Icon: Users
-                        }].map(({id, title, desc, Icon}) =>
-                            <button key={id} type="button" aria-pressed={planKind === id}
-                                    onClick={() => setPlanKind(id)}
-                                    className={`rounded-2xl border-2 p-4 text-right transition ${ring} ${planKind === id ? 'border-[#315bd5] bg-[#f1f5ff]' : 'border-[#e1e7f0] hover:border-[#aabbe6]'}`}>
-                                <Icon className={planKind === id ? 'text-[#315bd5]' : 'text-[#7b879b'}/>
-                                <p className="mt-3 font-extrabold">{title}</p><p
-                                className="mt-1 text-xs leading-6 text-[#68758a]">{desc}</p>
-                            </button>)}
-                    </div>
-                </div>
-
-                {planKind === 'class' && <div className="rounded-2xl border border-[#dce4f1] p-4">
-                    <p className="mb-3 text-sm font-extrabold">نوع مرکز آموزشی</p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                        <button type="button" onClick={() => setInstitutionKind('government')}
-                                aria-pressed={institutionKind === 'government'}
-                                className={`min-h-12 rounded-xl border-2 px-3 text-sm font-bold ${ring} ${institutionKind === 'government' ? 'border-[#315bd5] bg-[#f1f5ff] text-[#3d66e8]' : 'border-[#e1e7f0]'}`}>مدرسه
-                            دولتی
-                        </button>
-                        <button type="button" onClick={() => setInstitutionKind('nonprofit')}
-                                aria-pressed={institutionKind === 'nonprofit'}
-                                className={`min-h-12 rounded-xl border-2 px-3 text-sm font-bold ${ring} ${institutionKind === 'nonprofit' ? 'border-[#315bd5] bg-[#f1f5ff] text-[#3d66e8]' : 'border-[#e1e7f0]'}`}>مؤسسه
-                            غیرانتفاعی / آموزشی
+                <div className="rounded-2xl border border-[#dce4f1] p-4">
+                    <p className="mb-1 text-sm text-[#68758a]">این پلن هم برای جلسه آنلاین و هم برای کلاس آموزشی قابل استفاده است.</p>
+                    <div className="mt-3 flex items-center justify-between gap-4">
+                        <div>
+                            <p id="gov-school-label" className="text-sm font-extrabold">مدرسه دولتی هستم</p>
+                            <p className="mt-1 text-xs leading-6 text-[#68758a]">
+                                {Number(config.government_school_discount_percent) > 0
+                                    ? `با فعال‌سازی، ${fa(config.government_school_discount_percent)}٪ تخفیف مدارس دولتی اعمال می‌شود.`
+                                    : 'مخصوص مدارس دولتی'}
+                            </p>
+                        </div>
+                        <button type="button" role="switch" aria-checked={governmentSchool} aria-labelledby="gov-school-label"
+                                onClick={() => setGovernmentSchool((v) => !v)}
+                                className={`relative h-8 w-14 shrink-0 rounded-full transition-colors ${ring} ${governmentSchool ? 'bg-[#315bd5]' : 'bg-[#c8d3e5]'}`}>
+                            <span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all ${governmentSchool ? 'right-1' : 'right-7'}`}/>
                         </button>
                     </div>
-                    {institutionKind === 'government' &&
+                    {governmentSchool &&
                         <p className="mt-3 rounded-xl bg-[#fff8e8] p-3 text-xs leading-6 text-[#77551b]">
                             در صورت انتخاب این گزینه تخفیف مدارس
                             دولتی در محاسبه لحاظ می‌شود. پس از خرید، نیاز است که مدارک در اسرع وقت در کارتابل شما بارگزاری شود
                         </p>
                     }
-                </div>}
+                </div>
 
                 <div>
-                    <p className="mb-3 text-md font-extrabold">۲- ظرفیت پلن</p>
+                    <p className="mb-3 text-md font-extrabold">۱- ظرفیت پلن</p>
                     <div className="grid gap-3 sm:grid-cols-2">
                         <Stepper label="تعداد کاربران" value={users} options={userOptions}
                                  onChange={setUsersSafe} hint="تعداد کل کاربران مجاز در پلن"/>
@@ -246,7 +221,7 @@ export default function CustomPlanBuilder() {
                 </div>
 
                 <div>
-                    <p className="mb-3 text-md font-extrabold">۳- بازه اشتراک</p>
+                    <p className="mb-3 text-md font-extrabold">۲- بازه اشتراک</p>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                         {durations.map((item) => <button key={item.id} type="button"
                                                          onClick={() => changeDuration(item.id)}
@@ -310,8 +285,10 @@ export default function CustomPlanBuilder() {
                     className="font-extrabold">خلاصه پلن و پیش‌فاکتور</h3></div>
                 <div className="mt-4 space-y-3 text-sm">
                     <div className="flex justify-between"><span
-                        className="text-[#68758a]">نوع پلن</span><b>{planKind === 'webinar' ? 'وبینار' : 'کلاس آموزشی'}</b>
+                        className="text-[#68758a]">کاربرد</span><b>جلسه آنلاین و کلاس</b>
                     </div>
+                    {governmentSchool && <div className="flex justify-between"><span
+                        className="text-[#68758a]">مدرسه دولتی</span><b>بله</b></div>}
                     <div className="flex justify-between"><span
                         className="text-[#68758a]">کاربران</span><b>{fa(users)}</b></div>
                     <div className="flex justify-between"><span
