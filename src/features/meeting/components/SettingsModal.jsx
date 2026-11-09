@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from 'react'
-import { X, Mic, Video, Volume2, Gauge } from 'lucide-react'
+import { X, Mic, Video, Volume2, Gauge, MonitorUp } from 'lucide-react'
 import { useMeetingStore } from '../store/meeting-store'
 import { selectIsSettingsOpen } from '../store/meeting-selectors'
 import {
@@ -8,12 +8,21 @@ import {
   setVideoInputDevice,
   setAudioOutputDevice,
   setVideoQuality,
+  setScreenShareMode,
 } from '../store/meeting-actions'
+import { LOCAL_VIDEO_CONFIG, SCREEN_SHARE_PROFILES, getScreenShareMode } from '../jitsi/jitsi-config'
 
 const QUALITY_OPTIONS = [
   { label: 'پایین (۱۸۰p) — مناسب اینترنت ضعیف', value: 180 },
   { label: 'متوسط (۳۶۰p)', value: 360 },
+  { label: 'خوب (۴۸۰p)', value: 480 },
   { label: 'بالا (۷۲۰p)', value: 720 },
+]
+
+const SHARE_MODE_OPTIONS = [
+  { value: 'text', hint: 'کمترین مصرف اینترنت؛ برای اسلاید، PDF و متن' },
+  { value: 'balanced', hint: 'پیش‌فرض؛ اسکرول و حرکت ماوس روان است' },
+  { value: 'motion', hint: 'روان‌ترین؛ برای پخش ویدیو و انیمیشن (مصرف بیشتر)' },
 ]
 
 export const SettingsModal = memo(function SettingsModal() {
@@ -25,7 +34,11 @@ export const SettingsModal = memo(function SettingsModal() {
   const [selectedAudioInput, setSelectedAudioInput] = useState('')
   const [selectedVideoInput, setSelectedVideoInput] = useState('')
   const [selectedAudioOutput, setSelectedAudioOutput] = useState('')
-  const [quality, setQuality] = useState(360)
+  // پیش‌فرض همان مقدار tier دستگاه است، نه عدد ثابت؛ تا «تایید» بدون تغییر،
+  // کیفیت را بی‌دلیل پایین نیاورد.
+  const [quality, setQuality] = useState(LOCAL_VIDEO_CONFIG.maxHeight)
+  const [qualityTouched, setQualityTouched] = useState(false)
+  const [shareMode, setShareMode] = useState(getScreenShareMode)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -46,7 +59,7 @@ export const SettingsModal = memo(function SettingsModal() {
       if (selectedAudioInput) await setAudioInputDevice(selectedAudioInput)
       if (selectedVideoInput) await setVideoInputDevice(selectedVideoInput)
       if (selectedAudioOutput) await setAudioOutputDevice(selectedAudioOutput)
-      await setVideoQuality(quality)
+      if (qualityTouched) await setVideoQuality(quality)
       closeSettings()
     } finally {
       setLoading(false)
@@ -74,6 +87,14 @@ export const SettingsModal = memo(function SettingsModal() {
             }`}
           >
             <Gauge size={16} /> کیفیت تصویر
+          </button>
+          <button
+            onClick={() => setTab('share')}
+            className={`flex-1 md:flex-none flex items-center gap-2 px-4 py-3 text-sm ${
+              tab === 'share' ? 'bg-[var(--room-blue)]/15 text-white' : 'text-white/45 hover:bg-white/[.04]'
+            }`}
+          >
+            <MonitorUp size={16} /> اشتراک صفحه
           </button>
         </div>
 
@@ -113,6 +134,34 @@ export const SettingsModal = memo(function SettingsModal() {
               </>
             )}
 
+            {tab === 'share' && (
+              <div className="space-y-2">
+                <span className="text-sm text-white/55 block mb-2">حالت اشتراک‌گذاری صفحه (همان لحظه اعمال می‌شود)</span>
+                {SHARE_MODE_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    className={`flex items-start gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-colors ${
+                      shareMode === opt.value
+                        ? 'border-[var(--room-blue-2)]/40 bg-[var(--room-blue)]/10'
+                        : 'border-white/[.07] hover:bg-white/[.04]'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="share-mode"
+                      checked={shareMode === opt.value}
+                      onChange={() => { setShareMode(opt.value); setScreenShareMode(opt.value) }}
+                      className="accent-[var(--room-blue)] mt-1"
+                    />
+                    <span>
+                      <span className="text-sm text-white block">{SCREEN_SHARE_PROFILES[opt.value].label}</span>
+                      <span className="text-xs text-white/45 block mt-0.5">{opt.hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+
             {tab === 'quality' && (
               <div className="space-y-2">
                 <span className="text-sm text-white/55 block mb-2">کیفیت ویدیوی ارسالی</span>
@@ -129,7 +178,7 @@ export const SettingsModal = memo(function SettingsModal() {
                       type="radio"
                       name="quality"
                       checked={quality === opt.value}
-                      onChange={() => setQuality(opt.value)}
+                      onChange={() => { setQuality(opt.value); setQualityTouched(true) }}
                       className="accent-[var(--room-blue)]"
                     />
                     <span className="text-sm text-white">{opt.label}</span>

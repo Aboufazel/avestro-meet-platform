@@ -4,7 +4,12 @@ import {
     CONFERENCE_CONFIG,
     RECONNECT_CONFIG,
     JITSI_INIT_OPTIONS,
-    DESKTOP_SHARING_FRAME_RATE,
+    ADAPTIVE_UPLOAD,
+    getDesktopFrameRate,
+    getScreenShareMode,
+    getScreenShareProfile,
+    isFirefoxBrowser,
+    setScreenShareModePreference,
     MULTI_STREAM_ENABLED,
     LOCAL_VIDEO_CONFIG,
     RECEIVER_QUALITY,
@@ -920,8 +925,13 @@ export class JitsiController {
         }
 
         try {
+            // فقط سورس دوربین. بدون source name این محدودیت به اشتراک صفحه
+            // (در حالت multi-stream) هم اعمال می‌شد و متن را ۳۶۰p می‌کرد.
+            this._manualSendHeight = normalizedHeight
+
             await this._conference.setSenderVideoConstraint(
-                normalizedHeight
+                this._effectiveSendHeight(),
+                this._findCameraTrack()?.getSourceName?.()
             )
 
             return true
@@ -1158,7 +1168,7 @@ export class JitsiController {
             // screen share to camera resolution as well.
             this._conference
                 ?.setSenderVideoConstraint?.(
-                    LOCAL_VIDEO_CONFIG.maxHeight,
+                    this._effectiveSendHeight(),
                     track?.getSourceName?.()
                 )
                 ?.catch?.(() => {})
@@ -1166,7 +1176,144 @@ export class JitsiController {
         }
     }
 
+    /**
+     * ارتفاع مجاز ویدیوی ارسالی دوربین: انتخاب دستی کاربر (تنظیمات) یا مقدار
+     * tier دستگاه؛ و اگر آپلود خراب است سقف کاهش‌یافته‌ی adaptive.
+     */
+    _effectiveSendHeight() {
+        const base = this._manualSendHeight || LOCAL_VIDEO_CONFIG.maxHeight
+        return this._uploadCapped
+            ? Math.min(ADAPTIVE_UPLOAD.lowHeight, base)
+            : base
+    }
+
+    /**
+     * کاهش خودکار کیفیت ارسال در packet loss بالا و برگشت بعد از بهبود.
+     * به‌جای اینکه تصویر فریز شود/بپرد، رزولوشن پایین می‌آید تا جریان روان بماند.
+     */
+    _adaptUploadQuality(uploadPacketLoss) {
+        if (!this._conference || typeof uploadPacketLoss !== 'number') {
+            return
+        }
+
+        const camera = this._findCameraTrack()
+
+        if (!camera || camera.isMuted?.()) {
+            return
+        }
+
+        const state = this._adaptState || (this._adaptState = {bad: 0, good: 0})
+
+        if (uploadPacketLoss >= ADAPTIVE_UPLOAD.lossHigh) {
+            state.bad += 1
+            state.good = 0
+        } else if (uploadPacketLoss <= ADAPTIVE_UPLOAD.lossLow) {
+            state.good += 1
+            state.bad = 0
+        } else {
+            state.bad = 0
+            state.good = 0
+        }
+
+        let changed = false
+
+        if (!this._uploadCapped && state.bad >= ADAPTIVE_UPLOAD.downSamples) {
+            this._uploadCapped = true
+            changed = true
+        } else if (this._uploadCapped && state.good >= ADAPTIVE_UPLOAD.upSamples) {
+            this._uploadCapped = false
+            changed = true
+        }
+
+        if (!changed) {
+            return
+        }
+
+        state.bad = 0
+        state.good = 0
+
+        try {
+            this._conference
+                .setSenderVideoConstraint?.(
+                    this._effectiveSendHeight(),
+                    camera.getSourceName?.()
+                )
+                ?.catch?.(() => {})
+        } catch {
+        }
+    }
+
+    /**
+     * تنظیم track اشتراک صفحه بر اساس حالت انتخابی (متن / متعادل / ویدیو):
+     * contentHint، فریم‌ریت، سقف اندازه‌ی capture و سقف لایه‌ی ارسالی.
+     * همه best-effort هستند؛ مرورگری که پشتیبانی نکند بی‌صدا رد می‌شود.
+     */
+    _tuneDesktopTrack(track, mode = getScreenShareMode()) {
+        const profile = getScreenShareProfile(mode)
+        const mediaTrack = track?.getTrack?.()
+
+        try {
+            if (mediaTrack && 'contentHint' in mediaTrack) {
+                mediaTrack.contentHint = profile.contentHint
+            }
+        } catch {
+        }
+
+        // Firefox: applyConstraints روی track اشتراک صفحه می‌تواند capture را
+        // دوباره بسازد و فریم سیاه بدهد؛ آنجا فقط به سقف لایه‌ی ارسالی
+        // (setSenderVideoConstraint پایین) و فریم‌ریتِ زمان ساخت track تکیه می‌کنیم.
+        if (!isFirefoxBrowser()) {
+            try {
+                mediaTrack
+                    ?.applyConstraints?.({
+                        frameRate: {ideal: profile.fps, max: profile.fps},
+                        height: {max: profile.maxHeight},
+                        width: {max: Math.round((profile.maxHeight * 16) / 9)},
+                    })
+                    ?.catch?.(() => {})
+            } catch {
+            }
+        }
+
+        try {
+            this._conference
+                ?.setSenderVideoConstraint?.(
+                    profile.maxHeight,
+                    track?.getSourceName?.()
+                )
+                ?.catch?.(() => {})
+        } catch {
+        }
+    }
+
+    /**
+     * عوض‌کردن حالت اشتراک صفحه؛ اگر اشتراک فعال است بدون قطع، روی همان track اعمال می‌شود.
+     */
+    setScreenShareMode(mode) {
+        if (!setScreenShareModePreference(mode)) {
+            return false
+        }
+
+        const track = this._screenShare?.desktopTrack
+
+        if (this._screenShare?.active && track) {
+            this._tuneDesktopTrack(track, mode)
+        }
+
+        return true
+    }
+
     _resetReceiverState() {
+        this._uploadCapped = false
+        this._adaptState = null
+
+        if (this._reconcileTimers) {
+            for (const timers of this._reconcileTimers.values()) {
+                timers.forEach(clearTimeout)
+            }
+            this._reconcileTimers.clear()
+        }
+
         this._remoteVideoSources.clear()
         this._receiverIntent = null
         this._receiverKey = null
@@ -1268,7 +1415,9 @@ export class JitsiController {
 
         if (isSharing) {
             this._authoritativelyStoppedScreenShares.delete(participantId)
+            this._scheduleRemoteScreenShareReconcile(participantId)
         } else {
+            this._cancelRemoteScreenShareReconcile(participantId)
             this._authoritativelyStoppedScreenShares.set(participantId, Date.now())
         }
 
@@ -1286,6 +1435,105 @@ export class JitsiController {
             this._receiverKey = null
             this._applyReceiverConstraints()
         }
+
+        return true
+    }
+
+    /**
+     * شبکه‌ی ایمنی برای «توقف و شروع دوباره‌ی اشتراک».
+     *
+     * پیام «شروع اشتراک» (WebSocket/endpoint) از خودِ track زودتر می‌رسد و UI فقط
+     * با TRACK_ADDED واقعی تایل اشتراک را نشان می‌دهد. اگر آن رویداد برای
+     * اشتراک دوم از دست برود (یا در لحظه‌ی ناهماهنگ با پاک‌سازیِ اشتراک قبلی
+     * برسد)، تا refresh چیزی دیده نمی‌شد. این‌جا چند بار بعد از پیام «شروع»
+     * از خود lib می‌پرسیم track دسکتاپ این شرکت‌کننده هست یا نه و اگر هست،
+     * دوباره به استور و receiver constraints معرفی‌اش می‌کنیم.
+     */
+    _scheduleRemoteScreenShareReconcile(participantId) {
+        if (!participantId || participantId === this._conference?.myUserId?.()) {
+            return
+        }
+
+        this._cancelRemoteScreenShareReconcile(participantId)
+
+        this._reconcileTimers = this._reconcileTimers || new Map()
+        const timers = []
+
+        for (const delay of [300, 1200, 3000, 6000]) {
+            timers.push(
+                setTimeout(() => this._reconcileRemoteScreenShare(participantId, delay), delay)
+            )
+        }
+
+        this._reconcileTimers.set(participantId, timers)
+    }
+
+    _cancelRemoteScreenShareReconcile(participantId) {
+        const timers = this._reconcileTimers?.get(participantId)
+
+        if (timers) {
+            timers.forEach(clearTimeout)
+            this._reconcileTimers.delete(participantId)
+        }
+    }
+
+    _reconcileRemoteScreenShare(participantId, delay) {
+        const conference = this._conference
+
+        // بین‌راه اشتراک متوقف شده یا از جلسه خارج شده‌ایم
+        if (!conference || this._authoritativelyStoppedScreenShares.has(participantId)) {
+            return false
+        }
+
+        let remoteTracks = []
+
+        try {
+            remoteTracks = conference.getRemoteTracks?.(participantId) || []
+        } catch {
+            return false
+        }
+
+        const desktops = remoteTracks.filter(
+            (t) => t?.getType?.() === 'video' && t.getVideoType?.() === 'desktop'
+        )
+
+        // اگر lib هنوز track قدیمیِ اشتراک قبلی را هم نگه داشته، آخرین track
+        // «غیر mute» را انتخاب کن (جدیدترین)، نه اولی را.
+        const desktop =
+            [...desktops].reverse().find((t) => !t.isMuted?.()) ||
+            desktops[desktops.length - 1]
+
+        if (!desktop) {
+            // lib هم track دسکتاپی ندارد: مشکل از سمت فرستنده/Jicofo/bridge است.
+            console.warn(
+                '[ScreenShare] start message received but conference has no desktop track yet',
+                {participantId, afterMs: delay, remoteTrackCount: remoteTracks.length}
+            )
+            return false
+        }
+
+        const sourceName = desktop.getSourceName?.()
+
+        if (sourceName) {
+            this._remoteVideoSources.set(sourceName, {
+                participantId,
+                videoType: 'desktop',
+            })
+        }
+
+        // استور با همان key جایگزین می‌شود؛ اگر track همان بود هیچ re-attach ای رخ نمی‌دهد.
+        this._emit(JITSI_EVENTS.TRACK_ADDED, mapTrack(desktop))
+
+        this._receiverKey = null
+        this._applyReceiverConstraints()
+
+        console.info('[ScreenShare] reconciled remote desktop track', {
+            participantId,
+            sourceName,
+            afterMs: delay,
+            desktopTracks: desktops.length,
+            muted: desktop.isMuted?.(),
+        })
 
         return true
     }
@@ -1361,7 +1609,7 @@ export class JitsiController {
         try {
             const tracks = await JitsiMeetJS.createLocalTracks({
                 devices: ['desktop'],
-                desktopSharingFrameRate: DESKTOP_SHARING_FRAME_RATE,
+                desktopSharingFrameRate: getDesktopFrameRate(),
             })
 
             desktopTrack = tracks?.[0]
@@ -1398,6 +1646,14 @@ export class JitsiController {
                 desktopTrack,
                 wasCameraActiveBefore: Boolean(cameraTrack),
             }
+
+            this._tuneDesktopTrack(desktopTrack)
+
+            console.info('[ScreenShare] local desktop source added', {
+                sourceName: desktopTrack.getSourceName?.(),
+                ssrc: desktopTrack.getSsrc?.(),
+                mode: getScreenShareMode(),
+            })
 
             const stoppedHandler = this._handleDesktopTrackStopped
             desktopTrack.addEventListener(
@@ -2671,6 +2927,8 @@ export class JitsiController {
                             stats?.connectionQuality ?? null,
                             uploadPacketLoss
                         )
+
+                        this._adaptUploadQuality(uploadPacketLoss)
                     }
                 )
 

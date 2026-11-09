@@ -19,7 +19,8 @@ export const CONNECTION_CONFIG = {
   // بدون این گزینه lib-jitsi-meet هیچ iceServer ای به RTCPeerConnection نمی‌دهد
   // و در شبکه‌هایی که UDP مستقیم به JVB بسته است، ICE شکست می‌خورد.
   useStunTurn: true,
-  // TURN/UDP پیش‌فرض فیلتر می‌شود؛ TURN/TCP روی ۳۴۷۸ برای شبکه‌های بدون UDP می‌ماند.
+  // TURN/UDP فعال است (اولین گزینه‌ی fallback وقتی مسیر مستقیم به JVB بسته است).
+  // TURN/TCP روی ۳۴۷۸ برای شبکه‌هایی که UDP را کاملاً می‌بندند هم می‌ماند.
   useTurnUdp: true,
 }
 
@@ -54,8 +55,11 @@ export function isLowEndDevice() {
   const cores = navigator.hardwareConcurrency ?? 8
   const memory = navigator.deviceMemory ?? 8
 
-  // ۴ هسته یا کمتر / ۲ گیگ رم یا کمتر = دستگاه ضعیف/قدیمی
-  return cores <= 4 || memory <= 2
+  // موبایل: ۴ هسته یا کمتر ضعیف است.
+  // دسکتاپ: لپ‌تاپ ۴ هسته‌ای معمولی است و «ضعیف» حساب نمی‌شود (tier متوسط
+  // می‌گیرد)؛ فقط ۲ هسته یا کمتر / ۲ گیگ رم یا کمتر ضعیف است.
+  if (isMobileDevice()) return cores <= 4 || memory <= 2
+  return cores <= 2 || memory <= 2
 }
 
 /**
@@ -82,15 +86,64 @@ export function prefersH264() {
   return isAppleDevice() && !isFirefoxBrowser()
 }
 
-/**
- * سقف فریم‌ریت اشتراک صفحه. اسلاید/متن با ۵fps کامل خوانا است و مصرف bridge
- * (و بیت‌ریت اشتراک) را به‌شدت کم می‌کند. برای نمایش ویدیو/انیمیشن در .env:
- * VITE_SCREEN_SHARE_FPS=15
- */
-export const SCREEN_SHARE_MAX_FPS = (() => {
-  const v = Number(import.meta.env.VITE_SCREEN_SHARE_FPS)
-  return Number.isFinite(v) && v >= 1 && v <= 30 ? v : 5
-})()
+// =============================================================================
+// پروفایل‌های اشتراک صفحه
+//
+// قبلاً فریم‌ریت اشتراک صفحه برای همه‌چیز روی ۵fps قفل بود؛ برای اسلاید خوب
+// است ولی ویدیو، انیمیشن، اسکرول و حرکت ماوس را «پرشی» نشان می‌داد.
+// حالا سه حالت داریم و کاربر (از تنظیمات) حتی وسط اشتراک هم می‌تواند عوض کند:
+//
+//  text     : متن/اسلاید/PDF — وضوح بالا، ۵fps (کمترین مصرف اینترنت)
+//  balanced : پیش‌فرض — ۱۵fps، وضوح را حفظ می‌کند (اسکرول و ماوس روان)
+//  motion   : ویدیو/انیمیشن — فریم‌ریت بالا، روانی مهم‌تر از وضوح
+//
+// contentHint به انکودر مرورگر می‌گوید هنگام کمبود پهنای باند چه چیزی را فدا کند.
+// برای تغییر پیش‌فرض بدون کد: VITE_SCREEN_SHARE_MODE=text|balanced|motion
+// =============================================================================
+export const SCREEN_SHARE_PROFILES = {
+  text: {label: 'متن و اسلاید', fps: 5, contentHint: 'detail', maxHeight: 1080},
+  balanced: {label: 'متعادل', fps: 15, contentHint: 'detail', maxHeight: 1080},
+  motion: {label: 'ویدیو و انیمیشن', fps: 30, contentHint: 'motion', maxHeight: 1080},
+}
+
+const SCREEN_SHARE_STORAGE_KEY = 'avestro.screenShareMode'
+const SCREEN_SHARE_ENV_DEFAULT = import.meta.env.VITE_SCREEN_SHARE_MODE
+const SCREEN_SHARE_DEFAULT_MODE =
+  SCREEN_SHARE_ENV_DEFAULT in SCREEN_SHARE_PROFILES ? SCREEN_SHARE_ENV_DEFAULT : 'balanced'
+
+export function getScreenShareMode() {
+  try {
+    const saved = window.localStorage.getItem(SCREEN_SHARE_STORAGE_KEY)
+    if (saved && saved in SCREEN_SHARE_PROFILES) return saved
+  } catch {
+    // storage می‌تواند در بعضی مرورگرها/حالت‌ها در دسترس نباشد
+  }
+  return SCREEN_SHARE_DEFAULT_MODE
+}
+
+export function setScreenShareModePreference(mode) {
+  if (!(mode in SCREEN_SHARE_PROFILES)) return false
+  try {
+    window.localStorage.setItem(SCREEN_SHARE_STORAGE_KEY, mode)
+  } catch {
+    // فقط ذخیره نشد؛ حالت برای همین جلسه اعمال می‌شود
+  }
+  return true
+}
+
+export function getScreenShareProfile(mode = getScreenShareMode()) {
+  const base = SCREEN_SHARE_PROFILES[mode] || SCREEN_SHARE_PROFILES[SCREEN_SHARE_DEFAULT_MODE]
+  // دستگاه ضعیف: انکود ۱۰۸۰p با ۳۰fps = گرما و افت فریم؛ سقف را پایین بیاور.
+  if (DEVICE_TIER === 'low') {
+    return {...base, fps: Math.min(base.fps, 15), maxHeight: 720}
+  }
+  return base
+}
+
+export function getDesktopFrameRate(mode) {
+  const {fps} = getScreenShareProfile(mode)
+  return {min: Math.min(5, fps), max: fps}
+}
 
 const IS_MOBILE = isMobileDevice()
 const IS_LOW_END = isLowEndDevice()
@@ -111,7 +164,12 @@ export const MULTI_STREAM_ENABLED =
  * medium : موبایل معمولی
  * high   : دسکتاپ قوی
  */
-export const DEVICE_TIER = IS_LOW_END ? 'low' : IS_MOBILE ? 'medium' : 'high'
+const IS_MID_DESKTOP =
+  !IS_MOBILE &&
+  typeof navigator !== 'undefined' &&
+  (navigator.hardwareConcurrency ?? 8) <= 4
+
+export const DEVICE_TIER = IS_LOW_END ? 'low' : IS_MOBILE || IS_MID_DESKTOP ? 'medium' : 'high'
 
 export const PERF = {
   tier: DEVICE_TIER,
@@ -144,7 +202,8 @@ export const PERF = {
 // =============================================================================
 export const JITSI_INIT_OPTIONS = {
   disableAudioLevels: false,
-  desktopSharingFrameRate: { min: Math.min(5, SCREEN_SHARE_MAX_FPS), max: SCREEN_SHARE_MAX_FPS },
+  // سقف کلی؛ مقدار هر اشتراک بر اساس حالت انتخابی در createLocalTracks می‌آید.
+  desktopSharingFrameRate: { min: 5, max: 30 },
   audioLevelsInterval: PERF.audioLevelsInterval,
   disableThirdPartyRequests: true,
 }
@@ -176,7 +235,11 @@ export const CONFERENCE_CONFIG = {
     mobileCodecPreferenceOrder: ['VP8', 'H264'],
   },
 
-  p2p: { enabled: false },
+  // P2P برای جلسه‌ی ۲ نفره: یک hop کمتر، تأخیر کمتر، بدون بار روی JVB.
+  // پیش‌فرض خاموش است؛ بعد از تست در شبکه‌های واقعی با VITE_JITSI_P2P=true روشن کن.
+  p2p: import.meta.env.VITE_JITSI_P2P === 'true'
+    ? { enabled: true, useStunTurn: true }
+    : { enabled: false },
 
   // multi-stream با سوییچ MULTI_STREAM_ENABLED (بالای همین فایل) کنترل می‌شود.
   ...(MULTI_STREAM_ENABLED
@@ -188,8 +251,8 @@ export const CONFERENCE_CONFIG = {
       }
     : {}),
 
-  // اشتراک صفحه: پیش‌فرض lib فقط ۵fps است
-  desktopSharingFrameRate: { min: Math.min(5, SCREEN_SHARE_MAX_FPS), max: SCREEN_SHARE_MAX_FPS },
+  // اشتراک صفحه: مقدار واقعی هر اشتراک از SCREEN_SHARE_PROFILES می‌آید.
+  desktopSharingFrameRate: { min: 5, max: 30 },
 
   // این دو تشخیص هیچ‌جای اپ استفاده نشده‌اند ولی هرکدام یک پردازش صوتی
   // دائمی روی میکروفون اجرا می‌کنند.
@@ -227,5 +290,12 @@ export const RECONNECT_CONFIG = {
   baseDelayMs: 1000, // تلاش اول بعد از ۱ ثانیه
   maxDelayMs: 15000, // سقف فاصله بین تلاش‌ها
 }
-// فریم‌ریت اشتراک صفحه (برای createLocalTracks({devices:['desktop']}))
-export const DESKTOP_SHARING_FRAME_RATE = { min: 1, max: SCREEN_SHARE_MAX_FPS }
+// کاهش خودکار کیفیت آپلود دوربین در packet loss بالا (به‌جای فریز شدن).
+// مقادیر درصد packet loss آپلود هستند (از LOCAL_STATS_UPDATED).
+export const ADAPTIVE_UPLOAD = {
+  lossHigh: 8, // بالاتر از این = شبکه ضعیف
+  lossLow: 2, // پایین‌تر از این = شبکه دوباره خوب شده
+  downSamples: 2, // چند نمونه‌ی پشت‌سرهم برای پایین‌آوردن
+  upSamples: 8, // چند نمونه‌ی پشت‌سرهم برای برگرداندن (محتاط‌تر)
+  lowHeight: 360,
+}

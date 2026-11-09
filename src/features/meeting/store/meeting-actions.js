@@ -856,6 +856,14 @@ export async function startScreenShare() {
 }
 
 /**
+ * حالت اشتراک صفحه: 'text' | 'balanced' | 'motion'
+ * اگر اشتراک فعال باشد همان لحظه اعمال می‌شود.
+ */
+export function setScreenShareMode(mode) {
+    return jitsiController.setScreenShareMode(mode)
+}
+
+/**
  * پایان screen share
  */
 export async function stopScreenShare() {
