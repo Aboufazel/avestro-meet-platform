@@ -16,15 +16,37 @@ import toast from 'react-hot-toast'
 import {useNavigate} from 'react-router-dom'
 import {useAuthStore} from '../../store/authStore'
 import {paymentsService} from '../../services/payments'
+import InlineOtpDialog from './InlineOtpDialog'
 
 const fa = (value) => Number(value || 0).toLocaleString('fa-IR')
 const money = (value) => `${fa(value)} ریال`
 const ring = 'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#4f7cff]/30'
 
-function Stepper({label, value, min = 10, max, stepUntil100 = 10, stepOver100 = 50, onChange, hint}) {
-    const update = (next) => onChange(Math.max(min, Math.min(max, next)))
-    const increase = value >= 100 ? stepOver100 : (value + stepUntil100 > 100 ? 150 : stepUntil100)
-    const decrease = value > 100 ? stepOver100 : stepUntil100
+/**
+ * مقدارهای مجاز ظرفیت (هم‌راستا با اعتبارسنجی سرور):
+ * از حداقل تا قبل از `single_step_below` یکی‌یکی، بعد گام تا ۱۰۰ و بالای ۱۰۰ گام بزرگ‌تر.
+ */
+function buildOptions(min, max, cfg) {
+    const stepLow = cfg.step_until_100 || 10
+    const stepHigh = cfg.step_over_100 || 50
+    const singleBelow = cfg.single_step_below ?? 10
+    const out = []
+    for (let v = min; v < singleBelow && v <= max; v += 1) out.push(v)
+    for (let v = Math.ceil(Math.max(singleBelow, min) / stepLow) * stepLow; v <= Math.min(100, max); v += stepLow) out.push(v)
+    for (let v = 100 + stepHigh; v <= max; v += stepHigh) out.push(v)
+    return out.length ? out : [min]
+}
+
+const snapDown = (options, value) => {
+    let best = options[0]
+    for (const option of options) if (option <= value) best = option
+    return best
+}
+
+function Stepper({label, value, options, onChange, hint}) {
+    const min = options[0]
+    const max = options[options.length - 1]
+    const index = Math.max(0, options.indexOf(value))
     return <div className="rounded-2xl border border-[#dce4f1] bg-white p-4">
         <div className="flex items-center justify-between gap-3">
             <div><p className="font-extrabold">{label}</p>{hint &&
@@ -32,16 +54,16 @@ function Stepper({label, value, min = 10, max, stepUntil100 = 10, stepOver100 = 
             <output aria-live="polite" className="text-2xl font-black tabular-nums text-[#3d66e8]">{fa(value)}</output>
         </div>
         <div className="mt-4 flex items-center gap-2">
-            <button type="button" aria-label={`کاهش ${label}`} disabled={value <= min}
-                    onClick={() => update(value - decrease)}
+            <button type="button" aria-label={`کاهش ${label}`} disabled={index <= 0}
+                    onClick={() => onChange(options[index - 1])}
                     className={`flex h-11 w-11 items-center justify-center rounded-xl border border-[#c8d3e5] disabled:opacity-40 ${ring}`}>
                 <Minus size={17}/></button>
             <div className="h-2 flex-1 overflow-hidden rounded-full bg-[#e9eef8]">
                 <div className="h-full rounded-full bg-[#315bd5] transition-all"
                      style={{width: `${Math.max(0, Math.min(100, (value / max) * 100))}%`}}/>
             </div>
-            <button type="button" aria-label={`افزایش ${label}`} disabled={value >= max}
-                    onClick={() => update(value + increase)}
+            <button type="button" aria-label={`افزایش ${label}`} disabled={index >= options.length - 1}
+                    onClick={() => onChange(options[index + 1])}
                     className={`flex h-11 w-11 items-center justify-center rounded-xl border border-[#c8d3e5] disabled:opacity-40 ${ring}`}>
                 <Plus size={17}/></button>
         </div>
@@ -56,8 +78,10 @@ export default function CustomPlanBuilder() {
     const authenticated = useAuthStore((s) => Boolean(s.token))
     const [planKind, setPlanKind] = useState('webinar')
     const [institutionKind, setInstitutionKind] = useState('government')
-    const [users, setUsers] = useState(100)
-    const [images, setImages] = useState(50)
+    const [rawUsers, setUsers] = useState(100)
+    const [rawImages, setImages] = useState(50)
+    const [otpOpen, setOtpOpen] = useState(false)
+    const setAuth = useAuthStore((s) => s.setAuth)
     const [duration, setDuration] = useState('month')
     const [requestedStartMode, setStartMode] = useState('now')
     const [promoCode, setPromoCode] = useState('')
@@ -77,6 +101,13 @@ export default function CustomPlanBuilder() {
         queryKey: ['custom-plan-config'],
         queryFn: () => paymentsService.customConfig().then((r) => r.data),
     })
+    const cfg = config || {}
+    const minUsers = cfg.min_users ?? 2
+    const minImages = cfg.min_images ?? 1
+    const userOptions = useMemo(() => buildOptions(minUsers, cfg.max_users || 3000, cfg), [config]) // eslint-disable-line react-hooks/exhaustive-deps
+    const users = userOptions.includes(rawUsers) ? rawUsers : snapDown(userOptions, rawUsers)
+    const imageOptions = useMemo(() => buildOptions(minImages, Math.min(cfg.max_images || 500, users), cfg), [config, users]) // eslint-disable-line react-hooks/exhaustive-deps
+    const images = imageOptions.includes(rawImages) ? rawImages : snapDown(imageOptions, rawImages)
     const payload = useMemo(() => ({
         plan_kind: planKind,
         institution_kind: planKind === 'class' ? institutionKind : null,
@@ -94,7 +125,7 @@ export default function CustomPlanBuilder() {
         staleTime: 0,
     })
     const checkout = useMutation({
-        mutationFn: () => paymentsService.customCheckout(payload),
+        mutationFn: (override) => paymentsService.customCheckout({...payload, ...(override || {})}),
         onSuccess: ({data}) => {
             queryClient.invalidateQueries({queryKey: ['my-subscription']})
             queryClient.invalidateQueries({queryKey: ['payment-orders']})
@@ -104,18 +135,20 @@ export default function CustomPlanBuilder() {
         onError: (error) => toast.error(error.response?.data?.detail || 'ثبت سفارش انجام نشد.'),
     })
 
-    const setUsersSafe = (next) => {
-        const value = Math.max(10, Math.min(config?.max_users || 3000, next))
-        setUsers(value)
-        if (images > value) {
-            const step = value <= 100 ? (config?.step_until_100 || 10) : (config?.step_over_100 || 50)
-            setImages(Math.max(10, Math.floor(value / step) * step))
-        }
-    }
-    const setImagesSafe = (next) => {
-        const value = Math.max(10, Math.min(config?.max_images || 500, users, next))
-        const step = value <= 100 ? (config?.step_until_100 || 10) : (config?.step_over_100 || 50)
-        setImages(Math.max(10, Math.floor(value / step) * step))
+    const setUsersSafe = (next) => setUsers(snapDown(userOptions, next))
+    const setImagesSafe = (next) => setImages(snapDown(imageOptions, next))
+
+    // بعد از تأیید شماره: ورود، سپس مستقیم ثبت سفارش و رفتن به درگاه
+    const onOtpVerified = async (data) => {
+        setAuth(data.access, data.user, data.refresh)
+        queryClient.invalidateQueries({queryKey: ['free-plans']})
+        let override = {}
+        try {
+            const {data: info} = await paymentsService.me()
+            if (info?.active) override = {start_mode: 'reserved'} // با اشتراک فعال فقط رزرو ممکن است
+        } catch { /* نادیده: سرور پیام مناسب می‌دهد */ }
+        setOtpOpen(false)
+        checkout.mutate(override)
     }
     const changeDuration = (value) => setDuration(value)
 
@@ -201,11 +234,9 @@ export default function CustomPlanBuilder() {
                 <div>
                     <p className="mb-3 text-md font-extrabold">۲- ظرفیت پلن</p>
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <Stepper label="تعداد کاربران" value={users} max={config.max_users}
-                                 stepUntil100={config.step_until_100} stepOver100={config.step_over_100}
+                        <Stepper label="تعداد کاربران" value={users} options={userOptions}
                                  onChange={setUsersSafe} hint="تعداد کل کاربران مجاز در پلن"/>
-                        <Stepper label="تعداد تصاویر هم‌زمان" value={images} max={Math.min(config.max_images, users)}
-                                 stepUntil100={config.step_until_100} stepOver100={config.step_over_100}
+                        <Stepper label="تعداد تصاویر هم‌زمان" value={images} options={imageOptions}
                                  onChange={setImagesSafe} hint="تعداد تصویرهای مجاز هم‌زمان"/>
                     </div>
                     {users > 200 && <p role="status"
@@ -317,21 +348,22 @@ export default function CustomPlanBuilder() {
                 <button type="button" disabled={!quote || quoteLoading || checkout.isPending || quoteError}
                         onClick={() => {
                             if (!authenticated) {
-                                navigate(`/login?next=${encodeURIComponent('/dashboard/pricing')}`);
+                                setOtpOpen(true)
                                 return
                             }
                             checkout.mutate()
                         }}
                         className={`mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#315bd5] px-4 py-3 text-sm font-extrabold text-white hover:bg-[#3d66e8] disabled:cursor-not-allowed disabled:opacity-50 ${ring}`}>
                     {checkout.isPending ? <Loader2 size={17} className="animate-spin"/> : <><ShieldCheck
-                        size={17}/> ادامه و پرداخت <ArrowLeft size={16}/></>}
+                        size={17}/> {authenticated ? 'ادامه و پرداخت' : 'تأیید شماره و پرداخت'} <ArrowLeft size={16}/></>}
                 </button>
                 {!authenticated &&
-                    <p className="mt-2 text-center text-[11px] text-[#68758a]">برای ادامه خرید ابتدا وارد حساب
-                        شوید.</p>}
+                    <p className="mt-2 text-center text-[11px] text-[#68758a]">برای ادامه فقط شماره موبایل شما با کد پیامکی
+                        تأیید می‌شود؛ نیازی به ساخت جداگانه حساب نیست.</p>}
                 <p className="mt-3 text-center text-[10px] leading-5 text-[#7b879b]">مالیات و تخفیف‌ها مطابق تنظیمات
                     سامانه محاسبه می‌شوند.</p>
             </aside>
         </div>
+        <InlineOtpDialog open={otpOpen} onClose={() => setOtpOpen(false)} onVerified={onOtpVerified}/>
     </section>
 }

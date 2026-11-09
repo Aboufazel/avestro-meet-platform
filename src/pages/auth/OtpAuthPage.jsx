@@ -5,12 +5,7 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { useOtpRequest, useOtpVerify } from '../../hooks/useAuth'
 import { appRoutes } from '../../routes/appRoutes'
-
-const FA = '۰۱۲۳۴۵۶۷۸۹'
-const toEnDigits = (v) => String(v).replace(/[۰-۹]/g, (d) => FA.indexOf(d)).replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
-const PHONE_RE = /^09\d{9}$/
-const CODE_LENGTH = 5
-const fa = (n) => Number(n).toLocaleString('fa-IR')
+import { OTP_CODE_LENGTH as CODE_LENGTH, PHONE_RE, faNumber as fa, toEnDigits } from '../../utils/phoneInput'
 
 /**
  * ورود و ثبت‌نام یکسان: شماره‌ی موبایل ← کد پیامکی. mode فقط متن‌ها و فیلد نام اختیاری را عوض می‌کند.
