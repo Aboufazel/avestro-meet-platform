@@ -140,8 +140,12 @@ export async function joinMeeting({roomName, displayName, email = ''}) {
     const allowed = await _checkRoomCapacity(roomName, externalId, displayName)
     if (generation !== _joinGeneration) return
     if (!allowed.ok) {
-        store._setError({message: allowed.message})
+        store._setError({title: allowed.title, message: allowed.message})
         return
+    }
+    // تصاویر پلن در جلسه‌ی دیگری پر است: به میزبان می‌گوییم این جلسه چه ویژگی‌ای دارد و چرا
+    if (allowed.planNotice) {
+        window.dispatchEvent(new CustomEvent('meet:plan-notice', {detail: allowed.planNotice}))
     }
     _startHeartbeat(roomName, externalId)
 
@@ -668,12 +672,15 @@ async function _checkRoomCapacity(roomName, externalId, displayName) {
                 // ignore
             }
             // null = سرور Jitsi هنوز بدون JWT است (ورود آزاد)
-            return {ok: true, token: data.jitsi_token || null}
+            return {ok: true, token: data.jitsi_token || null, planNotice: data.plan_notice || null}
         }
 
         let detail = ''
+        let code = ''
         try {
-            detail = (await res.json())?.detail || ''
+            const body = await res.json()
+            detail = body?.detail || ''
+            code = body?.code || ''
         } catch {
             // پاسخ JSON نبود
         }
@@ -681,9 +688,11 @@ async function _checkRoomCapacity(roomName, externalId, displayName) {
         return {
             ok: false,
             status: res.status,
+            code,
+            title: code === 'plan_users_full' ? 'ظرفیت کاربران پلن تکمیل است' : undefined,
             message:
                 res.status === 409
-                    ? 'ظرفیت این جلسه بر اساس پلن میزبان تکمیل شده است.'
+                    ? detail || 'ظرفیت این جلسه بر اساس پلن میزبان تکمیل شده است.'
                     : res.status === 401
                         ? 'نشست شما منقضی شده است؛ لطفاً دوباره وارد شوید.'
                         : detail || 'ورود به جلسه ممکن نشد.',

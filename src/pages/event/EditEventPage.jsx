@@ -14,7 +14,7 @@ import {JalaliDateTimePicker} from '../../components/ui/JalaliDateTimePicker'
 import {isoToLocalValue} from '../../utils/jalali'
 import {useRoom, useUpdateRoom} from '../../hooks/useRooms'
 import {paymentsService} from '../../services/payments'
-import {readRoomBudget, budgetHint, faNumber} from '../../utils/roomBudget'
+import {readRoomBudget, limitHint, faNumber} from '../../utils/roomBudget'
 import {RoomAccessSettings} from '../../components/shared/RoomAccessSettings'
 import ClassFeatureSettings from './ClassFeatureSettings'
 
@@ -73,16 +73,14 @@ export default function EditEventPage() {
         isPending: isUpdating,
     } = useUpdateRoom(slug)
 
-    // بودجه‌ی پلن: سقف این اتاق = باقی‌مانده‌ی پلن + سهم فعلی خودِ همین اتاق
+    // سقف این اتاق = کل پلن (تعداد اتاق‌ها و سهم اتاق‌های دیگر مهم نیست)
     const {data: subscriptionInfo} = useQuery({
         queryKey: ['my-subscription'],
         queryFn: () => paymentsService.me().then((response) => response.data),
     })
     const budget = readRoomBudget(subscriptionInfo)
-    const ownUsers = Number(room?.max_participants || 0)
-    const ownImages = Number(room?.allocated_video_streams || 0)
-    const usersCap = budget.usersRemaining == null ? null : budget.usersRemaining + ownUsers
-    const imagesCap = budget.imagesRemaining == null ? null : budget.imagesRemaining + ownImages
+    const usersCap = budget.usersTotal
+    const imagesCap = budget.imagesTotal
 
 
     const {
@@ -136,11 +134,11 @@ export default function EditEventPage() {
             return
         }
         if (usersCap != null && Number(data.max_participants) > usersCap) {
-            toast.error(`ظرفیت این اتاق حداکثر ${faNumber(usersCap)} نفر می‌تواند باشد (باقی‌مانده‌ی پلن)`)
+            toast.error(`ظرفیت این اتاق حداکثر ${faNumber(usersCap)} نفر می‌تواند باشد (کل پلن)`)
             return
         }
         if (imagesCap != null && Number(data.allocated_video_streams) > imagesCap) {
-            toast.error(`سهم تصاویر این اتاق حداکثر ${faNumber(imagesCap)} می‌تواند باشد (باقی‌مانده‌ی پلن)`)
+            toast.error(`سهم تصاویر این اتاق حداکثر ${faNumber(imagesCap)} می‌تواند باشد (کل پلن)`)
             return
         }
         updateRoom(
@@ -367,8 +365,8 @@ export default function EditEventPage() {
                                 {...register('allocated_video_streams')}
                             />
                             <div className="space-y-1 text-xs leading-6 text-[#8d98aa] sm:col-span-2">
-                                <p>{budgetHint({total: budget.usersTotal, used: budget.usersUsed, remaining: budget.usersRemaining, unit: 'نفر', ownShare: ownUsers})}</p>
-                                <p>{budgetHint({total: budget.imagesTotal, used: budget.imagesUsed, remaining: budget.imagesRemaining, unit: 'تصویر', ownShare: ownImages})}</p>
+                                <p>{limitHint({total: budget.usersTotal, unit: 'نفر'})}</p>
+                                <p>{limitHint({total: budget.imagesTotal, unit: 'تصویر'})}</p>
                             </div>
 
                         </div>

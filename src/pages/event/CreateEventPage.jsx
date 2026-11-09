@@ -28,7 +28,7 @@ import {JalaliDateTimePicker} from '../../components/ui/JalaliDateTimePicker'
 import {roomsService} from '../../services/rooms'
 import {paymentsService} from '../../services/payments'
 import {RoomAccessSettings} from '../../components/shared/RoomAccessSettings'
-import {readRoomBudget, budgetHint, faNumber} from '../../utils/roomBudget'
+import {readRoomBudget, limitHint, faNumber} from '../../utils/roomBudget'
 
 const FEATURE_META = {
     whiteboard: {title: 'تخته تعاملی', hint: 'نوشتن و ترسیم هم‌زمان روی یک فضای مشترک', icon: PenTool},
@@ -123,25 +123,23 @@ export default function CreateEventPage() {
         ))
     }, [allowedRoomKinds])
 
-    // بودجه‌ی پلن: سقف هر اتاق = باقی‌مانده‌ی کاربر/تصویر پلن (مجموع اتاق‌ها از پلن بیشتر نمی‌شود). null = نامحدود.
+    // سقف هر اتاق = کل کاربر/تصویر پلن (تعداد اتاق‌ها محدودیت ندارد). null = نامحدود.
     const budget = readRoomBudget(subscriptionInfo)
-    const participantLimit = budget.usersRemaining
-    const imageLimit = budget.imagesRemaining
-    const budgetExhausted = Boolean(activeSubscription) && ((participantLimit != null && participantLimit < 2) || (imageLimit != null && imageLimit < 1))
+    const participantLimit = budget.usersTotal
+    const imageLimit = budget.imagesTotal
     const [isPrivate, setIsPrivate] = useState(false)
     const [allowGuests, setAllowGuests] = useState(true)
     const [invitedPeople, setInvitedPeople] = useState([])
     const [configureFeatures, setConfigureFeatures] = useState(true)
     const [featureDraft, setFeatureDraft] = useState({})
+    // فیلدهای ظرفیت و تصویر با کل پلن پر می‌شوند و کاربر می‌تواند کمترشان کند (فقط یک بار، تا ویرایش کاربر بازنویسی نشود)
+    const [limitsPrefilled, setLimitsPrefilled] = useState(false)
     useEffect(() => {
-        if (participantLimit != null) {
-            setMaxParticipants((current) => {
-                const value = Number(current)
-                if (Number.isInteger(value) && value >= 2 && value <= participantLimit) return current
-                return String(Math.max(2, participantLimit))
-            })
-        }
-    }, [participantLimit])
+        if (limitsPrefilled || !activeSubscription) return
+        if (participantLimit != null) setMaxParticipants(String(participantLimit))
+        if (imageLimit != null) setAllocatedVideoStreams(String(imageLimit))
+        setLimitsPrefilled(true)
+    }, [limitsPrefilled, activeSubscription, participantLimit, imageLimit])
 
     const {data: accountFeatures = [], isLoading: featuresLoading, isError: featuresError} = useQuery({
         queryKey: ['account-features'],
@@ -197,14 +195,14 @@ export default function CreateEventPage() {
         }
         const capacity = Number(maxParticipants)
         if (!Number.isInteger(capacity) || capacity < 2 || (participantLimit != null && capacity > participantLimit)) {
-            toast.error(participantLimit != null ? `ظرفیت باید بین ۲ تا ${faNumber(participantLimit)} نفر باشد (باقی‌مانده‌ی پلن)` : 'ظرفیت باید حداقل ۲ نفر باشد');
+            toast.error(participantLimit != null ? `ظرفیت باید بین ۲ تا ${faNumber(participantLimit)} نفر باشد (کل پلن)` : 'ظرفیت باید حداقل ۲ نفر باشد');
             setStep(0);
             return
         }
 
         const imageAllocation = Number(allocatedVideoStreams)
         if (!Number.isInteger(imageAllocation) || imageAllocation < 1 || (imageLimit != null && imageAllocation > imageLimit)) {
-            toast.error(imageLimit != null ? `سهم تصاویر باید بین ۱ تا ${faNumber(imageLimit)} باشد (باقی‌مانده‌ی پلن)` : 'سهم تصاویر باید حداقل ۱ باشد');
+            toast.error(imageLimit != null ? `سهم تصاویر باید بین ۱ تا ${faNumber(imageLimit)} باشد (کل پلن)` : 'سهم تصاویر باید حداقل ۱ باشد');
             setStep(0);
             return
         }
@@ -382,14 +380,6 @@ export default function CreateEventPage() {
                                           rows={3} placeholder="توضیح کوتاهی درباره رویداد..."
                                           className="w-full resize-none rounded-xl border border-[#e1e6ef] bg-[#f8faff] px-4 py-3 text-sm text-[#101827] outline-none transition focus:border-[#9eb6ff] focus:ring-2 focus:ring-[#4f7cff]/15"/>
                             </div>
-                            {budgetExhausted && (
-                                <div role="alert"
-                                     className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-800">
-                                    سهم کاربران یا تصاویر پلن شما تمام شده است و اتاق جدید نمی‌توان ساخت. برای آزادشدن
-                                    سهم، <Link to="/dashboard/rooms" className="font-bold underline">یک اتاق را
-                                    حذف</Link> یا ظرفیت اتاقی را کم کنید.
-                                </div>
-                            )}
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <JalaliDateTimePicker label="تاریخ و ساعت برگزاری (اختیاری)" value={scheduledAt}
                                                       onChange={setScheduledAt}/>
@@ -403,18 +393,8 @@ export default function CreateEventPage() {
                                        className="meet-auth-input"/>
                             </div>
                             <div className="space-y-1 text-xs leading-6 text-[#8d98aa]">
-                                <p>{budgetHint({
-                                    total: budget.usersTotal,
-                                    used: budget.usersUsed,
-                                    remaining: budget.usersRemaining,
-                                    unit: 'نفر'
-                                })}</p>
-                                <p>{budgetHint({
-                                    total: budget.imagesTotal,
-                                    used: budget.imagesUsed,
-                                    remaining: budget.imagesRemaining,
-                                    unit: 'تصویر'
-                                })}</p>
+                                <p>{limitHint({total: budget.usersTotal, unit: 'نفر'})}</p>
+                                <p>{limitHint({total: budget.imagesTotal, unit: 'تصویر'})}</p>
                             </div>
                             <label
                                 className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#e5eaf2] bg-[#f8faff] p-4">
@@ -644,16 +624,12 @@ export default function CreateEventPage() {
                                             toast.error('شناسه لینک معتبر نیست');
                                             return
                                         }
-                                        if (budgetExhausted) {
-                                            toast.error('سهم کاربران یا تصاویر پلن تمام شده است');
-                                            return
-                                        }
                                         if (Number(maxParticipants) < 2 || (participantLimit != null && Number(maxParticipants) > participantLimit)) {
-                                            toast.error('ظرفیت از باقی‌مانده‌ی پلن بیشتر است');
+                                            toast.error('ظرفیت از کل پلن بیشتر است');
                                             return
                                         }
                                         if (Number(allocatedVideoStreams) < 1 || (imageLimit != null && Number(allocatedVideoStreams) > imageLimit)) {
-                                            toast.error('سهم تصاویر از باقی‌مانده‌ی پلن بیشتر است');
+                                            toast.error('سهم تصاویر از کل پلن بیشتر است');
                                             return
                                         }
                                     }

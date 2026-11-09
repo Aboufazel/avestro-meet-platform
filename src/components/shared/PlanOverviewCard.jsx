@@ -17,7 +17,7 @@ function tone(percent) {
     return {bar: 'bg-[#35b992]', text: 'text-[#16815f]', label: 'در محدوده'}
 }
 
-function Meter({icon: Icon, title, unit, total, used, remaining}) {
+function Meter({icon: Icon, title, unit, total, used, available}) {
     const unlimited = total == null
     const percent = unlimited || total <= 0 ? 0 : Math.min(100, Math.round((used / total) * 100))
     const t = tone(percent)
@@ -33,7 +33,8 @@ function Meter({icon: Icon, title, unit, total, used, remaining}) {
                 {!unlimited && <span
                     className={`rounded-full bg-[#f4f7fb] px-2 py-0.5 text-[11px] font-bold ${t.text}`}>{t.label}</span>}
             </div>
-            <p className="mt-3 flex items-baseline gap-1 text-[#101827]">
+            <p className="mt-3 flex flex-wrap items-baseline gap-1 text-[#101827]">
+                <span className="text-xs text-[#8d98aa]">همین الان:</span>
                 <span className="text-2xl font-extrabold tabular-nums">{faNumber(used)}</span>
                 <span className="text-xs text-[#8d98aa]">از</span>
                 {unlimited
@@ -45,12 +46,12 @@ function Meter({icon: Icon, title, unit, total, used, remaining}) {
             {!unlimited && (
                 <>
                     <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-[#edf1f7]" role="progressbar"
-                         aria-label={`مصرف ${title}`} aria-valuemin={0} aria-valuemax={total} aria-valuenow={used}
+                         aria-label={`وضعیت لحظه‌ای ${title}`} aria-valuemin={0} aria-valuemax={total} aria-valuenow={used}
                          aria-valuetext={`${faNumber(used)} از ${faNumber(total)} ${unit}`}>
                         <div className={`h-full rounded-full transition-all ${t.bar}`} style={{width: `${percent}%`}}/>
                     </div>
-                    <p className="mt-2 text-xs text-[#68758a]">باقی‌مانده: <b
-                        className="tabular-nums text-[#101827]">{faNumber(remaining)}</b> {unit}</p>
+                    <p className="mt-2 text-xs text-[#68758a]">جای خالی برای جلسه‌های زنده: <b
+                        className="tabular-nums text-[#101827]">{faNumber(available)}</b> {unit}</p>
                 </>
             )}
         </div>
@@ -58,7 +59,7 @@ function Meter({icon: Icon, title, unit, total, used, remaining}) {
 }
 
 /**
- * کارت جمع‌وجور وضعیت پلن در نمای کلی: مصرف کاربر و تصویر نسبت به بودجه‌ی پلن.
+ * کارت جمع‌وجور وضعیت پلن در نمای کلی: وضعیت لحظه‌ای کاربر و تصویر نسبت به سقف پلن.
  * subscription: پاسخ GET /payments/subscription/ — تعداد اتاق‌ها فقط اطلاعاتی است.
  */
 export default function PlanOverviewCard({subscription, loading}) {
@@ -113,15 +114,16 @@ export default function PlanOverviewCard({subscription, loading}) {
 
             {!loading && active && (
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <Meter icon={Users} title="کاربران" unit="نفر" total={budget.usersTotal} used={budget.usersUsed}
-                           remaining={budget.usersRemaining}/>
+                    <Meter icon={Users} title="کاربران" unit="نفر" total={budget.usersTotal} used={budget.usersLive}
+                           available={budget.usersAvailable}/>
                     <Meter icon={ImageIcon} title="تصاویر هم‌زمان" unit="تصویر" total={budget.imagesTotal}
-                           used={budget.imagesUsed} remaining={budget.imagesRemaining}/>
+                           used={budget.imagesLive} available={budget.imagesAvailable}/>
                 </div>
             )}
             {!loading && active &&
-                <p className="mt-3 text-[11px] leading-6 text-[#8d98aa]">مجموع ظرفیت و تصاویر اتاق‌های شما از بودجه‌ی
-                    پلن بیشتر نمی‌شود؛ تعداد اتاق‌ها محدودیتی ندارد و با حذف یک اتاق سهمش آزاد می‌شود.</p>}
+                <p className="mt-3 text-[11px] leading-6 text-[#8d98aa]">تعداد اتاق‌ها محدودیتی ندارد. اعداد بالا
+                    وضعیت لحظه‌ای جلسه‌های زنده است: وقتی کاربران پلن (با احتساب میزبان) پر شود، جلسه‌ی دیگری شروع
+                    نمی‌شود و وقتی تصاویر پر شود، جلسه‌ی جدید بدون تصویر برگزار می‌شود.</p>}
             {!loading && !active && reserved &&
                 <p className="mt-3 rounded-xl bg-[#edf2ff] px-3 py-2.5 text-xs leading-6 text-[#3d66e8]">پلن رزروشده
                     است؛ مصرف و روزهای اعتبار پس از شروع پلن نمایش داده می‌شوند.</p>}

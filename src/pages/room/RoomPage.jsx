@@ -83,6 +83,7 @@ export default function RoomPage() {
     const [attendanceOpen, setAttendanceOpen] = useState(false)
     const [endOpen, setEndOpen] = useState(false)
     const [guard, setGuard] = useState(null) // null | 'exit' | 'reload'
+    const [planNotice, setPlanNotice] = useState(null) // توضیح میزبان: چرا این جلسه بدون تصویر شروع شد
     const allowUnloadRef = useRef(false)
     const [documentsOpen, setDocumentsOpen] = useState(false)
     const [whiteboardOpen, setWhiteboardOpen] = useState(false)
@@ -152,15 +153,18 @@ export default function RoomPage() {
     useEffect(() => {
         const forceMuteVideo = () => {
             if (!isVideoMuted) toggleVideo()
-            toast.error('سقف تعداد دوربین‌های فعال پلن میزبان تکمیل شده است.')
+            toast.error('تمام تصاویر پلن میزبان در جلسه‌های زنده روشن است؛ تا آزاد شدن یک تصویر نمی‌توانید دوربین را روشن کنید.')
         }
         const forceMuteForPermission = () => {
             if (!isVideoMuted) toggleVideo()
             toast.error('اجازه استفاده از دوربین برای شما فعال نیست.')
         }
+        const showPlanNotice = (event) => setPlanNotice(event.detail || null)
+        window.addEventListener('meet:plan-notice', showPlanNotice)
         window.addEventListener('meet:video-limit-reached', forceMuteVideo)
         window.addEventListener('meet:video-permission-required', forceMuteForPermission)
         return () => {
+            window.removeEventListener('meet:plan-notice', showPlanNotice)
             window.removeEventListener('meet:video-limit-reached', forceMuteVideo)
             window.removeEventListener('meet:video-permission-required', forceMuteForPermission)
         }
@@ -353,6 +357,19 @@ export default function RoomPage() {
         </div>
     )
 
+    const planNoticeBanner = planNotice && isHostRole && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 room-pop w-[min(560px,calc(100%-24px))]">
+            <div role="status"
+                 className="flex items-start gap-3 rounded-2xl bg-[var(--room-surface)] border room-border px-4 py-3 text-xs leading-6 shadow-xl">
+                <span className="mt-2 w-2 h-2 shrink-0 rounded-full bg-[var(--room-warning)]"/>
+                <p className="flex-1">{planNotice.message}</p>
+                <button type="button" onClick={() => setPlanNotice(null)} aria-label="بستن پیام"
+                        className="shrink-0 rounded-lg px-2 text-white/60 hover:text-white">✕
+                </button>
+            </div>
+        </div>
+    )
+
     const controlProps = {
         isAudioMuted,
         isVideoMuted,
@@ -424,6 +441,7 @@ export default function RoomPage() {
                                                  canControl={canControlMedia}
                                                  onOpenAttendance={canAttendance ? () => setAttendanceOpen(true) : undefined}/>
                                     {reconnectBanner}
+                                    {planNoticeBanner}
                                 </main>
                             </div>
                         ) : (
@@ -443,6 +461,7 @@ export default function RoomPage() {
                                                     aria-label="بازکردن تخته تعاملی"><PenTool size={16}/><span>تخته تعاملی</span>
                                             </button>}
                                         {reconnectBanner}
+                                    {planNoticeBanner}
                                         <MeetingControls {...controlProps} />
                                     </main>
                                 </div>
