@@ -5,6 +5,7 @@ import AuthProvider from '../providers/AuthProvider'
 
 import LoginPage from '../pages/auth/LoginPage'
 import RegisterPage from '../pages/auth/RegisterPage'
+import PasswordLoginPage from '../pages/auth/PasswordLoginPage'
 import DashboardPage from '../pages/dashboard/DashboardPage'
 import RoomsPage from '../pages/dashboard/RoomsPage'
 import CreateEventPage from '../pages/event/CreateEventPage'
@@ -21,6 +22,7 @@ import BillingResultPage from '../pages/landing/BillingResultPage'
 import PeoplePage from '../pages/people/PeoplePage'
 import ClassReportsPage from '../pages/dashboard/ClassReportsPage'
 import ClassReportDetailPage from '../pages/dashboard/ClassReportDetailPage'
+import ProfilePage from '../pages/settings/ProfilePage'
 
 const router = createBrowserRouter([
     {
@@ -34,6 +36,14 @@ const router = createBrowserRouter([
         element: (
             <GuestRoute>
                 <LoginPage/>
+            </GuestRoute>
+        )
+    },
+    {
+        path: appRoutes.auth.passwordLogin,
+        element: (
+            <GuestRoute>
+                <PasswordLoginPage/>
             </GuestRoute>
         )
     },
@@ -78,6 +88,7 @@ const router = createBrowserRouter([
             { path: appRoutes.dashboard.subscription, element: <SubscriptionPage/> },
             { path: appRoutes.dashboard.pricing, element: <PricingPage/> },
             { path: appRoutes.dashboard.people, element: <PeoplePage/> },
+            { path: appRoutes.dashboard.profile, element: <ProfilePage/> },
         ]
     },
     {

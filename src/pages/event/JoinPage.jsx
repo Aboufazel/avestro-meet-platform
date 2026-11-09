@@ -12,6 +12,7 @@ import { useAuthStore } from '../../store/authStore'
 import { roomsService } from '../../services/rooms'
 import { useRoom } from '../../hooks/useRooms'
 import { appRoutes } from '../../routes/appRoutes'
+import { userDisplayName } from '../../utils/userName'
 
 const guestSchema = yup.object({ guest_name: yup.string().required('نام الزامی است').min(2, 'حداقل ۲ کاراکتر') })
 const classGuestSchema = yup.object({
@@ -123,7 +124,7 @@ export default function JoinPage() {
                 <h2 className="text-lg sm:text-xl font-bold">ورود</h2><p className="text-xs text-[#8d98aa] mt-2 mb-4 sm:mb-6">روش ورود خود را انتخاب کنید.</p>
                 {token ? (
                   <>
-                    <div className="flex items-center gap-3 p-3.5 bg-[#f8faff] rounded-2xl border border-[#e5eaf2] mb-3"><Avatar name={user?.display_name || user?.username} size="sm" /><div className="min-w-0"><p className="text-sm font-medium truncate">{user?.display_name || user?.username}</p><p className="text-[11px] text-[#9aa4b4] truncate mt-1">{user?.email}</p></div><span className="mr-auto w-2 h-2 rounded-full bg-[#54d9b0]" /></div>
+                    <div className="flex items-center gap-3 p-3.5 bg-[#f8faff] rounded-2xl border border-[#e5eaf2] mb-3"><Avatar name={userDisplayName(user)} size="sm" /><div className="min-w-0"><p className="text-sm font-medium truncate">{userDisplayName(user)}</p><p className="text-[11px] text-[#9aa4b4] truncate mt-1">{user?.email || user?.phone_number}</p></div><span className="mr-auto w-2 h-2 rounded-full bg-[#54d9b0]" /></div>
                     <Button fullWidth size="lg" onClick={handleJoinAsUser} className="!bg-gradient-to-l !from-[#4f7cff] !to-[#6a8fff] !text-white !border-0 !rounded-xl">ورود با حساب کاربری</Button>
                     {/*<Button fullWidth variant="ghost" onClick={() => setMode('guest')} className="!text-[#68758a] hover:!bg-[#f4f7fb] mt-2">ورود</Button>*/}
                   </>

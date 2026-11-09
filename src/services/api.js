@@ -9,7 +9,7 @@ const api = axios.create({
   },
 })
 
-const AUTH_URLS = ['/auth/login/', '/auth/refresh/', '/auth/register/']
+const AUTH_URLS = ['/auth/login/', '/auth/refresh/', '/auth/otp/']
 
 function readAuth() {
   try {

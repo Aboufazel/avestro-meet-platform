@@ -14,6 +14,7 @@ import {useAuthStore} from '../../store/authStore'
 import {useRooms} from '../../hooks/useRooms'
 import {paymentsService} from '../../services/payments'
 import PlanOverviewCard from '../../components/shared/PlanOverviewCard'
+import {userDisplayName} from '../../utils/userName'
 
 function Shortcut({to, icon: Icon, title, description, tone = 'blue'}) {
     return <Link to={to} className="group meet-card meet-card-hover flex min-h-[156px] flex-col justify-between p-5">
@@ -50,12 +51,13 @@ export default function DashboardPage() {
             <header
                 className="dashboard-hero mb-5 flex flex-col gap-5 rounded-[26px] p-5 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:p-7">
                 <div><p className="mb-2 text-xs font-bold text-[#4f7cff]">نمای کلی فضای کاری</p><h1
-                    className="text-2xl font-extrabold tracking-tight text-[#101827] sm:text-3xl">{user?.display_name || user?.username || 'کاربر'}،
+                    className="text-2xl font-extrabold tracking-tight text-[#101827] sm:text-3xl">{userDisplayName(user)}،
                     خوش آمدید</h1><p className="mt-2 text-sm text-[#68758a]">مدیریت جلسات و اتاق‌های آنلاین از یک فضای
                     ساده و یکپارچه.</p></div>
                 <Link to="/dashboard/create"
                       className="meet-primary-btn inline-flex min-h-12 items-center justify-center gap-2 self-stretch rounded-xl px-5 text-sm font-bold sm:self-start"><Plus
                     size={18}/>ساخت اتاق جدید</Link></header>
+            {user && !user.display_name && <Link to="/dashboard/profile" className="mb-5 flex items-center justify-between gap-3 rounded-2xl border border-[#d9e3ff] bg-[#f3f6ff] px-4 py-3 text-sm text-[#3d66e8]"><span>پروفایل خود را کامل کنید تا نام شما در جلسه‌ها نمایش داده شود.</span><ArrowLeft size={16}/></Link>}
             <div className="mb-6 grid gap-3 sm:grid-cols-3"><Metric
                 value={isLoading ? '—' : live.toLocaleString('fa-IR')} label="اتاق در حال برگزاری" icon={Video}/><Metric
                 value={isLoading ? '—' : scheduled.toLocaleString('fa-IR')} label="اتاق زمان‌بندی‌شده"

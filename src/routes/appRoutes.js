@@ -5,6 +5,7 @@ export const appRoutes = {
   auth: {
     login: '/login',
     register: '/register',
+    passwordLogin: '/login/password',
   },
   dashboard: {
     indexPage: '/dashboard',
@@ -17,6 +18,7 @@ export const appRoutes = {
     settings: '/dashboard/settings',
     subscription: '/dashboard/subscription',
     people: '/dashboard/people',
+    profile: '/dashboard/profile',
   },
   event: {
     join: '/join/:slug',

@@ -1,6 +1,7 @@
 import {Link, useLocation} from 'react-router-dom'
 import {useAuthStore} from '../../store/authStore'
 import CustomPlanBuilder from '../../components/shared/CustomPlanBuilder'
+import FreePlanCards from '../../components/shared/FreePlanCards'
 
 export default function PricingPage() {
     const isAuthenticated = useAuthStore((s) => Boolean(s.token))
@@ -36,6 +37,7 @@ export default function PricingPage() {
                     دسترسی به تمامی امکانات ساخت وبینار، جلسه و کلاس‌آموزشی برای شما در دسترس است
                 </p>
             </section>
+            <FreePlanCards/>
             <CustomPlanBuilder/>
         </main>
     </div>

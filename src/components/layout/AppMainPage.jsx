@@ -6,6 +6,7 @@ import { useAuthStore } from '../../store/authStore'
 import { Avatar } from '../ui/Avatar'
 import { useDialogFocus } from '../../hooks/useDialogFocus'
 import toast from 'react-hot-toast'
+import { userDisplayName } from '../../utils/userName'
 
 function MobileItem({ to, icon: Icon, label }) {
   return <NavLink to={to} end={to === '/dashboard'} className={({ isActive }) => `flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 text-[11px] font-semibold transition ${isActive ? 'text-[#4f7cff]' : 'text-[#71809a]'}`} aria-label={label}>
@@ -46,9 +47,9 @@ export function AppMainPage() {
     {moreOpen && <div className="fixed inset-0 z-[70] bg-[#08101d]/45 backdrop-blur-sm lg:hidden" onClick={close}>
       <section ref={sheetRef} role="dialog" aria-modal="true" aria-label="بیشتر و حساب کاربری" onClick={e => e.stopPropagation()} className="absolute inset-x-0 bottom-0 rounded-t-[28px] border border-white/70 bg-white px-5 pt-3 pb-[max(20px,env(safe-area-inset-bottom))] text-[#101827] shadow-2xl" style={{animation:'room-sheet-in .28s ease both'}}>
         <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-[#d9e1ee]"/><div className="mb-4 flex items-center justify-between"><h2 className="text-base font-extrabold">بیشتر</h2><button data-autofocus onClick={close} aria-label="بستن" className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#f4f7fb]"><X size={18}/></button></div>
-        <div className="mb-3 flex items-center gap-3 rounded-2xl bg-[#f6f8fc] p-3"><Avatar name={user?.display_name || user?.username || 'کاربر'} size="lg"/><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{user?.display_name || user?.username || 'کاربر'}</p><p className="mt-1 truncate text-xs text-[#8d98aa]">{user?.email || ''}</p></div><UserRound className="text-[#8d98aa]"/></div>
+        <div className="mb-3 flex items-center gap-3 rounded-2xl bg-[#f6f8fc] p-3"><Avatar name={userDisplayName(user)} size="lg"/><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{userDisplayName(user)}</p><p className="mt-1 truncate text-xs text-[#8d98aa]">{user?.email || user?.phone_number || ''}</p></div><UserRound className="text-[#8d98aa]"/></div>
         <div className="grid grid-cols-2 gap-2">
-          {[['/dashboard/people',Users,'تعریف کاربران'],['/dashboard/subscription',CreditCard,'اشتراک و پرداخت'],['/dashboard/pricing',Tags,'ساخت پلن'],['/dashboard/settings',Settings,'تنظیمات حساب']].map(([to,Icon,label])=><NavLink key={to} to={to} onClick={close} className="flex min-h-12 items-center gap-2 rounded-xl border border-[#e8edf5] px-3 text-sm font-semibold text-[#34415a] hover:bg-[#f6f8fc]"><Icon size={17} className="text-[#4f7cff]"/>{label}</NavLink>)}
+          {[['/dashboard/profile',UserRound,'پروفایل'],['/dashboard/people',Users,'تعریف کاربران'],['/dashboard/subscription',CreditCard,'اشتراک و پرداخت'],['/dashboard/pricing',Tags,'ساخت پلن'],['/dashboard/settings',Settings,'تنظیمات حساب']].map(([to,Icon,label])=><NavLink key={to} to={to} onClick={close} className="flex min-h-12 items-center gap-2 rounded-xl border border-[#e8edf5] px-3 text-sm font-semibold text-[#34415a] hover:bg-[#f6f8fc]"><Icon size={17} className="text-[#4f7cff]"/>{label}</NavLink>)}
         </div>
         <button onClick={close} className="mt-2 flex min-h-12 w-full items-center gap-2 rounded-xl px-3 text-sm font-semibold text-[#34415a] hover:bg-[#f6f8fc]"><Headset size={17}/>راهنما و پشتیبانی</button>
         <button onClick={handleLogout} className="mt-2 flex min-h-12 w-full items-center gap-2 rounded-xl bg-[#fff3f4] px-3 text-sm font-bold text-[#d64052]"><LogOut size={17}/>خروج از حساب</button>

@@ -197,7 +197,7 @@ const daysLeft = (iso) => {
 export function SubscriptionPlanCard({ subscription, reserved = false, usage = {} }) {
   const plan = subscription.plan || {}
   const customSnapshot = subscription.custom_plan_snapshot || {}
-  const customTitle = customSnapshot.plan_kind === 'webinar' ? 'وبینار اختصاصی' : customSnapshot.plan_kind === 'class' ? 'کلاس آموزشی اختصاصی' : null
+  const customTitle = customSnapshot.free_trial ? null : customSnapshot.plan_kind === 'webinar' ? 'وبینار اختصاصی' : customSnapshot.plan_kind === 'class' ? 'کلاس آموزشی اختصاصی' : null
   const uid = `sub-${subscription.id}`
   const manualReserved = subscription.status === 'reserved'
   const remaining = reserved ? null : daysLeft(subscription.expires_at)

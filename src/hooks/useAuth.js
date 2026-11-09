@@ -2,6 +2,7 @@ import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {useNavigate} from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {authService} from '../services/auth'
+import {paymentsService} from '../services/payments'
 import {useAuthStore} from '../store/authStore'
 
 export function useMe() {
@@ -39,26 +40,68 @@ export function useLogin() {
     })
 }
 
-export function useRegister() {
+function safeNextPath() {
+    const next = new URLSearchParams(window.location.search).get('next')
+    return next && next.startsWith('/') && !next.startsWith('//') ? next : null
+}
+
+function errorMessage(error, fallback) {
+    const data = error.response?.data
+    if (typeof data?.detail === 'string') return data.detail
+    const first = data && Object.values(data)[0]
+    return (Array.isArray(first) ? first[0] : first) || fallback
+}
+
+export function useOtpRequest() {
+    return useMutation({
+        mutationFn: (phone) => authService.otpRequest(phone).then((r) => r.data),
+        onError: (error) => toast.error(errorMessage(error, 'ارسال کد ناموفق بود')),
+    })
+}
+
+/**
+ * تأیید کد؛ اگر ?free=<slug> در آدرس باشد، پلن رایگان همان‌جا (قبل از ورود به داشبورد) دریافت می‌شود.
+ */
+export function useOtpVerify() {
+    const {setAuth} = useAuthStore()
     const navigate = useNavigate()
+    const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: (data) => authService.register(data).then((r) => r.data),
-        onSuccess: () => {
-            toast.success('ثبت‌نام با موفقیت انجام شد')
-            const next = new URLSearchParams(window.location.search).get('next')
-            const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : null
-            navigate(safeNext ? `/login?next=${encodeURIComponent(safeNext)}` : '/login')
-        },
-        onError: (error) => {
-            const data = error.response?.data
-            if (data) {
-                const firstError = Object.values(data)[0]
-                toast.error(Array.isArray(firstError) ? firstError[0] : firstError)
-            } else {
-                toast.error('خطا در ثبت‌نام')
+        mutationFn: (data) => authService.otpVerify(data).then((r) => r.data),
+        onSuccess: async (data) => {
+            const params = new URLSearchParams(window.location.search)
+            const freeSlug = params.get('free')
+            let destination = safeNextPath() || '/dashboard'
+            if (freeSlug) {
+                try {
+                    await paymentsService.claimFreePlan(freeSlug, {headers: {Authorization: `Bearer ${data.access}`}})
+                    toast.success('پلن رایگان شما فعال شد')
+                    destination = '/dashboard/subscription'
+                } catch (error) {
+                    toast.error(errorMessage(error, 'دریافت پلن رایگان ممکن نشد'))
+                }
             }
+            queryClient.clear()
+            setAuth(data.access, data.user, data.refresh)
+            if (!freeSlug) toast.success(data.is_new_user ? 'حساب شما ساخته شد' : 'خوش آمدید!')
+            navigate(destination, {replace: true})
         },
+        onError: (error) => toast.error(errorMessage(error, 'کد واردشده درست نیست')),
+    })
+}
+
+export function useUpdateProfile() {
+    const queryClient = useQueryClient()
+    const {token, refresh, setAuth} = useAuthStore()
+    return useMutation({
+        mutationFn: (data) => authService.updateMe(data).then((r) => r.data),
+        onSuccess: (user) => {
+            setAuth(token, user, refresh)
+            queryClient.invalidateQueries({queryKey: ['me']})
+            toast.success('پروفایل ذخیره شد')
+        },
+        onError: (error) => toast.error(errorMessage(error, 'ذخیره‌ی پروفایل ناموفق بود')),
     })
 }
 
