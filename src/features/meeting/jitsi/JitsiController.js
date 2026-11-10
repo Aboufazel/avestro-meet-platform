@@ -1486,9 +1486,18 @@ export class JitsiController {
         }
 
         let remoteTracks = []
+        let participantFound = false
 
         try {
-            remoteTracks = conference.getRemoteTracks?.(participantId) || []
+            // API مستند lib: JitsiParticipant.getTracks(). (conference.getRemoteTracks
+            // در همه‌ی نسخه‌ها وجود ندارد یا شکل دیگری دارد؛ نتیجه‌ی خالی آن مدرک نیست.)
+            const participant = conference.getParticipantById?.(participantId)
+            participantFound = Boolean(participant)
+            remoteTracks = participant?.getTracks?.() || []
+
+            if (!remoteTracks.length) {
+                remoteTracks = conference.getRemoteTracks?.(participantId) || []
+            }
         } catch {
             return false
         }
@@ -1506,8 +1515,18 @@ export class JitsiController {
         if (!desktop) {
             // lib هم track دسکتاپی ندارد: مشکل از سمت فرستنده/Jicofo/bridge است.
             console.warn(
-                '[ScreenShare] start message received but conference has no desktop track yet',
-                {participantId, afterMs: delay, remoteTrackCount: remoteTracks.length}
+                '[ScreenShare] start message received but no desktop track found yet',
+                {
+                    participantId,
+                    afterMs: delay,
+                    participantFound,
+                    tracks: remoteTracks.map((t) => ({
+                        type: t?.getType?.(),
+                        videoType: t?.getVideoType?.(),
+                        source: t?.getSourceName?.(),
+                        muted: t?.isMuted?.(),
+                    })),
+                }
             )
             return false
         }

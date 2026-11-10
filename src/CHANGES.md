@@ -197,5 +197,5 @@ Build نهایی در این محیط اجرا نشد؛ وابستگی‌های 
 - UI تایل اشتراک را فقط با `TRACK_ADDED` واقعی نشان می‌دهد و پیام «شروع» عمداً تنها کافی نیست.
   اگر آن رویداد برای اشتراک دوم از دست می‌رفت، چیزی نمایش داده نمی‌شد.
 - افزوده شد: `_scheduleRemoteScreenShareReconcile` — بعد از پیام «شروع»، در ۰٫۳/۱٫۲/۳/۶ ثانیه از lib می‌پرسد track دسکتاپ شرکت‌کننده هست یا نه و اگر هست دوباره به استور و receiver constraints معرفی‌اش می‌کند.
-- اگر lib هم track دسکتاپ نداشته باشد، هشدار `[ScreenShare] start message received but conference has no desktop track yet` در کنسول گیرنده چاپ می‌شود (یعنی مشکل از سمت فرستنده/Jicofo است).
+- اگر track دسکتاپ پیدا نشود، هشدار `[ScreenShare] start message received but no desktop track found yet` با فهرست track های شرکت‌کننده چاپ می‌شود. (نسخه‌ی اول این لاگ از `conference.getRemoteTracks` می‌پرسید که نتیجه‌ی خالیش مدرک نبود؛ حالا از `participant.getTracks()` می‌خواند.)
 - فرستنده هم لاگ `[ScreenShare] local desktop source added` (sourceName, ssrc) چاپ می‌کند.

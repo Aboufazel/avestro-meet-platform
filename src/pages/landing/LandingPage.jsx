@@ -94,7 +94,7 @@ export default function LandingPage() {
                                     ارتباطی حرفه‌ای
                                     <br/>
                                     <span className="meet-gradient-text">
-                                        با مدرن‌ترین تکنولوژی‌های جهان
+                                        با مدرن‌ترین تکنولوژی‌های جهانی
                                     </span>
                                 </h1>
 
