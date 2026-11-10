@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft, Check, Circle, Eraser, Hand, Highlighter, Minus, MoreHorizontal, Pencil,
-  Redo2, RotateCcw, Shapes, Square, Trash2, Type, Undo2, X, AlertTriangle, Maximize,
+  Redo2, RotateCcw, Shapes, Square, Trash2, Type, Undo2, X, AlertTriangle, Maximize, CornerUpLeft,
 } from 'lucide-react'
 import './whiteboard.css'
 
@@ -16,6 +16,11 @@ const SHAPE_TOOLS = [
   { id: 'ellipse', label: 'بیضی', icon: Circle },
 ]
 const ERASE_RADIUS_PX = 16
+const MIN_ZOOM = 0.35
+const MAX_ZOOM = 3
+const clampZoom = (value) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value))
+const VIEW_THROTTLE_MS = 80 // نمای زنده‌ی معلم حداکثر با این فاصله فرستاده می‌شود
+const VIEW_FINAL_MS = 300 // این‌قدر بعد از آخرین حرکت، نمای نهایی (برای ذخیره) فرستاده می‌شود
 const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 
 // ── پاک‌کن: فاصله‌ی نقطه تا هر نوع شیء (واحد: مختصات تخته) ──
@@ -59,6 +64,9 @@ export default function WhiteboardPanel({
   onClose, initialObjects = [], onObjectsChange, onClear, readOnly = false, isHost = false,
   // برای صحنه‌ی سند: بوم هم‌اندازه‌ی صفحه، با تصویر صفحه به‌جای شبکه‌ی تخته
   canvasWidth = WIDTH, canvasHeight = HEIGHT, background = null, labels = {}, moreExtra = null,
+  // همگام‌سازی نما: میزبان initialView و onViewChange(view, final) می‌دهد؛ دنبال‌کننده followView (null یا {zoom,x,y,t}).
+  // بدون هیچ‌کدام (مثل صحنه‌ی سند) نما فقط محلی است.
+  followView, initialView, onViewChange,
 }) {
   const rootRef = useRef(null)
   const svgRef = useRef(null)
@@ -70,8 +78,16 @@ export default function WhiteboardPanel({
   const tool = readOnly ? 'hand' : chosenTool
   const [color, setColor] = useState(COLORS[0])
   const [strokeWidth, setStrokeWidth] = useState(4)
-  const [zoom, setZoom] = useState(1)
-  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const isFollower = followView !== undefined
+  const startView = (isFollower ? followView : initialView) || null
+  const [zoom, setZoom] = useState(() => startView?.zoom ?? 1)
+  const [pan, setPan] = useState(() => ({ x: startView?.x ?? 0, y: startView?.y ?? 0 }))
+  // دنبال‌کردن نمای معلم تا وقتی کاربر خودش نما را عوض نکرده؛ با دکمه‌ی «نمای معلم» برمی‌گردد
+  const [following, setFollowing] = useState(true)
+  const stopFollowing = () => { if (isFollower) setFollowing(false) }
+  const pointersRef = useRef(new Map()) // فقط انگشت‌ها (برای پینچ)
+  const pinchRef = useRef(null)
+  const touchLockRef = useRef(false) // بعد از پینچ تا بالاآمدن همه‌ی انگشت‌ها چیزی شروع نشود
   const [draft, setDraft] = useState(null)
   const [gesture, setGesture] = useState(null)
   const [popover, setPopover] = useState(null) // 'shapes' | 'style' | 'more' | null
@@ -79,6 +95,45 @@ export default function WhiteboardPanel({
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
 
   useEffect(() => { setObjects(initialObjects || []) }, [initialObjects])
+
+  // دنبال‌کننده: نمای معلم را اعمال کن
+  useEffect(() => {
+    if (!isFollower || !following || !followView) return
+    setZoom(followView.zoom)
+    setPan({ x: followView.x, y: followView.y })
+  }, [isFollower, following, followView])
+
+  // میزبان: نمای خودش را (throttle) می‌فرستد و ۳۰۰ms بعد از آخرین حرکت نمای نهایی را
+  const viewRef = useRef({ zoom, pan })
+  viewRef.current = { zoom, pan }
+  const onViewChangeRef = useRef(onViewChange)
+  onViewChangeRef.current = onViewChange
+  const emitRef = useRef({ first: true, last: 0, timer: null, finalTimer: null, dirty: false })
+  const sendView = useCallback((final) => {
+    const e = emitRef.current
+    const handler = onViewChangeRef.current
+    if (!handler) return
+    const { zoom: z, pan: p } = viewRef.current
+    e.last = Date.now()
+    if (final) e.dirty = false
+    handler({ zoom: z, x: p.x, y: p.y, t: Date.now() }, final)
+  }, [])
+  useEffect(() => {
+    const e = emitRef.current
+    if (!onViewChangeRef.current) return
+    if (e.first) { e.first = false; return } // ابتدای نمایش؛ چیزی عوض نشده
+    e.dirty = true
+    clearTimeout(e.timer)
+    clearTimeout(e.finalTimer)
+    e.timer = setTimeout(() => sendView(false), Math.max(0, VIEW_THROTTLE_MS - (Date.now() - e.last)))
+    e.finalTimer = setTimeout(() => { clearTimeout(e.timer); sendView(true) }, VIEW_FINAL_MS)
+  }, [zoom, pan, sendView])
+  useEffect(() => () => {
+    const e = emitRef.current
+    clearTimeout(e.timer)
+    clearTimeout(e.finalTimer)
+    if (e.dirty) sendView(true) // بستن تخته وسط حرکت: نمای آخر ذخیره شود
+  }, [sendView])
 
   const replaceObjects = useCallback((next) => {
     const resolved = typeof next === 'function' ? next(objects) : next
@@ -135,8 +190,45 @@ export default function WhiteboardPanel({
     if (next.length !== objects.length) replaceObjects(next)
   }
 
+  // ── پینچ (دو انگشت): زوم و جابه‌جایی هم‌زمان؛ نقطه‌ی زیر وسط دو انگشت ثابت می‌ماند ──
+  const beginPinch = () => {
+    const [a, b] = [...pointersRef.current.values()].slice(0, 2).map((p) => toView(p.x, p.y))
+    setDraft(null) // خط نیمه‌کاره‌ی انگشت اول لغو می‌شود
+    setGesture(null)
+    touchLockRef.current = true
+    pinchRef.current = {
+      dist: Math.hypot(a.x - b.x, a.y - b.y) || 1,
+      mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+      zoom,
+      pan,
+    }
+    stopFollowing()
+  }
+  const updatePinch = () => {
+    const start = pinchRef.current
+    const [a, b] = [...pointersRef.current.values()].slice(0, 2).map((p) => toView(p.x, p.y))
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+    const nextZoom = Number(clampZoom(start.zoom * (Math.hypot(a.x - b.x, a.y - b.y) / start.dist)).toFixed(3))
+    const anchorX = (start.mid.x - start.pan.x) / start.zoom
+    const anchorY = (start.mid.y - start.pan.y) / start.zoom
+    setZoom(nextZoom)
+    setPan({ x: mid.x - anchorX * nextZoom, y: mid.y - anchorY * nextZoom })
+  }
+
   const startGesture = (event) => {
+    if (event.pointerType === 'touch') {
+      // انگشت اولِ یک لمس تازه یعنی همه‌ی انگشت‌های قبلی بالا رفته‌اند؛ هر ردِ مانده پاک شود
+      if (event.isPrimary) { pointersRef.current.clear(); pinchRef.current = null; touchLockRef.current = false }
+      pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+      if (pointersRef.current.size >= 2) {
+        event.preventDefault()
+        svgRef.current?.setPointerCapture?.(event.pointerId)
+        beginPinch()
+        return
+      }
+    }
     if (!event.isPrimary) return
+    if (touchLockRef.current) return
     setPopover(null)
     if (readOnly && tool !== 'hand') return
     event.preventDefault()
@@ -162,8 +254,13 @@ export default function WhiteboardPanel({
   }
 
   const moveGesture = (event) => {
-    if (!gesture) return
+    if (pointersRef.current.has(event.pointerId)) {
+      pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+      if (pinchRef.current && pointersRef.current.size >= 2) { updatePinch(); return }
+    }
+    if (pinchRef.current || !gesture) return
     if (gesture.kind === 'pan') {
+      stopFollowing()
       const v = toView(event.clientX, event.clientY)
       setPan({ x: gesture.pan.x + (v.x - gesture.startX), y: gesture.pan.y + (v.y - gesture.startY) })
       return
@@ -179,7 +276,14 @@ export default function WhiteboardPanel({
     })
   }
 
-  const endGesture = () => {
+  const endGesture = (event) => {
+    if (event?.pointerId !== undefined) pointersRef.current.delete(event.pointerId)
+    if (pinchRef.current) {
+      if (pointersRef.current.size < 2) pinchRef.current = null
+      if (pointersRef.current.size === 0) touchLockRef.current = false
+      return
+    }
+    if (pointersRef.current.size === 0) touchLockRef.current = false
     if (!readOnly && gesture?.kind === 'draw' && draft) {
       const finalObject = draft.type === 'path' && draft.points.length < 2
         ? { ...draft, points: [...draft.points, { x: draft.x + 0.1, y: draft.y + 0.1 }] }
@@ -199,8 +303,8 @@ export default function WhiteboardPanel({
     setTextEntry(null)
   }
 
-  const zoomBy = (factor) => setZoom((current) => Math.min(3, Math.max(0.35, Number((current * factor).toFixed(2)))))
-  const resetView = () => { setZoom(1); setPan({ x: 0, y: 0 }) }
+  const zoomBy = (factor) => { stopFollowing(); setZoom((current) => clampZoom(Number((current * factor).toFixed(2)))) }
+  const resetView = () => { stopFollowing(); setZoom(1); setPan({ x: 0, y: 0 }) }
   const allObjects = useMemo(() => (draft ? [...objects, draft] : objects), [objects, draft])
 
   const renderObject = (item) => {
@@ -304,7 +408,11 @@ export default function WhiteboardPanel({
             <pattern id="whiteboard-grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M 32 0 L 0 0 0 32" fill="none" stroke="#e8edf4" strokeWidth="1" /></pattern>
             <marker id="whiteboard-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L6,3 z" fill="context-stroke" /></marker>
           </defs>
-          <g transform={`translate(${pan.x} ${pan.y}) scale(${zoom})`}>
+          <g
+            {...(isFollower && following
+              ? { style: { transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transition: 'transform 140ms linear' } }
+              : { transform: `translate(${pan.x} ${pan.y}) scale(${zoom})` })}
+          >
             {background || (
               <>
                 <rect x="-12000" y="-12000" width="24000" height="24000" fill="#ffffff" />
@@ -316,6 +424,12 @@ export default function WhiteboardPanel({
         </svg>
 
         {!objects.length && !draft && !readOnly && <div className="wb-empty" aria-hidden="true">{labels.empty || 'با قلم روی بوم بنویسید'}</div>}
+
+        {isFollower && followView && !following && (
+          <button type="button" className="wb-follow" onClick={() => setFollowing(true)}>
+            <CornerUpLeft size={14} aria-hidden="true" />{labels.followTeacher || 'نمای معلم'}
+          </button>
+        )}
 
         <div className="wb-zoom" dir="ltr" role="group" aria-label="بزرگ‌نمایی">
           <button type="button" onClick={() => zoomBy(0.87)} aria-label="کوچک‌نمایی">−</button>

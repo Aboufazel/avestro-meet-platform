@@ -88,6 +88,9 @@
 .wb-zoom { position: absolute; left: 8px; bottom: 8px; z-index: 2; display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 10px; border: 1px solid #e1e6ef; background: rgba(255, 255, 255, .95); box-shadow: 0 4px 12px rgba(20, 35, 65, .1); }
 .wb-zoom button { width: 30px; height: 28px; display: grid; place-items: center; border-radius: 7px; color: #536178; font-size: 18px; touch-action: manipulation; }
 .wb-zoom button:hover { background: #edf2fa; }
+.wb-follow { position: absolute; right: 8px; bottom: 8px; z-index: 2; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 10px; border: 1px solid #bcd0f5; background: #eaf1ff; color: #1d4ed8; font-size: 12px; font-weight: 600; box-shadow: 0 4px 12px rgba(20, 35, 65, .12); touch-action: manipulation; }
+.wb-follow:hover { background: #dce8ff; }
+.is-compact .wb-follow { right: 6px; bottom: 6px; padding: 6px 10px; }
 .wb-zoom span { min-width: 38px; text-align: center; font-size: 10px; color: #758198; font-variant-numeric: tabular-nums; }
 
 /* ── ورود متن: یک نوار کوچک در پایین بوم (به‌جای پنجره‌ی مستقل) ── */

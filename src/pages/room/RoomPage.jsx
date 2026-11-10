@@ -325,6 +325,10 @@ export default function RoomPage() {
             }}
             readOnly={!isHostRole && !studentsCanDraw}
             isHost={isHostRole}
+            // میزبان نمای خودش را می‌فرستد؛ بقیه نمای معلم را دنبال می‌کنند
+            {...(isHostRole
+                ? {initialView: access.whiteboardView, onViewChange: access.sendWhiteboardView}
+                : {followView: access.whiteboardView || null})}
         />
     ) : null
 

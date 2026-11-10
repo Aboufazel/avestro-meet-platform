@@ -25,8 +25,15 @@ export function useClassAccess(slug, { enabled = false } = {}) {
   const [roster, setRoster] = useState([])
   const [connected, setConnected] = useState(false)
   const [whiteboardState, setWhiteboardState] = useState(null)
+  // نمای معلم روی تخته: { zoom, x, y, t }؛ t زمان سرور است و نمای قدیمی‌تر نمای جدیدتر را بازنویسی نمی‌کند
+  const [whiteboardView, setWhiteboardView] = useState(null)
   const [documentState, setDocumentState] = useState(null)
   const wsRef = useRef(null)
+  const sentViewRef = useRef(false) // میزبانی که خودش نما فرستاده، نمای ذخیره‌شده‌ی سرور را روی نمای خودش نمی‌نویسد
+  const applyWhiteboardView = useCallback((view) => {
+    if (!view) return
+    setWhiteboardView((current) => (!current || (view.t || 0) >= (current.t || 0) ? view : current))
+  }, [])
   const onScreenShareStateRef = useRef(null)
   const pendingMessagesRef = useRef([])
 
@@ -56,7 +63,10 @@ export function useClassAccess(slug, { enabled = false } = {}) {
           const msg = JSON.parse(ev.data)
           if (msg.type === 'me') setMe(msg)
           else if (msg.type === 'roster') setRoster(msg.items || [])
-          else if (msg.type === 'whiteboard_state') setWhiteboardState(msg)
+          else if (msg.type === 'whiteboard_state') {
+            setWhiteboardState(msg)
+            if (!sentViewRef.current) applyWhiteboardView(msg.views?.[String(msg.page || 1)])
+          } else if (msg.type === 'whiteboard_view') applyWhiteboardView(msg.view)
           else if (msg.type === 'document_state') setDocumentState(msg)
           else if (msg.type === 'document_annotations') {
             setDocumentState((current) => (current?.document?.id === msg.document_id
@@ -92,9 +102,11 @@ export function useClassAccess(slug, { enabled = false } = {}) {
       pendingMessagesRef.current = []
       setConnected(false)
       setWhiteboardState(null)
+      setWhiteboardView(null)
+      sentViewRef.current = false
       setDocumentState(null)
     }
-  }, [slug, enabled])
+  }, [slug, enabled, applyWhiteboardView])
 
   const send = useCallback((msg) => {
     const ws = wsRef.current
@@ -112,6 +124,13 @@ export function useClassAccess(slug, { enabled = false } = {}) {
     revoke: useCallback((key) => send({ type: 'revoke', key }), [send]),
     lowerHand: useCallback((key) => send({ type: 'lower_hand', key }), [send]),
     whiteboardState,
+    whiteboardView,
+    // فقط میزبان: نمای زنده (final=false حین حرکت، final=true پایان حرکت و ذخیره برای ورودهای دیرتر)
+    sendWhiteboardView: useCallback((view, final = false) => {
+      sentViewRef.current = true
+      setWhiteboardView(view) // زمان نما را سرور می‌گذارد؛ این فقط برای باز شدن دوباره‌ی تخته‌ی خود میزبان است
+      send({ type: 'whiteboard_view', zoom: view.zoom, x: view.x, y: view.y, final: Boolean(final) })
+    }, [send]),
     publishScreenShareState: useCallback((participantId, isSharing, seq) => send({
       type: 'screenshare_state',
       participant_id: participantId,
