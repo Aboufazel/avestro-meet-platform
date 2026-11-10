@@ -158,6 +158,11 @@ export class JitsiController {
         // TRACK_ADDED events until that participant explicitly starts sharing again.
         this._screenShareSeqByParticipant = new Map() // participantId -> last accepted seq
         this._authoritativelyStoppedScreenShares = new Map() // participantId -> stoppedAt (ms)
+        // کی الان واقعاً در حال اشتراک است (از پیام‌های وضعیت) و track دسکتاپی که
+        // قبل از دانستن این وضعیت رسیده و منتظر است.
+        this._remoteScreenShareActive = new Map() // participantId -> lastSeenAt (ms)
+        this._pendingDesktopTracks = new Map() // participantId -> JitsiRemoteTrack
+        this._screenShareHeartbeat = null
         this._localScreenShareSeq = 0
         this._trackVideoTypeListeners = new Map()
         this._receiverIntent = null
@@ -1306,6 +1311,9 @@ export class JitsiController {
     _resetReceiverState() {
         this._uploadCapped = false
         this._adaptState = null
+        this._stopScreenShareHeartbeat()
+        this._remoteScreenShareActive.clear()
+        this._pendingDesktopTracks.clear()
 
         if (this._reconcileTimers) {
             for (const timers of this._reconcileTimers.values()) {
@@ -1411,13 +1419,24 @@ export class JitsiController {
             this._screenShareSeqByParticipant.set(participantId, numericSeq)
         }
 
+        // heartbeat: همان وضعیت «در حال اشتراک» دوباره آمد؛ بی‌سروصدا فقط
+        // مطمئن شو track نمایش داده شده (اگر رویدادش گم شده بود).
+        if (isSharing && this._remoteScreenShareActive.has(participantId)) {
+            this._remoteScreenShareActive.set(participantId, Date.now())
+            this._reconcileRemoteScreenShare(participantId, -1)
+            return true
+        }
+
         console.info('[ScreenShare] state', { participantId, isSharing, seq: numericSeq })
 
         if (isSharing) {
             this._authoritativelyStoppedScreenShares.delete(participantId)
+            this._remoteScreenShareActive.set(participantId, Date.now())
             this._scheduleRemoteScreenShareReconcile(participantId)
         } else {
             this._cancelRemoteScreenShareReconcile(participantId)
+            this._remoteScreenShareActive.delete(participantId)
+            this._pendingDesktopTracks.delete(participantId)
             this._authoritativelyStoppedScreenShares.set(participantId, Date.now())
         }
 
@@ -1449,6 +1468,70 @@ export class JitsiController {
      * از خود lib می‌پرسیم track دسکتاپ این شرکت‌کننده هست یا نه و اگر هست،
      * دوباره به استور و receiver constraints معرفی‌اش می‌کنیم.
      */
+    /**
+     * track دسکتاپ remote را فقط وقتی به UI می‌دهد که آن شرکت‌کننده «الان»
+     * در حال اشتراک است.
+     *
+     * Jicofo منبع دسکتاپِ آخرین اشتراک را حتی بعد از تمام‌شدن اشتراک نگه می‌دارد
+     * (فرستنده track را با replaceTrack برمی‌دارد و source-remove نمی‌فرستد).
+     * کسی که بعداً وارد می‌شود آن منبع کهنه را می‌گیرد و قبلاً تایلِ «اشتراک
+     * تصویر» شبح نشان می‌داد. حالا تا پیام وضعیت «در حال اشتراک» نرسد نگه
+     * داشته می‌شود و نمایش داده نمی‌شود.
+     */
+    _emitRemoteTrackAdded(mapped, jitsiTrack) {
+        if (
+            mapped?.type === 'desktop' &&
+            !mapped.isLocal &&
+            mapped.participantId &&
+            !this._remoteScreenShareActive.has(mapped.participantId)
+        ) {
+            this._pendingDesktopTracks.set(mapped.participantId, jitsiTrack)
+            return false
+        }
+
+        this._emit(JITSI_EVENTS.TRACK_ADDED, mapped)
+        return true
+    }
+
+    /**
+     * فرستنده: وضعیت «در حال اشتراک» را تازه نگه می‌دارد تا کسی که بعداً وارد
+     * شد یا پیام شروع را از دست داد، بدون اینکه فرستنده دوباره اشتراک بگیرد ببیند.
+     */
+    _startScreenShareHeartbeat() {
+        this._stopScreenShareHeartbeat()
+
+        this._screenShareHeartbeat = setInterval(() => {
+            if (!this._screenShare?.active) {
+                this._stopScreenShareHeartbeat()
+                return
+            }
+            this._broadcastScreenShareState(true, { publish: false })
+        }, 8000)
+    }
+
+    _stopScreenShareHeartbeat() {
+        if (this._screenShareHeartbeat) {
+            clearInterval(this._screenShareHeartbeat)
+            this._screenShareHeartbeat = null
+        }
+    }
+
+    /** فرستنده: به شرکت‌کننده‌ی تازه‌وارد وضعیت اشتراک جاری را اعلام کن. */
+    _announceScreenShareToNewcomer() {
+        if (!this._screenShare?.active) {
+            return
+        }
+
+        this._broadcastScreenShareState(true)
+
+        // کانال bridge تازه‌وارد ممکن است لحظه‌ی اول هنوز باز نباشد.
+        setTimeout(() => {
+            if (this._screenShare?.active) {
+                this._broadcastScreenShareState(true, { publish: false })
+            }
+        }, 2000)
+    }
+
     _scheduleRemoteScreenShareReconcile(participantId) {
         if (!participantId || participantId === this._conference?.myUserId?.()) {
             return
@@ -1513,7 +1596,9 @@ export class JitsiController {
             desktops[desktops.length - 1]
 
         if (!desktop) {
-            // lib هم track دسکتاپی ندارد: مشکل از سمت فرستنده/Jicofo/bridge است.
+            if (delay < 0) {
+                return false
+            }
             console.warn(
                 '[ScreenShare] start message received but no desktop track found yet',
                 {
@@ -1546,13 +1631,17 @@ export class JitsiController {
         this._receiverKey = null
         this._applyReceiverConstraints()
 
-        console.info('[ScreenShare] reconciled remote desktop track', {
-            participantId,
-            sourceName,
-            afterMs: delay,
-            desktopTracks: desktops.length,
-            muted: desktop.isMuted?.(),
-        })
+        this._pendingDesktopTracks.delete(participantId)
+
+        if (delay >= 0) {
+            console.info('[ScreenShare] reconciled remote desktop track', {
+                participantId,
+                sourceName,
+                afterMs: delay,
+                desktopTracks: desktops.length,
+                muted: desktop.isMuted?.(),
+            })
+        }
 
         return true
     }
@@ -1575,11 +1664,13 @@ export class JitsiController {
         this._acceptScreenShareState(participantId, isSharing, seq)
     }
 
-    _broadcastScreenShareState(isSharing) {
+    _broadcastScreenShareState(isSharing, { publish = true } = {}) {
         const seq = this._nextScreenShareSeq()
 
         // The classroom WebSocket is the authoritative state source.
-        this._publishAuthoritativeScreenShareState(isSharing, seq)
+        if (publish) {
+            this._publishAuthoritativeScreenShareState(isSharing, seq)
+        }
 
         const conference = this._conference
         if (!conference || typeof conference.sendEndpointMessage !== 'function') {
@@ -1685,6 +1776,7 @@ export class JitsiController {
             this._emit(JITSI_EVENTS.TRACK_ADDED, mappedDesktop)
             this._emit(JITSI_EVENTS.SCREEN_SHARE_STARTED, mappedDesktop)
             this._broadcastScreenShareState(true)
+            this._startScreenShareHeartbeat()
             return true
         } catch (error) {
             try {
@@ -1748,6 +1840,7 @@ export class JitsiController {
 
         // Tell remote clients immediately. Do not wait for removeTrack(), which
         // can resolve before all endpoints have processed the source removal.
+        this._stopScreenShareHeartbeat()
         this._broadcastScreenShareState(false)
 
         try {
@@ -2787,6 +2880,8 @@ export class JitsiController {
                                 participant
                             )
                         )
+
+                        this._announceScreenShareToNewcomer()
                     }
                 )
 
@@ -2798,6 +2893,9 @@ export class JitsiController {
                     JitsiMeetJS.events.conference.USER_LEFT,
                     (id) => {
                         this._qualityCache.delete(id)
+                        this._remoteScreenShareActive.delete(id)
+                        this._pendingDesktopTracks.delete(id)
+                        this._cancelRemoteScreenShareReconcile(id)
 
                         const timer = this._disconnectWatchdogs.get(id)
                         if (timer) {
@@ -2879,10 +2977,7 @@ export class JitsiController {
                             return
                         }
 
-                        this._emit(
-                            JITSI_EVENTS.TRACK_ADDED,
-                            mapTrack(track)
-                        )
+                        this._emitRemoteTrackAdded(mapTrack(track), track)
                     }
                 )
 
@@ -3001,7 +3096,7 @@ export class JitsiController {
                                     ...mappedTrack,
                                     type: entry.lastType,
                                 })
-                                this._emit(JITSI_EVENTS.TRACK_ADDED, mappedTrack)
+                                this._emitRemoteTrackAdded(mappedTrack, track)
                                 entry.lastType = mappedTrack.type
 
                                 // While its type was still unknown, this track was
