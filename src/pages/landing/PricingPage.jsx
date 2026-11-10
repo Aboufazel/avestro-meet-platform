@@ -27,8 +27,9 @@ export default function PricingPage() {
         <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
             <section className="mx-auto mb-8 max-w-3xl text-center sm:mb-10">
                 {/*<p className="mb-3 inline-flex rounded-full bg-[#edf2ff] px-3.5 py-1.5 text-sm font-bold text-[#3d66e8]">تعرفه‌های اَوسترو میت</p>*/}
-                <h1 className="text-2xl font-extrabold tracking-tight sm:text-4xl">پلن متناسب با شیوه برگزاری خود را
-                    بسازید</h1>
+                <h1 className="text-2xl font-extrabold tracking-tight sm:text-4xl">
+                    رویداد آنلاین اختصاصی خودت را بساز
+                </h1>
                 <p className="mt-3 text-sm leading-8 text-[#46536b]">
                     ظرفیت موردنیاز را انتخاب کنید و جزئیات قیمت را پیش
                     از پرداخت ببینید.
