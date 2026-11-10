@@ -271,38 +271,41 @@ export default function CreateEventPage() {
 
 
     return (
-        <div className="min-h-full bg-[#f4f7fb] p-4 sm:p-6 lg:p-8">
-            <div className="mx-auto max-w-4xl">
-                <div className="mb-6 flex items-center gap-3">
+        <div dir="rtl" className="min-h-full overflow-x-hidden bg-[#f4f7fb] px-3 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+            <div className="mx-auto w-full max-w-4xl">
+                <div className="mb-5 flex items-center gap-3 sm:mb-6">
                     <Link to="/dashboard"
-                          className="flex h-10 w-10 items-center justify-center rounded-xl text-[#8d98aa] transition hover:bg-[#edf2ff] hover:text-[#4f7cff]">
+                          aria-label="بازگشت به داشبورد"
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[#68758a] transition hover:bg-[#edf2ff] hover:text-[#3d66e8] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#4f7cff]/25">
                         <ArrowRight className="h-5 w-5"/>
                     </Link>
                     <div>
-                        <h1 className="text-lg font-bold text-[#101827]">ساخت {kindMeta.shortTitle} جدید</h1>
-                        <p className="mt-1 text-sm text-[#8d98aa]">{kindMeta.description}</p>
+                        <h1 className="text-lg font-bold text-[#101827] sm:text-xl">ساخت رویداد جدید</h1>
+                        <p className="mt-1 text-xs leading-6 text-[#68758a] sm:text-sm">{kindMeta.description}</p>
                     </div>
                 </div>
 
-                <div className="mb-6 rounded-2xl border border-[#e5eaf2] bg-white p-4 sm:p-5">
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                        <span className="text-xs font-semibold text-[#536074]">مرحله {step + 1} از {STEPS.length}</span>
-                        <span className="text-xs text-[#8d98aa]">{STEPS[step]}</span>
+                <nav aria-label="مراحل ساخت رویداد" className="mb-5 rounded-2xl border border-[#e5eaf2] bg-white p-4 sm:mb-6 sm:p-5">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                        <span className="text-xs font-bold text-[#253247]">مرحله {faNumber(step + 1)} از {faNumber(STEPS.length)}</span>
+                        <span className="rounded-full bg-[#edf2ff] px-3 py-1 text-xs font-semibold text-[#3d66e8]" aria-live="polite">{STEPS[step]}</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <ol className="grid grid-cols-3 gap-2">
                         {STEPS.map((label, index) => (
-                            <div key={label} className="min-w-0">
-                                <div
-                                    className={`h-1.5 rounded-full ${index <= step ? 'bg-[#4f7cff]' : 'bg-[#e9edf4]'}`}/>
-                                <p className={`mt-2 truncate text-[10px] sm:text-xs ${index === step ? 'font-bold text-[#4f7cff]' : 'text-[#9aa4b4]'}`}>{label}</p>
-                            </div>
+                            <li key={label} aria-current={index === step ? 'step' : undefined} className="min-w-0">
+                                <div className={`h-1.5 rounded-full ${index <= step ? 'bg-[#4f7cff]' : 'bg-[#e9edf4]'}`} aria-hidden="true" />
+                                <p className={`mt-2 truncate text-[11px] sm:text-xs ${index === step ? 'font-bold text-[#3d66e8]' : index < step ? 'font-medium text-[#536074]' : 'text-[#9aa4b4]'}`}>
+                                    <span className="ml-1">{faNumber(index + 1)}.</span>{label}
+                                </p>
+                            </li>
                         ))}
-                    </div>
-                </div>
+                    </ol>
+                </nav>
 
-                <Card className="!p-5 sm:!p-8">
+                <Card className="!p-4 sm:!p-7 lg:!p-8">
                     {step === 0 && (
-                        <section className="space-y-5">
+                        <section aria-labelledby="event-details-heading" className="space-y-5">
+                            <div className="sr-only" id="event-details-heading">اطلاعات اصلی {kindMeta.shortTitle}</div>
                             <div className="mb-2 flex items-center gap-3">
                                 <span
                                     className={`flex h-11 w-11 items-center justify-center rounded-xl ${kind === 'class' ? 'bg-[#edf2ff] text-[#4f7cff]' : 'bg-[#e8faf4] text-[#2eaf89]'}`}>{kind === 'class' ?
@@ -310,44 +313,90 @@ export default function CreateEventPage() {
                                 <div><h2 className="font-bold text-[#101827]">{kindMeta.heading}</h2><p
                                     className="mt-1 text-xs text-[#8d98aa]">{kindMeta.description}</p></div>
                             </div>
-                            <fieldset className="rounded-xl border border-[#e5eaf2] bg-[#f8faff] p-4">
-                                <legend className="px-1 text-sm font-semibold text-[#536074]">نوع اتاق</legend>
-                                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                            <fieldset className="rounded-2xl border border-[#dfe6f2] bg-[#f8faff] p-3 sm:p-4">
+                                <legend className="px-2 text-sm font-bold text-[#253247]">نوع رویداد را انتخاب کنید</legend>
+                                <p className="mb-3 px-1 text-xs leading-6 text-[#68758a]">پیش‌نمایش زیر تفاوت فضای داخل هر نوع اتاق را نشان می‌دهد.</p>
+                                <div className="grid gap-3 md:grid-cols-2">
                                     {KIND_OPTIONS.map(({id, title: optionTitle, hint, icon: Icon}) => {
                                         const allowed = allowedRoomKinds.includes(id)
                                         const checked = kind === id
                                         return (
-                                            <label key={id}
-                                                   className={allowed ? 'cursor-pointer' : 'cursor-not-allowed'}>
-                                                <input type="radio" name="room-kind" value={id} checked={checked}
-                                                       disabled={!allowed}
-                                                       onChange={() => setSelectedKind(id)}
-                                                       className="peer sr-only"/>
-                                                <span
-                                                    className={`flex min-h-[76px] items-start gap-3 rounded-xl border p-3 transition peer-focus-visible:ring-4 peer-focus-visible:ring-[#4f7cff]/35 ${checked ? 'border-[#4f7cff] bg-[#edf2ff]' : allowed ? 'border-[#e1e6ef] bg-white hover:border-[#cbd8ff]' : 'border-[#e8eaf0] bg-[#f4f6fa] opacity-70'}`}>
-                          <span
-                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${checked ? 'bg-[#dbe5ff] text-[#3d66e8]' : 'bg-[#eef1f6] text-[#7d899b]'}`}><Icon
-                              className="h-5 w-5" aria-hidden="true"/></span>
-                          <span className="min-w-0 flex-1">
-                            <span
-                                className="flex flex-wrap items-center gap-2 text-sm font-bold text-[#101827]">{optionTitle}{!allowed &&
-                                <span
-                                    className="inline-flex items-center gap-1 rounded-full bg-[#fff4df] px-2 py-0.5 text-[10px] font-medium text-[#9b681b]"><Lock
-                                    className="h-3 w-3" aria-hidden="true"/>در پلن شما نیست</span>}</span>
-                            <span className="mt-1 block text-xs leading-5 text-[#68758a]">{hint}</span>
-                          </span>
-                                                    {checked && <Check className="h-4 w-4 shrink-0 text-[#3d66e8]"
-                                                                       aria-hidden="true"/>}
-                        </span>
+                                            <label key={id} className={`relative block min-w-0 ${allowed ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
+                                                <input
+                                                    type="radio"
+                                                    name="room-kind"
+                                                    value={id}
+                                                    checked={checked}
+                                                    disabled={!allowed}
+                                                    onChange={() => setSelectedKind(id)}
+                                                    className="peer sr-only"
+                                                    aria-describedby={`room-kind-${id}-hint${allowed ? '' : ' room-kind-locked-hint'}`}
+                                                />
+                                                <span className={`block h-full overflow-hidden rounded-2xl border-2 bg-white transition-colors focus-within:ring-4 focus-within:ring-[#4f7cff]/20 ${checked ? 'border-[#4f7cff] shadow-[0_8px_24px_rgba(79,124,255,.10)]' : allowed ? 'border-[#e1e6ef] hover:border-[#b9c8ef]' : 'border-[#e8eaf0] opacity-65'}`}>
+                                                    <span className="flex items-center justify-between gap-3 px-4 pt-4">
+                                                        <span className="flex min-w-0 items-center gap-3">
+                                                            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${checked ? 'bg-[#edf2ff] text-[#3d66e8]' : 'bg-[#f0f3f8] text-[#68758a]'}`}>
+                                                                <Icon className="h-5 w-5" aria-hidden="true" />
+                                                            </span>
+                                                            <span className="min-w-0">
+                                                                <span className="block text-sm font-bold text-[#101827]">{optionTitle}</span>
+                                                                <span className="mt-1 block text-[11px] leading-5 text-[#68758a]" id={`room-kind-${id}-hint`}>{hint}</span>
+                                                            </span>
+                                                        </span>
+                                                        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${checked ? 'border-[#4f7cff] bg-[#4f7cff] text-white' : 'border-[#cbd4e2] bg-white text-transparent'}`} aria-hidden="true">
+                                                            <Check className="h-3.5 w-3.5" />
+                                                        </span>
+                                                    </span>
+                                                    <span className="mx-4 mt-4 block overflow-hidden rounded-xl border border-[#e7ebf2] bg-[#f7f9fc] p-3" aria-hidden="true">
+                                                        {id === 'class' ? (
+                                                            <span className="flex h-[104px] gap-2">
+                                                                <span className="flex w-1/4 flex-col gap-2 rounded-lg bg-white p-2">
+                                                                    <span className="h-2 w-3/4 rounded bg-[#dce5f7]" />
+                                                                    <span className="h-2 w-full rounded bg-[#e9edf4]" />
+                                                                    <span className="h-2 w-4/5 rounded bg-[#e9edf4]" />
+                                                                    <span className="mt-auto h-5 rounded-md bg-[#edf2ff]" />
+                                                                </span>
+                                                                <span className="flex min-w-0 flex-1 flex-col gap-2 rounded-lg bg-white p-2">
+                                                                    <span className="flex items-center justify-between"><span className="h-2 w-1/3 rounded bg-[#dce5f7]" /><span className="h-2 w-1/5 rounded bg-[#e9edf4]" /></span>
+                                                                    <span className="grid flex-1 grid-cols-3 gap-2">
+                                                                        <span className="rounded-md bg-[#e8eefb]" /><span className="rounded-md bg-[#e8eefb]" /><span className="rounded-md bg-[#e8eefb]" />
+                                                                    </span>
+                                                                    <span className="h-2 w-2/5 rounded bg-[#dce5f7]" />
+                                                                </span>
+                                                            </span>
+                                                        ) : (
+                                                            <span className="flex h-[104px] flex-col gap-2">
+                                                                <span className="flex items-center justify-between"><span className="h-2 w-1/4 rounded bg-[#dce5f7]" /><span className="h-2 w-1/6 rounded bg-[#e9edf4]" /></span>
+                                                                <span className="grid flex-1 grid-cols-3 gap-2">
+                                                                    <span className="rounded-lg bg-[#dfe7f5]" /><span className="rounded-lg bg-[#dfe7f5]" /><span className="rounded-lg bg-[#dfe7f5]" />
+                                                                </span>
+                                                                <span className="mx-auto h-3 w-2/5 rounded-full bg-[#e9edf4]" />
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                    <span className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                                                        <span className="text-[11px] font-medium text-[#68758a]">{id === 'class' ? 'چیدمان آموزشی با فضای محتوای کلاس' : 'چیدمان جلسه با نمایش شرکت‌کنندگان'}</span>
+                                                        {!allowed ? (
+                                                            <span id="room-kind-locked-hint" className="inline-flex items-center gap-1 rounded-full bg-[#fff4df] px-2.5 py-1 text-[10px] font-semibold text-[#8b5b13]">
+                                                                <Lock className="h-3 w-3" aria-hidden="true" /> در پلن شما نیست
+                                                            </span>
+                                                        ) : checked ? (
+                                                            <span className="text-[11px] font-bold text-[#3d66e8]">انتخاب‌شده</span>
+                                                        ) : (
+                                                            <span className="text-[11px] font-semibold text-[#68758a]">برای انتخاب لمس کنید</span>
+                                                        )}
+                                                    </span>
+                                                </span>
                                             </label>
                                         )
                                     })}
                                 </div>
+                                <p className="mt-3 px-1 text-[11px] leading-5 text-[#8d98aa]">پیش‌نمایش‌ها شماتیک‌اند؛ چیدمان نهایی در موبایل و دسکتاپ متناسب با اندازه صفحه تنظیم می‌شود.</p>
                                 {allowedRoomKinds.length < KIND_OPTIONS.length && (
-                                    <p className="mt-3 text-xs leading-6 text-[#68758a]">فقط نوع‌های موجود در پلن فعال
-                                        قابل انتخاب‌اند. برای نوع دیگر، <Link to="/dashboard/pricing"
-                                                                              className="font-bold text-[#3d66e8] underline">پلن
-                                            مناسب را از تعرفه‌ها</Link> تهیه کنید.</p>
+                                    <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs leading-6 text-[#68758a]">
+                                        فقط نوع‌های موجود در پلن فعال قابل انتخاب‌اند. برای دسترسی به نوع دیگر،{' '}
+                                        <Link to="/dashboard/pricing" className="font-bold text-[#3d66e8] underline underline-offset-2">پلن مناسب را از تعرفه‌ها</Link> تهیه کنید.
+                                    </p>
                                 )}
                             </fieldset>
                             <Input label={`عنوان ${kindMeta.shortTitle}`}
@@ -375,12 +424,15 @@ export default function CreateEventPage() {
                                 </div>
                             )}
                             <div className="flex flex-col gap-1.5">
-                                <label className="text-sm text-[#536074]">توضیحات (اختیاری)</label>
-                                <textarea value={description} onChange={(event) => setDescription(event.target.value)}
-                                          rows={3} placeholder="توضیح کوتاهی درباره رویداد..."
-                                          className="w-full resize-none rounded-xl border border-[#e1e6ef] bg-[#f8faff] px-4 py-3 text-sm text-[#101827] outline-none transition focus:border-[#9eb6ff] focus:ring-2 focus:ring-[#4f7cff]/15"/>
+                                <label htmlFor="event-description" className="text-sm font-medium text-[#536074]">توضیحات <span className="font-normal text-[#8d98aa]">(اختیاری)</span></label>
+                                <textarea id="event-description" value={description} onChange={(event) => setDescription(event.target.value)}
+                                          rows={3} maxLength={1000} placeholder="توضیح کوتاهی درباره رویداد..."
+                                          className="min-h-[104px] w-full resize-y rounded-xl border border-[#d9e1ed] bg-white px-4 py-3 text-sm leading-6 text-[#101827] outline-none transition placeholder:text-[#9aa4b4] focus:border-[#7d9cff] focus:ring-4 focus:ring-[#4f7cff]/15" />
+                                <p className="text-left text-[11px] text-[#8d98aa]">{faNumber(description.length)} از ۱۰۰۰ نویسه</p>
                             </div>
-                            <div className="grid gap-4 sm:grid-cols-2">
+                            <fieldset className="rounded-2xl border border-[#e5eaf2] bg-[#fbfcfe] p-3 sm:p-4">
+                                <legend className="px-2 text-sm font-bold text-[#536074]">زمان و ظرفیت رویداد</legend>
+                                <div className="grid gap-4 sm:grid-cols-2">
                                 <JalaliDateTimePicker label="تاریخ و ساعت برگزاری (اختیاری)" value={scheduledAt}
                                                       onChange={setScheduledAt}/>
                                 <Input label="حداکثر شرکت‌کنندگان" type="number" min="2"
@@ -391,13 +443,14 @@ export default function CreateEventPage() {
                                        max={imageLimit ?? undefined} value={allocatedVideoStreams}
                                        onChange={(event) => setAllocatedVideoStreams(event.target.value)}
                                        className="meet-auth-input"/>
-                            </div>
-                            <div className="space-y-1 text-xs leading-6 text-[#8d98aa]">
-                                <p>{limitHint({total: budget.usersTotal, unit: 'نفر'})}</p>
-                                <p>{limitHint({total: budget.imagesTotal, unit: 'تصویر'})}</p>
-                            </div>
+                                </div>
+                                <div className="mt-3 space-y-1 text-xs leading-6 text-[#68758a]">
+                                    <p>{limitHint({total: budget.usersTotal, unit: 'نفر'})}</p>
+                                    <p>{limitHint({total: budget.imagesTotal, unit: 'تصویر'})}</p>
+                                </div>
+                            </fieldset>
                             <label
-                                className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#e5eaf2] bg-[#f8faff] p-4">
+                                className="flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border border-[#e5eaf2] bg-white p-4 transition hover:border-[#b9c8ef]">
                                 <input type="checkbox" checked={isPrivate}
                                        onChange={(event) => setIsPrivate(event.target.checked)}
                                        className="h-4 w-4 accent-[#4f7cff]"/>
@@ -410,12 +463,12 @@ export default function CreateEventPage() {
                     )}
 
                     {step === 1 && (
-                        <section>
+                        <section aria-labelledby="event-features-heading">
                             <div className="mb-5 flex items-center gap-3">
                                 <span
                                     className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#edf2ff] text-[#4f7cff]"><Settings2
                                     className="h-5 w-5"/></span>
-                                <div><h2 className="font-bold text-[#101827]">امکانات و
+                                <div><h2 id="event-features-heading" className="font-bold text-[#101827]">امکانات و
                                     تنظیمات {kindMeta.shortTitle}</h2><p
                                     className="mt-1 text-xs text-[#8d98aa]">قابلیت‌های قابل تنظیم این رویداد نمایش داده
                                     شده‌اند. وضعیت هر قابلیت مطابق پاسخ سرویس و پلن حساب شماست.</p></div>
@@ -519,11 +572,11 @@ export default function CreateEventPage() {
                     )}
 
                     {step === 2 && (
-                        <section>
+                        <section aria-labelledby="event-review-heading">
                             <div className="mb-5 flex items-center gap-3"><span
                                 className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#e8faf4] text-[#2eaf89]"><ShieldCheck
                                 className="h-5 w-5"/></span>
-                                <div><h2 className="font-bold text-[#101827]">بازبینی و ساخت کلاس</h2><p
+                                <div><h2 id="event-review-heading" className="font-bold text-[#101827]">بازبینی و ساخت {kindMeta.shortTitle}</h2><p
                                     className="mt-1 text-xs text-[#8d98aa]">قبل از ساخت، اطلاعات را بررسی کنید.</p>
                                 </div>
                             </div>
@@ -604,8 +657,8 @@ export default function CreateEventPage() {
                     )}
 
                     <div
-                        className="mt-8 flex flex-col-reverse gap-3 border-t border-[#eef1f5] pt-5 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex gap-2">
+                        className="sticky bottom-0 z-10 -mx-4 mt-7 flex flex-col-reverse gap-3 border-t border-[#e8edf4] bg-white/95 px-4 pb-1 pt-4 backdrop-blur sm:static sm:mx-0 sm:mt-8 sm:flex-row sm:items-center sm:justify-between sm:border-t sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-5 sm:backdrop-blur-0">
+                        <div className="flex gap-2 sm:order-1">
                             {step > 0 &&
                                 <Button type="button" variant="ghost" onClick={() => setStep((current) => current - 1)}><ArrowRight
                                     className="ml-1 h-4 w-4"/> قبلی</Button>}
@@ -613,7 +666,7 @@ export default function CreateEventPage() {
                         </div>
                         {
                             (step < 2) ? (
-                                <Button type="button" size="lg"
+                                <Button type="button" size="lg" fullWidth className="sm:!w-auto"
                                         disabled={step === 1 && configureFeatures && featuresLoading} onClick={() => {
                                     if (step === 0) {
                                         if (!title.trim()) {
@@ -639,7 +692,7 @@ export default function CreateEventPage() {
                                     setStep((current) => current + 1)
                                 }}>ادامه <ArrowLeft className="mr-1 h-4 w-4"/></Button>
                             ) : (
-                                <Button type="button" size="lg" loading={saving} disabled={saving}
+                                <Button type="button" size="lg" fullWidth className="sm:!w-auto" loading={saving} disabled={saving}
                                         onClick={handleCreate}><Check
                                     className="ml-1 h-4 w-4"/> ساخت {kindMeta.shortTitle}</Button>
                             )}
