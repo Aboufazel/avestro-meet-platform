@@ -163,6 +163,8 @@ export class JitsiController {
         this._remoteScreenShareActive = new Map() // participantId -> lastSeenAt (ms)
         this._pendingDesktopTracks = new Map() // participantId -> JitsiRemoteTrack
         this._screenShareHeartbeat = null
+        this._receiverWatchdog = null
+        this._onBrowserOnline = null
         this._localScreenShareSeq = 0
         this._trackVideoTypeListeners = new Map()
         this._receiverIntent = null
@@ -1017,7 +1019,7 @@ export class JitsiController {
         return result
     }
 
-    _applyReceiverConstraints() {
+    _applyReceiverConstraints(force = false) {
         const conference = this._conference
         const intent = this._receiverIntent
 
@@ -1090,7 +1092,8 @@ export class JitsiController {
         const key = JSON.stringify(message)
 
         // React state می‌تواند مدام refresh شود؛ یک پیام یکسان را تکرار نکن.
-        if (key === this._receiverKey) {
+        // (مگر وقتی مجبوریم دوباره بفرستیم: بعد از قطع/وصل، bridge تنظیمات را از دست داده.)
+        if (!force && key === this._receiverKey) {
             return true
         }
 
@@ -1098,6 +1101,19 @@ export class JitsiController {
 
         try {
             if (typeof conference.setReceiverConstraints === 'function') {
+                if (force) {
+                    // lib ممکن است پیام کاملاً یکسان را خودش dedupe کند و به bridge
+                    // نفرستد. اول یک پیام ۱ پیکسل متفاوت (همان لایه‌ی simulcast) و
+                    // بلافاصله پیام واقعی؛ وضعیت نهایی همان پیام واقعی است.
+                    conference.setReceiverConstraints({
+                        ...message,
+                        defaultConstraints: {
+                            ...message.defaultConstraints,
+                            maxHeight: (message.defaultConstraints?.maxHeight || RECEIVER_QUALITY.SMALL) + 1,
+                        },
+                    })
+                }
+
                 conference.setReceiverConstraints(message)
             } else {
                 // fallback برای نسخه‌های قدیمی lib
@@ -1108,6 +1124,8 @@ export class JitsiController {
                         : RECEIVER_QUALITY.SMALL
                 )
             }
+
+            this._startReceiverWatchdog()
 
             return true
         } catch (error) {
@@ -1308,7 +1326,81 @@ export class JitsiController {
         return true
     }
 
+    /**
+     * بعد از افت/برگشت اینترنت، ICE restart یا باز شدن دوباره‌ی کانال bridge،
+     * JVB تنظیمات دریافت ویدیوی ما (lastN، selectedSources، رزولوشن) را فراموش
+     * می‌کند و فقط چند نفر آخرِ صحبت‌کننده را با کیفیت پیش‌فرض می‌فرستد؛
+     * ولی ما چون پیام قبلی را «همان» می‌دانستیم دوباره نمی‌فرستادیم و تایل بقیه
+     * خالی می‌ماند. این‌جا اجباری دوباره می‌فرستیم و دوربین خودمان را هم
+     * دوباره محدود می‌کنیم.
+     */
+    _recoverMediaAfterInterruption(reason) {
+        if (!this._conference || this._isLeaving || this._isDisposed) {
+            return
+        }
+
+        try {
+            this._applyReceiverConstraints(true)
+        } catch (error) {
+            console.warn('[JitsiController] receiver recovery failed:', reason, error)
+        }
+
+        // watchdog دوره‌ای فقط تنظیمات دریافت را تازه می‌کند؛ دوربین را فقط بعد از
+        // قطعی واقعی دوباره محدود می‌کنیم تا بی‌دلیل روی track دست نزنیم.
+        if (reason === 'watchdog') {
+            return
+        }
+
+        try {
+            const camera = this._findCameraTrack()
+            if (camera) {
+                this._tuneLocalCamera(camera)
+            }
+        } catch {
+        }
+
+        console.info('[Recovery] receiver constraints re-sent', {reason})
+    }
+
+    _startReceiverWatchdog() {
+        if (this._receiverWatchdog || typeof window === 'undefined') {
+            return
+        }
+
+        // چک ملایم هر ۳۰ ثانیه؛ پیام یک پیکسل متفاوت همان لایه را انتخاب می‌کند
+        // پس چشمک/تغییر کیفیت دیده نمی‌شود.
+        this._receiverWatchdog = setInterval(() => {
+            if (
+                !this._conference ||
+                this._isLeaving ||
+                this._isDisposed ||
+                this._status === MEETING_STATUS.RECONNECTING
+            ) {
+                return
+            }
+            this._recoverMediaAfterInterruption('watchdog')
+        }, 30000)
+
+        this._onBrowserOnline = () => {
+            setTimeout(() => this._recoverMediaAfterInterruption('browser-online'), 1500)
+        }
+        window.addEventListener('online', this._onBrowserOnline)
+    }
+
+    _stopReceiverWatchdog() {
+        if (this._receiverWatchdog) {
+            clearInterval(this._receiverWatchdog)
+            this._receiverWatchdog = null
+        }
+
+        if (this._onBrowserOnline && typeof window !== 'undefined') {
+            window.removeEventListener('online', this._onBrowserOnline)
+            this._onBrowserOnline = null
+        }
+    }
+
     _resetReceiverState() {
+        this._stopReceiverWatchdog()
         this._uploadCapped = false
         this._adaptState = null
         this._stopScreenShareHeartbeat()
@@ -2795,6 +2887,7 @@ export class JitsiController {
                             this._iceRestartInFlight = true
                             try {
                                 await currentConference.restartJvbIce()
+                                this._recoverMediaAfterInterruption('ice-restart')
                             } catch (error) {
                                 console.warn('[JitsiController] JVB ICE restart failed:', error)
                             } finally {
@@ -2820,8 +2913,24 @@ export class JitsiController {
                         this._reconnectAttempts = 0
                         this._setStatus(MEETING_STATUS.CONNECTED)
                         this._emit(JITSI_EVENTS.CONNECTION_RESTORED)
+
+                        // JVB بعد از قطعی تنظیمات دریافت را از دست می‌دهد.
+                        this._recoverMediaAfterInterruption('connection-restored')
+                        setTimeout(
+                            () => this._recoverMediaAfterInterruption('connection-restored+3s'),
+                            3000
+                        )
                     }
                 )
+
+                // کانال bridge (WebSocket/SCTP) هر بار که (دوباره) باز می‌شود، JVB با
+                // تنظیمات پیش‌فرض شروع می‌کند.
+                if (JitsiMeetJS.events.conference.DATA_CHANNEL_OPENED) {
+                    bind(
+                        JitsiMeetJS.events.conference.DATA_CHANNEL_OPENED,
+                        () => this._recoverMediaAfterInterruption('bridge-channel-open')
+                    )
+                }
 
                 // =================================================================
                 // Conference joined

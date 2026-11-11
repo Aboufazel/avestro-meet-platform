@@ -210,9 +210,9 @@ export default function CustomPlanBuilder() {
                     <p className="mb-3 text-md font-extrabold">۱- ظرفیت پلن</p>
                     <div className="grid gap-3 sm:grid-cols-2">
                         <Stepper label="تعداد کاربران" value={users} options={userOptions}
-                                 onChange={setUsersSafe} hint="تعداد کل کاربران مجاز در پلن"/>
+                                 onChange={setUsersSafe} hint="تعداد کاربران هم‌زمان"/>
                         <Stepper label="تعداد تصاویر هم‌زمان" value={images} options={imageOptions}
-                                 onChange={setImagesSafe} hint="تعداد تصویرهای مجاز هم‌زمان"/>
+                                 onChange={setImagesSafe} hint="تعداد تصاویر هم‌زمان"/>
                     </div>
                     {users > 200 && <p role="status"
                                        className="mt-3 flex items-start gap-2 rounded-xl border border-[#dce4f1] bg-[#f6f8fc] p-3 text-xs leading-6 text-[#46536b]">

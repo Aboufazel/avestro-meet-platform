@@ -35,7 +35,7 @@ export default function PricingPage() {
                     از پرداخت ببینید.
                 </p>
                 <p className="mt-3 text-sm leading-8 text-meet-blue">
-                    دسترسی به تمامی امکانات ساخت وبینار، جلسه و کلاس‌آموزشی برای شما در دسترس است
+                    دسترسی به تمامی امکانات ساخت وبینار، جلسه و کلاس‌آموزشی در تمامی پلن‌ها پس از خرید در دسترس است
                 </p>
             </section>
             <FreePlanCards/>
