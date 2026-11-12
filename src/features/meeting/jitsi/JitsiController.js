@@ -1564,6 +1564,7 @@ export class JitsiController {
         }
 
         console.info('[ScreenShare] state', { participantId, isSharing, seq: numericSeq })
+        this._logParticipantSources(isSharing ? 'on-share-start' : 'on-share-stop', participantId)
 
         if (isSharing) {
             this._authoritativelyStoppedScreenShares.delete(participantId)
@@ -1666,6 +1667,40 @@ export class JitsiController {
                 this._broadcastScreenShareState(true, { publish: false })
             }
         }, 2000)
+    }
+
+    /** فهرست سورس‌های ویدیوی یک شرکت‌کننده طبق lib (فقط برای عیب‌یابی). */
+    _snapshotParticipantSources(participantId) {
+        const out = []
+
+        try {
+            const participant = this._conference?.getParticipantById?.(participantId)
+            const sources = participant?.getSources?.()
+
+            if (sources && typeof sources.entries === 'function') {
+                for (const [mediaType, bySource] of sources.entries()) {
+                    if (mediaType !== 'video' || !bySource?.entries) continue
+                    for (const [sourceName, info] of bySource.entries()) {
+                        out.push({
+                            sourceName,
+                            videoType: info?.videoType,
+                            muted: info?.muted,
+                        })
+                    }
+                }
+            }
+        } catch {
+        }
+
+        return out
+    }
+
+    _logParticipantSources(reason, participantId) {
+        if (!participantId) return
+        console.info('[Sources]', reason, {
+            participantId,
+            video: this._snapshotParticipantSources(participantId),
+        })
     }
 
     _scheduleRemoteScreenShareReconcile(participantId) {
@@ -2969,6 +3004,92 @@ export class JitsiController {
                         )
                     }
                 )
+
+                // =================================================================
+                // رویدادهای مستند JitsiConferenceEvents برای سلامت مدیا
+                // =================================================================
+                const CE = JitsiMeetJS.events.conference
+
+                // «بایت می‌رسد ولی فریم decode نمی‌شود» = دقیقاً علت تایل سیاه. بعد از
+                // بازیابی، lib یک بار دیگر با map خالی (all-clear) خبر می‌دهد.
+                if (CE.INBOUND_VIDEO_STATS_RECEIVED) {
+                    bind(CE.INBOUND_VIDEO_STATS_RECEIVED, (tpc, stats) => {
+                        const failing =
+                            stats instanceof Map
+                                ? stats.size
+                                : stats && typeof stats === 'object'
+                                  ? Object.keys(stats).length
+                                  : 0
+
+                        if (failing === 0) {
+                            console.info('[Media] inbound video decoding OK / recovered')
+                            return
+                        }
+
+                        console.warn('[Media] remote video receiving bytes but not decoding', {
+                            streams: failing,
+                        })
+
+                        const now = Date.now()
+                        if (now - (this._lastDecodeRecoveryAt || 0) > 10000) {
+                            this._lastDecodeRecoveryAt = now
+                            this._recoverMediaAfterInterruption('inbound-video-not-decoding')
+                        }
+                    })
+                }
+
+                // کامپیوتر/تب از خواب برگشت (suspend): مدیا و تنظیمات دریافت را تازه کن.
+                if (CE.SUSPEND_DETECTED) {
+                    bind(CE.SUSPEND_DETECTED, () => {
+                        console.warn('[Media] suspend detected')
+                        setTimeout(
+                            () => this._recoverMediaAfterInterruption('suspend-detected'),
+                            1500
+                        )
+                    })
+                }
+
+                // Jicofo درخواست source-add (unmute دوربین/اشتراک) را رد کرد؛
+                // یعنی دیگران ویدیوی ما را نمی‌بینند. تا الان این بی‌صدا بود.
+                if (CE.TRACK_UNMUTE_REJECTED) {
+                    bind(CE.TRACK_UNMUTE_REJECTED, (track) => {
+                        console.warn('[Media] Jicofo rejected source-add (unmute)', {
+                            type: track?.getType?.(),
+                            videoType: track?.getVideoType?.(),
+                        })
+                    })
+                }
+
+                if (CE.VIDEO_UNMUTE_PERMISSIONS_CHANGED) {
+                    bind(CE.VIDEO_UNMUTE_PERMISSIONS_CHANGED, (...args) => {
+                        console.info('[Media] video unmute permissions changed', args)
+                    })
+                }
+
+                // bridge چه سورس‌هایی را واقعاً برای ما می‌فرستد.
+                if (CE.FORWARDED_SOURCES_CHANGED) {
+                    this._forwardedSources = this._forwardedSources || new Set()
+                    bind(CE.FORWARDED_SOURCES_CHANGED, (leaving = [], entering = []) => {
+                        leaving.forEach((n) => this._forwardedSources.delete(n))
+                        entering.forEach((n) => this._forwardedSources.add(n))
+                        console.debug('[Media] forwarded sources', {
+                            entering,
+                            leaving,
+                            total: this._forwardedSources.size,
+                        })
+                    })
+                }
+
+                // وضعیت سورس‌های یک شرکت‌کننده‌ی remote عوض شد (mute / videoType).
+                // مستند: participant.getSources() → Map<mediaType, Map<sourceName,
+                // {muted, videoType}>> و برای ورود دیرهنگام از presence خودکار می‌آید.
+                // فعلاً فقط ثبت می‌کنیم تا ببینیم lib هنگام توقف اشتراک واقعاً چه می‌گوید.
+                if (CE.PARTICIPANT_SOURCE_UPDATED) {
+                    bind(CE.PARTICIPANT_SOURCE_UPDATED, (arg) => {
+                        const id = typeof arg === 'string' ? arg : arg?.getId?.()
+                        this._logParticipantSources('source-updated', id)
+                    })
+                }
 
                 // کانال bridge (WebSocket/SCTP) هر بار که (دوباره) باز می‌شود، JVB با
                 // تنظیمات پیش‌فرض شروع می‌کند.
