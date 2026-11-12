@@ -42,7 +42,7 @@ import {useHandRequests} from '../../features/meeting/hooks/useHandRequests'
 import {ClassAccessContext} from '../../features/meeting/ClassAccessContext'
 import {ClassViewportContext} from '../../features/meeting/ClassViewportContext'
 import {PenTool} from 'lucide-react'
-import WhiteboardPanel from '../../features/whiteboard/WhiteboardPanel'
+import {WhiteboardStage} from '../../features/whiteboard/WhiteboardStage'
 import {DocumentStage} from '../../features/meeting/components/DocumentStage'
 import {DocumentsModal} from '../../features/meeting/components/DocumentsModal'
 
@@ -87,7 +87,6 @@ export default function RoomPage() {
     const allowUnloadRef = useRef(false)
     const [documentsOpen, setDocumentsOpen] = useState(false)
     const [whiteboardOpen, setWhiteboardOpen] = useState(false)
-    const [whiteboardObjects, setWhiteboardObjects] = useState([])
     const storeHand = useMeetingStore((s) => !!s.participants.get(s.localParticipantId)?.isHandRaised)
 
     const {
@@ -226,7 +225,6 @@ export default function RoomPage() {
 
     useEffect(() => {
         if (!access.whiteboardState) return
-        setWhiteboardObjects(access.whiteboardState.objects || [])
         setWhiteboardOpen(Boolean(access.whiteboardState.is_open))
     }, [access.whiteboardState])
 
@@ -312,23 +310,16 @@ export default function RoomPage() {
 
     // تخته (فقط وقتی باز است). همگام‌سازی و مجوز نوشتن مثل قبل از props می‌آید.
     const board = boardOpen ? (
-        <WhiteboardPanel
-            initialObjects={whiteboardObjects}
-            onObjectsChange={(next) => {
-                setWhiteboardObjects(next)
-                access.updateWhiteboardObjects(next)
-            }}
+        <WhiteboardStage
+            state={access.whiteboardState}
+            views={access.whiteboardViews}
+            canControl={isHostRole}
+            studentsCanDraw={studentsCanDraw}
             onClose={closeWhiteboard}
-            onClear={() => {
-                setWhiteboardObjects([])
-                access.clearWhiteboard()
-            }}
-            readOnly={!isHostRole && !studentsCanDraw}
-            isHost={isHostRole}
-            // میزبان نمای خودش را می‌فرستد؛ بقیه نمای معلم را دنبال می‌کنند
-            {...(isHostRole
-                ? {initialView: access.whiteboardView, onViewChange: access.sendWhiteboardView}
-                : {followView: access.whiteboardView || null})}
+            onObjects={access.updateWhiteboardObjects}
+            onPage={access.setWhiteboardPage}
+            onAddPage={access.addWhiteboardPage}
+            onView={access.sendWhiteboardView}
         />
     ) : null
 
@@ -342,6 +333,8 @@ export default function RoomPage() {
             onSettings={access.setDocumentSettings}
             onClearPage={access.clearDocumentPage}
             onAnnotate={access.annotateDocument}
+            views={access.documentViews}
+            onView={access.sendDocumentView}
         />
     ) : null
 

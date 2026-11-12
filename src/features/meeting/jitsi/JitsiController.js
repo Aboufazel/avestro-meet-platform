@@ -165,6 +165,7 @@ export class JitsiController {
         this._screenShareHeartbeat = null
         this._receiverWatchdog = null
         this._onBrowserOnline = null
+        this._onBrowserOffline = null
         this._localScreenShareSeq = 0
         this._trackVideoTypeListeners = new Map()
         this._receiverIntent = null
@@ -1267,6 +1268,26 @@ export class JitsiController {
     }
 
     /**
+     * روش مستند lib برای فریم‌ریت اشتراک صفحه: PeerConnection را طوری تنظیم می‌کند
+     * که فریم‌ریت داده‌شده قابل دستیابی باشد
+     * (JitsiConference.setDesktopSharingFrameRate(maxFps) → boolean).
+     * در مستند نسخه‌ی جدید lib گزینه‌ی desktopSharingFrameRate در init / createLocalTracks /
+     * config کنفرانس وجود ندارد؛ پس فقط به آن‌ها تکیه نمی‌کنیم و این را هم صدا می‌زنیم.
+     */
+    _applyDesktopFrameRate(mode = getScreenShareMode()) {
+        const {fps} = getScreenShareProfile(mode)
+
+        try {
+            const applied = this._conference?.setDesktopSharingFrameRate?.(fps)
+            console.info('[ScreenShare] setDesktopSharingFrameRate', {fps, applied})
+            return applied
+        } catch (error) {
+            console.warn('[ScreenShare] setDesktopSharingFrameRate failed', error)
+            return false
+        }
+    }
+
+    /**
      * تنظیم track اشتراک صفحه بر اساس حالت انتخابی (متن / متعادل / ویدیو):
      * contentHint، فریم‌ریت، سقف اندازه‌ی capture و سقف لایه‌ی ارسالی.
      * همه best-effort هستند؛ مرورگری که پشتیبانی نکند بی‌صدا رد می‌شود.
@@ -1274,6 +1295,8 @@ export class JitsiController {
     _tuneDesktopTrack(track, mode = getScreenShareMode()) {
         const profile = getScreenShareProfile(mode)
         const mediaTrack = track?.getTrack?.()
+
+        this._applyDesktopFrameRate(mode)
 
         try {
             if (mediaTrack && 'contentHint' in mediaTrack) {
@@ -1381,9 +1404,24 @@ export class JitsiController {
             this._recoverMediaAfterInterruption('watchdog')
         }, 30000)
 
+        // مستند lib: JitsiMeetJS.setNetworkInfo({isOnline}) وضعیت شبکه را به خود
+        // کتابخانه می‌گوید تا قطع/وصل اینترنت را درست مدیریت کند (به‌جای اینکه
+        // فقط از شکست ICE بفهمد).
+        const tellLibNetwork = (isOnline) => {
+            try {
+                window.JitsiMeetJS?.setNetworkInfo?.({isOnline})
+            } catch {
+            }
+        }
+
+        tellLibNetwork(typeof navigator === 'undefined' ? true : navigator.onLine !== false)
+
+        this._onBrowserOffline = () => tellLibNetwork(false)
         this._onBrowserOnline = () => {
+            tellLibNetwork(true)
             setTimeout(() => this._recoverMediaAfterInterruption('browser-online'), 1500)
         }
+        window.addEventListener('offline', this._onBrowserOffline)
         window.addEventListener('online', this._onBrowserOnline)
     }
 
@@ -1393,9 +1431,15 @@ export class JitsiController {
             this._receiverWatchdog = null
         }
 
-        if (this._onBrowserOnline && typeof window !== 'undefined') {
-            window.removeEventListener('online', this._onBrowserOnline)
-            this._onBrowserOnline = null
+        if (typeof window !== 'undefined') {
+            if (this._onBrowserOnline) {
+                window.removeEventListener('online', this._onBrowserOnline)
+                this._onBrowserOnline = null
+            }
+            if (this._onBrowserOffline) {
+                window.removeEventListener('offline', this._onBrowserOffline)
+                this._onBrowserOffline = null
+            }
         }
     }
 
@@ -1799,6 +1843,9 @@ export class JitsiController {
 
         const JitsiMeetJS = ensureJitsiInitialized()
         this._screenShareTransitioning = true
+
+        // قبل از ساخت track: فریم‌ریت PeerConnection را مطابق حالت انتخابی تنظیم کن.
+        this._applyDesktopFrameRate()
 
         // true  = دوربین و دسکتاپ هم‌زمان (پیش‌فرض؛ multi-stream روی سرور)
         // false = مدل قدیمی meet: دوربین جایگزین دسکتاپ می‌شود

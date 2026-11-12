@@ -225,6 +225,11 @@ export const CONFERENCE_CONFIG = {
   // conference.setReceiverConstraints انجام می‌شود (JitsiController).
   channelLastN: PERF.maxRemoteVideos,
 
+  // ICE restart درجا (make-before-break) مطابق مستند lib: Jicofo از bridge یک ICE agent
+  // تازه می‌خواهد در حالی که قبلی هنوز مدیا می‌برد؛ بدون ریلود کلاینت و بدون قطع.
+  // به پشتیبانی Jicofo وابسته است؛ پیش‌فرض خاموش. بعد از تست: VITE_JITSI_ICE_RESTART=true
+  enableIceRestart: import.meta.env.VITE_JITSI_ICE_RESTART === 'true',
+
   videoQuality: {
     enableAdaptiveMode: true,
 
