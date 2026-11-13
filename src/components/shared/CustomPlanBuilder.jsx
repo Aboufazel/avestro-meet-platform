@@ -81,8 +81,8 @@ export default function CustomPlanBuilder() {
     const setAuth = useAuthStore((s) => s.setAuth)
     const [duration, setDuration] = useState('month')
     const [requestedStartMode, setStartMode] = useState('now')
-    const [promoCode, setPromoCode] = useState('')
-    const [referralCode, setReferralCode] = useState('')
+    const [codeText, setCodeText] = useState(() => new URLSearchParams(window.location.search).get('ref') || '')
+    const [useReferralCredit, setUseReferralCredit] = useState(false)
 
     // با اشتراک فعال فقط «رزرو» ممکن است؛ بدون اشتراک فعال، شروع از امروز هم مجاز است.
     const {data: subscriptionInfo, isLoading: subscriptionLoading} = useQuery({
@@ -111,9 +111,9 @@ export default function CustomPlanBuilder() {
         images,
         duration,
         start_mode: startMode,
-        promo_code: promoCode.trim(),
-        referral_code: referralCode.trim(),
-    }), [governmentSchool, users, images, duration, startMode, promoCode, referralCode])
+        promo_code: codeText.trim(),
+        use_referral_credit: useReferralCredit,
+    }), [governmentSchool, users, images, duration, startMode, codeText, useReferralCredit])
     const {data: quote, isFetching: quoteLoading, isError: quoteError, error: quoteErrorData} = useQuery({
         queryKey: ['custom-plan-quote', payload],
         queryFn: () => paymentsService.customQuote(payload).then((r) => r.data),
@@ -238,24 +238,19 @@ export default function CustomPlanBuilder() {
 
                 <div className="rounded-2xl border border-[#dce4f1] p-4">
                     <p className="mb-3 text-md font-extrabold">کد تخفیف یا کد معرف</p>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="block text-xs font-bold text-[#46536b]">کد تخفیف
-                            <input value={promoCode} onChange={(e) => {
-                                setPromoCode(e.target.value.toUpperCase());
-                                if (e.target.value) setReferralCode('')
-                            }} placeholder="مثلاً AV-XXXX"
-                                   className="mt-2 min-h-11 w-full rounded-xl border border-[#dce4f1] px-3 text-sm outline-none focus:border-[#315bd5]"/>
-                        </label>
-                        <label className="block text-xs font-bold text-[#46536b]">کد معرف
-                            <input value={referralCode} onChange={(e) => {
-                                setReferralCode(e.target.value.toUpperCase());
-                                if (e.target.value) setPromoCode('')
-                            }} placeholder="کد معرف"
-                                   className="mt-2 min-h-11 w-full rounded-xl border border-[#dce4f1] px-3 text-sm outline-none focus:border-[#315bd5]"/>
-                        </label>
-                    </div>
-                    <p className="mt-2 text-[11px] text-[#7b879b]">فقط یکی از این دو کد را می‌توانید در هر سفارش استفاده
-                        کنید.</p>
+                    <label className="block text-xs font-bold text-[#46536b]">کد را وارد کنید
+                        <input value={codeText} onChange={(e) => setCodeText(e.target.value.toUpperCase())}
+                               placeholder="کد تخفیف یا کد معرف"
+                               className="mt-2 min-h-11 w-full rounded-xl border border-[#dce4f1] px-3 text-sm outline-none focus:border-[#315bd5]"/>
+                    </label>
+                    <p className="mt-2 text-[11px] leading-6 text-[#7b879b]">سامانه نوع کد را به‌صورت خودکار تشخیص می‌دهد؛ نیازی به انتخاب جداگانه نیست.</p>
+                    {quote?.referral && (Number(quote.referral.pool_balance || 0) > 0 || Number(quote.referral.wallet_balance || 0) > 0) &&
+                        <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-xl bg-[#f3f6ff] p-3 text-xs leading-6 text-[#46536b]">
+                            <input type="checkbox" checked={useReferralCredit} onChange={(e) => setUseReferralCredit(e.target.checked)} className="mt-1 h-4 w-4 accent-[#315bd5]"/>
+                            <span><b>استفاده از اعتبار و کیف پول معرفی در این خرید</b>
+                                <span className="mt-1 block">اعتبار درصدی: {fa(quote.referral.pool_balance)}٪ · کیف پول: {money(quote.referral.wallet_balance)}</span>
+                            </span>
+                        </label>}
                 </div>
 
                 <div className="rounded-2xl border border-[#dce4f1] p-4">
@@ -310,6 +305,18 @@ export default function CustomPlanBuilder() {
                             {quote.code_discount_amount > 0 &&
                                 <div className="mb-3 flex justify-between text-sm text-[#176447]">
                                     <span>تخفیف کد {quote.code || ''}</span><b>{money(quote.code_discount_amount)}</b>
+                                </div>}
+                            {quote.referral?.self_amount > 0 &&
+                                <div className="mb-3 flex justify-between text-sm text-[#176447]">
+                                    <span>تخفیف معرفی</span><b>{money(quote.referral.self_amount)}</b>
+                                </div>}
+                            {quote.referral?.pool_amount > 0 &&
+                                <div className="mb-3 flex justify-between text-sm text-[#176447]">
+                                    <span>اعتبار تخفیف معرفی</span><b>{money(quote.referral.pool_amount)}</b>
+                                </div>}
+                            {quote.referral?.wallet_use > 0 &&
+                                <div className="mb-3 flex justify-between text-sm text-[#176447]">
+                                    <span>مصرف کیف پول معرفی</span><b>{money(quote.referral.wallet_use)}</b>
                                 </div>}
                             {quote.government_discount_amount > 0 &&
                                 <div className="mb-3 flex justify-between text-sm text-[#176447]"><span>تخفیف مدارس دولتی ({fa(quote.government_discount_percent)}٪)</span><b>{money(quote.government_discount_amount)}</b>

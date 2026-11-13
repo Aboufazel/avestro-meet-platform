@@ -8,7 +8,8 @@ import {
     Settings,
     Plus,
     ArrowLeft,
-    Sparkles
+    Sparkles,
+    Gift
 } from 'lucide-react'
 import {useAuthStore} from '../../store/authStore'
 import {useRooms} from '../../hooks/useRooms'
@@ -72,7 +73,8 @@ export default function DashboardPage() {
                                                                                 description="مشاهده، ورود و مدیریت اتاق‌ها"
                                                                                 tone="mint"/><Shortcut
                 to="/dashboard/people" icon={Users} title="تعریف کاربران"
-                description="مدیریت معلمان، دانش‌آموزان و کاربران"/><Shortcut to="/dashboard/subscription"
+                description="مدیریت معلمان، دانش‌آموزان و کاربران"/><Shortcut to="/dashboard/referrals" icon={Gift} title="معرفی دیگران"
+                description="کد اختصاصی، اعتبارها و تاریخچه معرفی" tone="mint"/><Shortcut to="/dashboard/subscription"
                                                                               icon={CreditCard} title="اشتراک و پرداخت"
                                                                               description="وضعیت پلن و سوابق پرداخت"
                                                                               tone="violet"/><Shortcut

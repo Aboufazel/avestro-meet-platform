@@ -15,6 +15,7 @@ export default function OtpAuthPage({ mode = 'login' }) {
   const [step, setStep] = useState('phone')
   const [phone, setPhone] = useState('')
   const [name, setName] = useState('')
+  const [referralCode, setReferralCode] = useState(() => new URLSearchParams(window.location.search).get('ref') || '')
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [resendIn, setResendIn] = useState(0)
@@ -49,13 +50,13 @@ export default function OtpAuthPage({ mode = 'login' }) {
     const clean = toEnDigits(code).replace(/\D/g, '')
     if (clean.length !== CODE_LENGTH) { setError(`کد ${fa(CODE_LENGTH)} رقمی را کامل وارد کنید`); return }
     setError('')
-    verify({ phone: normalizedPhone, code: clean, display_name: name.trim() })
+    verify({ phone: normalizedPhone, code: clean, display_name: name.trim(), referral_code: referralCode.trim() })
   }
 
   function onCodeChange(e) {
     const clean = toEnDigits(e.target.value).replace(/\D/g, '').slice(0, CODE_LENGTH)
     setCode(clean)
-    if (clean.length === CODE_LENGTH && !verifying) verify({ phone: normalizedPhone, code: clean, display_name: name.trim() })
+    if (clean.length === CODE_LENGTH && !verifying) verify({ phone: normalizedPhone, code: clean, display_name: name.trim(), referral_code: referralCode.trim() })
   }
 
   return (
@@ -84,6 +85,7 @@ export default function OtpAuthPage({ mode = 'login' }) {
               <form onSubmit={sendCode} className="flex flex-col gap-4" noValidate>
                 <Input label="شماره موبایل" type="tel" inputMode="numeric" autoComplete="tel" placeholder="09123456789" icon={Phone} value={phone} onChange={(e) => setPhone(e.target.value)} error={error} className="meet-auth-input" dir="ltr" />
                 {isRegister && <Input label="نام و نام خانوادگی (اختیاری)" placeholder="نامی که دیگران می‌بینند" icon={User} value={name} onChange={(e) => setName(e.target.value)} className="meet-auth-input" />}
+                {isRegister && <Input label="کد معرف (اختیاری)" placeholder="کد معرف دوستتان" icon={Gift} value={referralCode} onChange={(e) => setReferralCode(e.target.value.toUpperCase())} className="meet-auth-input" />}
                 <Button type="submit" fullWidth size="lg" loading={requesting} className="!bg-gradient-to-l !from-[#4f7cff] !to-[#6a8fff] !text-white !border-0 !shadow-[0_12px_28px_rgba(79,124,255,.22)] !rounded-xl !py-3.5">دریافت کد تأیید</Button>
                 <p className="text-xs leading-6 text-[#8d98aa] text-center">کد تأیید به شماره شما پیامک می‌شود؛ بدون نیاز به رمز عبور.</p>
               </form>

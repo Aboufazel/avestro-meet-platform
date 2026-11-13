@@ -1,12 +1,13 @@
 import { useCallback, useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
-import { Home, CalendarDays, Plus, MoreHorizontal, X, Settings, CreditCard, Tags, Users, LogOut, Headset, UserRound } from 'lucide-react'
+import { Home, CalendarDays, Plus, MoreHorizontal, X, Settings, CreditCard, Tags, Users, LogOut, Headset, UserRound, Gift } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { Avatar } from '../ui/Avatar'
 import { useDialogFocus } from '../../hooks/useDialogFocus'
 import toast from 'react-hot-toast'
 import { userDisplayName } from '../../utils/userName'
+import NotificationCenter from '../shared/NotificationCenter'
 
 function MobileItem({ to, icon: Icon, label }) {
   return <NavLink to={to} end={to === '/dashboard'} className={({ isActive }) => `flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 text-[11px] font-semibold transition ${isActive ? 'text-[#4f7cff]' : 'text-[#71809a]'}`} aria-label={label}>
@@ -29,7 +30,11 @@ export function AppMainPage() {
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
       <header className="flex h-[62px] shrink-0 items-center justify-between border-b border-[#e5eaf2] bg-white/85 px-4 backdrop-blur-xl lg:hidden">
         <div className="flex items-center gap-2"><img src="/avestro-logo.png" alt="اَوسترو" className="h-8 w-8 rounded-lg"/><b className="text-sm text-[#101827]">اَوسترو میت</b></div>
-        <button onClick={() => setMoreOpen(true)} aria-label="بیشتر" className="flex h-10 w-10 items-center justify-center rounded-xl text-[#68758a] hover:bg-[#edf2ff]"><MoreHorizontal/></button>
+        <div className="flex items-center gap-2"><NotificationCenter/><button onClick={() => setMoreOpen(true)} aria-label="بیشتر" className="flex h-10 w-10 items-center justify-center rounded-xl text-[#68758a] hover:bg-[#edf2ff]"><MoreHorizontal/></button></div>
+      </header>
+      <header className="hidden h-[62px] shrink-0 items-center justify-between border-b border-[#e5eaf2] bg-white/90 px-6 lg:flex">
+        <div><p className="text-xs font-bold text-[#17233a]">فضای کاری اَوسترو میت</p><p className="mt-1 text-[10px] text-[#8d98aa]">مدیریت هوشمند جلسات و کلاس‌ها</p></div>
+        <NotificationCenter/>
       </header>
       <main className="min-h-0 flex-1 overflow-y-auto pb-24 lg:pb-0"><Outlet/></main>
       <nav aria-label="ناوبری اصلی" className="fixed inset-x-0 bottom-0 z-30 border-t border-[#e5eaf2] bg-white/95 px-2 pt-2 pb-[max(8px,env(safe-area-inset-bottom))] shadow-[0_-8px_30px_rgba(20,35,65,.06)] backdrop-blur-xl lg:hidden">
@@ -49,7 +54,7 @@ export function AppMainPage() {
         <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-[#d9e1ee]"/><div className="mb-4 flex items-center justify-between"><h2 className="text-base font-extrabold">بیشتر</h2><button data-autofocus onClick={close} aria-label="بستن" className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#f4f7fb]"><X size={18}/></button></div>
         <div className="mb-3 flex items-center gap-3 rounded-2xl bg-[#f6f8fc] p-3"><Avatar name={userDisplayName(user)} size="lg"/><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{userDisplayName(user)}</p><p className="mt-1 truncate text-xs text-[#8d98aa]">{user?.email || user?.phone_number || ''}</p></div><UserRound className="text-[#8d98aa]"/></div>
         <div className="grid grid-cols-2 gap-2">
-          {[['/dashboard/profile',UserRound,'پروفایل'],['/dashboard/people',Users,'تعریف کاربران'],['/dashboard/subscription',CreditCard,'اشتراک و پرداخت'],['/dashboard/pricing',Tags,'ساخت پلن'],['/dashboard/settings',Settings,'تنظیمات حساب']].map(([to,Icon,label])=><NavLink key={to} to={to} onClick={close} className="flex min-h-12 items-center gap-2 rounded-xl border border-[#e8edf5] px-3 text-sm font-semibold text-[#34415a] hover:bg-[#f6f8fc]"><Icon size={17} className="text-[#4f7cff]"/>{label}</NavLink>)}
+          {[['/dashboard/profile',UserRound,'پروفایل'],['/dashboard/people',Users,'تعریف کاربران'],['/dashboard/referrals',Gift,'معرفی دیگران'],['/dashboard/subscription',CreditCard,'اشتراک و پرداخت'],['/dashboard/pricing',Tags,'ساخت پلن'],['/dashboard/settings',Settings,'تنظیمات حساب']].map(([to,Icon,label])=><NavLink key={to} to={to} onClick={close} className="flex min-h-12 items-center gap-2 rounded-xl border border-[#e8edf5] px-3 text-sm font-semibold text-[#34415a] hover:bg-[#f6f8fc]"><Icon size={17} className="text-[#4f7cff]"/>{label}</NavLink>)}
         </div>
         <button onClick={close} className="mt-2 flex min-h-12 w-full items-center gap-2 rounded-xl px-3 text-sm font-semibold text-[#34415a] hover:bg-[#f6f8fc]"><Headset size={17}/>راهنما و پشتیبانی</button>
         <button onClick={handleLogout} className="mt-2 flex min-h-12 w-full items-center gap-2 rounded-xl bg-[#fff3f4] px-3 text-sm font-bold text-[#d64052]"><LogOut size={17}/>خروج از حساب</button>

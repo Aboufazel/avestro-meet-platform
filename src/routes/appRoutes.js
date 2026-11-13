@@ -19,6 +19,7 @@ export const appRoutes = {
     subscription: '/dashboard/subscription',
     people: '/dashboard/people',
     profile: '/dashboard/profile',
+    referrals: '/dashboard/referrals',
   },
   event: {
     join: '/join/:slug',

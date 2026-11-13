@@ -23,6 +23,7 @@ import PeoplePage from '../pages/people/PeoplePage'
 import ClassReportsPage from '../pages/dashboard/ClassReportsPage'
 import ClassReportDetailPage from '../pages/dashboard/ClassReportDetailPage'
 import ProfilePage from '../pages/settings/ProfilePage'
+import ReferralsPage from '../pages/dashboard/ReferralsPage'
 
 const router = createBrowserRouter([
     {
@@ -89,6 +90,7 @@ const router = createBrowserRouter([
             { path: appRoutes.dashboard.pricing, element: <PricingPage/> },
             { path: appRoutes.dashboard.people, element: <PeoplePage/> },
             { path: appRoutes.dashboard.profile, element: <ProfilePage/> },
+            { path: appRoutes.dashboard.referrals, element: <ReferralsPage/> },
         ]
     },
     {
