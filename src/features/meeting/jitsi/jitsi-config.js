@@ -198,11 +198,16 @@ export const PERF = {
 // =============================================================================
 // JitsiMeetJS.init()
 //
-// این گزینه‌ها طبق IJitsiMeetJSOptions مستندات lib-jitsi-meet معتبرند.
+// گزینه‌های مستند IJitsiMeetJSOptions: analytics, audioLevelsInterval,
+// desktopSharingSources, disableAudioLevels, disableThirdPartyRequests,
+// enableAnalyticsLogging, enableWindowOnErrorHandler, externalStorage,
+// flags{runInLiteMode, ssrcRewritingEnabled}, pcStatsInterval.
+// `desktopSharingFrameRate` در مستند نیست (فقط برای نسخه‌های قدیمی‌تر lib نگه داشته شده؛
+// روش مستند: conference.setDesktopSharingFrameRate).
 // =============================================================================
 export const JITSI_INIT_OPTIONS = {
   disableAudioLevels: false,
-  // سقف کلی؛ مقدار هر اشتراک بر اساس حالت انتخابی در createLocalTracks می‌آید.
+  // [غیرمستند] مقدار واقعی هر اشتراک با conference.setDesktopSharingFrameRate اعمال می‌شود.
   desktopSharingFrameRate: { min: 5, max: 30 },
   audioLevelsInterval: PERF.audioLevelsInterval,
   disableThirdPartyRequests: true,
@@ -256,7 +261,8 @@ export const CONFERENCE_CONFIG = {
       }
     : {}),
 
-  // اشتراک صفحه: مقدار واقعی هر اشتراک از SCREEN_SHARE_PROFILES می‌آید.
+  // [غیرمستند در IConferenceOptions] مقدار واقعی از SCREEN_SHARE_PROFILES و
+  // conference.setDesktopSharingFrameRate می‌آید.
   desktopSharingFrameRate: { min: 5, max: 30 },
 
   // این دو تشخیص هیچ‌جای اپ استفاده نشده‌اند ولی هرکدام یک پردازش صوتی
