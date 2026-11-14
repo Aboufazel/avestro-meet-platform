@@ -804,6 +804,21 @@ export async function getDevices() {
 }
 
 /**
+ * دستگاه‌های فعلی (برای انتخاب درست در تنظیمات) و پشتیبانی تغییر خروجی صدا
+ */
+export function getCurrentDevices() {
+    return jitsiController.getCurrentDevices()
+}
+
+export function isAudioOutputChangeAvailable() {
+    return jitsiController.isAudioOutputChangeAvailable()
+}
+
+export function getVideoQuality() {
+    return jitsiController.getVideoQuality()
+}
+
+/**
  * تغییر microphone
  */
 export async function setAudioInputDevice(deviceId) {

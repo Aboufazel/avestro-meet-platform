@@ -14,6 +14,8 @@ import {
     LOCAL_VIDEO_CONFIG,
     RECEIVER_QUALITY,
     PERF,
+    readMediaPrefs,
+    writeMediaPrefs,
 } from './jitsi-config.js'
 import {
     mapParticipant,
@@ -166,7 +168,6 @@ export class JitsiController {
         this._receiverWatchdog = null
         this._onBrowserOnline = null
         this._onBrowserOffline = null
-        this._screenSharePresenceId = null
         this._localScreenShareSeq = 0
         this._trackVideoTypeListeners = new Map()
         this._receiverIntent = null
@@ -525,6 +526,15 @@ export class JitsiController {
                     )
                 }
 
+                // کاربر وقتی میکروفون بسته بود دستگاه دیگری انتخاب کرده؛ همین حالا که
+                // خودش روشنش می‌کند، همان دستگاه باز می‌شود.
+                const preferredMic = this._pref('audio')
+                if (preferredMic && audioTrack.getDeviceId?.() !== preferredMic) {
+                    if (await this._swapLocalTrack('audio', preferredMic)) {
+                        return true
+                    }
+                }
+
                 await audioTrack.unmute()
             } else {
                 await audioTrack.mute()
@@ -583,6 +593,18 @@ export class JitsiController {
 
         try {
             if (videoTrack.isMuted()) {
+                const preferredCamera = this._pref('video')
+                if (
+                    preferredCamera &&
+                    videoTrack.getDeviceId?.() !== preferredCamera &&
+                    !this._screenShare.active &&
+                    !this._screenShareTransitioning
+                ) {
+                    if (await this._swapLocalTrack('video', preferredCamera)) {
+                        return true
+                    }
+                }
+
                 await videoTrack.unmute()
             } else {
                 await videoTrack.mute()
@@ -661,8 +683,10 @@ export class JitsiController {
     /**
      * Change microphone device.
      *
-     * This is an explicit media action and can request
-     * microphone permission if required.
+     * انتخاب کاربر همیشه به‌عنوان «دستگاه ترجیحی» ذخیره می‌شود. فقط وقتی میکروفون
+     * همین الان روشن است track عوض می‌شود؛ اگر بسته است (یا هنوز track ندارد) چیزی
+     * روشن نمی‌شود و ترجیح هنگام روشن‌کردنِ بعدیِ خودِ کاربر اعمال می‌شود.
+     * (تعویض نباید میکروفونِ بسته را باز کند یا اجازه‌ی مدیر را دور بزند.)
      */
     async setAudioInputDevice(
         deviceId
@@ -671,92 +695,19 @@ export class JitsiController {
             return false
         }
 
-        if (!this._conference) {
-            return false
-        }
+        writeMediaPrefs({micId: deviceId})
 
-        if (this._audioTrackCreating) {
-            return false
-        }
+        const track = this._findLocalTrack('audio')
 
-        const JitsiMeetJS =
-            ensureJitsiInitialized()
-
-        let newTrack = null
-
-        const oldTrack =
-            this._findLocalTrack(
-                'audio'
-            )
-
-        try {
-            const tracks =
-                await JitsiMeetJS.createLocalTracks(
-                    {
-                        devices: [
-                            'audio',
-                        ],
-
-                        micDeviceId:
-                        deviceId,
-                    }
-                )
-
-            newTrack =
-                tracks?.[0]
-
-            if (!newTrack) {
-                throw new Error(
-                    'Could not create audio track'
-                )
-            }
-
-            this._bindLocalTrackEvents(
-                newTrack
-            )
-
-            if (oldTrack) {
-                await this._conference.replaceTrack(
-                    oldTrack,
-                    newTrack
-                )
-            } else {
-                await this._conference.addTrack(
-                    newTrack
-                )
-            }
-
-            this._replaceLocalTrack(
-                oldTrack,
-                newTrack
-            )
-
-            if (oldTrack) {
-                await this._safeDisposeTrack(
-                    oldTrack
-                )
-            }
-
-            this._emit(
-                JITSI_EVENTS.TRACK_ADDED,
-                mapTrack(newTrack)
-            )
-
+        if (!this._conference || !track || track.isMuted?.()) {
             return true
-        } catch (error) {
-            if (newTrack) {
-                await this._safeDisposeTrack(
-                    newTrack
-                )
-            }
-
-            console.warn(
-                '[JitsiController] Audio device switch failed:',
-                error
-            )
-
-            return false
         }
+
+        if (track.getDeviceId?.() === deviceId) {
+            return true
+        }
+
+        return this._swapLocalTrack('audio', deviceId)
     }
 
     // =========================================================================
@@ -764,9 +715,8 @@ export class JitsiController {
     // =========================================================================
 
     /**
-     * Change camera device.
-     *
-     * Screen sharing is intentionally protected from camera switching.
+     * Change camera device. همان قاعده‌ی میکروفون: دوربین بسته یا در حال اشتراک صفحه
+     * فقط ترجیح را ذخیره می‌کند و چیزی روشن نمی‌شود.
      */
     async setVideoInputDevice(
         deviceId
@@ -775,102 +725,145 @@ export class JitsiController {
             return false
         }
 
-        if (!this._conference) {
-            return false
-        }
+        writeMediaPrefs({cameraId: deviceId})
+
+        const track = this._findCameraTrack()
 
         if (
+            !this._conference ||
+            !track ||
+            track.isMuted?.() ||
             this._screenShare.active ||
             this._screenShareTransitioning
         ) {
+            return true
+        }
+
+        if (track.getDeviceId?.() === deviceId) {
+            return true
+        }
+
+        return this._swapLocalTrack('video', deviceId)
+    }
+
+    /**
+     * جایگزینی track زنده‌ی میکروفون/دوربین با دستگاه دیگر (بدون قطع اتصال).
+     */
+    async _swapLocalTrack(type, deviceId) {
+        const isAudio = type === 'audio'
+
+        if (isAudio ? this._audioTrackCreating : this._videoTrackCreating) {
             return false
         }
 
-        if (this._videoTrackCreating) {
-            return false
-        }
+        if (isAudio) this._audioTrackCreating = true
+        else this._videoTrackCreating = true
 
-        const JitsiMeetJS =
-            ensureJitsiInitialized()
-
+        const JitsiMeetJS = ensureJitsiInitialized()
+        const oldTrack = isAudio
+            ? this._findLocalTrack('audio')
+            : this._findCameraTrack()
         let newTrack = null
 
-        const oldTrack =
-            this._findCameraTrack()
-
         try {
-            const tracks =
-                await JitsiMeetJS.createLocalTracks(
-                    {
-                        devices: [
-                            'video',
-                        ],
-
-                        cameraDeviceId:
-                        deviceId,
-
-                        resolution:
-                        LOCAL_VIDEO_CONFIG.resolution,
+            const tracks = await JitsiMeetJS.createLocalTracks(
+                isAudio
+                    ? {devices: ['audio'], micDeviceId: deviceId}
+                    : {
+                        devices: ['video'],
+                        cameraDeviceId: deviceId,
+                        resolution: this._captureHeight(),
                     }
-                )
+            )
 
-            newTrack =
-                tracks?.[0]
+            newTrack = tracks?.[0]
 
             if (!newTrack) {
-                throw new Error(
-                    'Could not create video track'
-                )
+                throw new Error(`Could not create ${type} track`)
             }
 
-            this._bindLocalTrackEvents(
-                newTrack
-            )
+            this._bindLocalTrackEvents(newTrack)
 
             if (oldTrack) {
-                await this._conference.replaceTrack(
-                    oldTrack,
-                    newTrack
-                )
+                await this._conference.replaceTrack(oldTrack, newTrack)
             } else {
-                await this._conference.addTrack(
-                    newTrack
-                )
+                await this._conference.addTrack(newTrack)
             }
 
-            this._replaceLocalTrack(
-                oldTrack,
-                newTrack
-            )
+            this._replaceLocalTrack(oldTrack, newTrack)
 
             if (oldTrack) {
-                await this._safeDisposeTrack(
-                    oldTrack
-                )
+                await this._safeDisposeTrack(oldTrack)
             }
 
-            this._tuneLocalCamera(newTrack)
+            if (!isAudio) {
+                this._tuneLocalCamera(newTrack)
+            }
 
-            this._emit(
-                JITSI_EVENTS.TRACK_ADDED,
-                mapTrack(newTrack)
-            )
+            this._emit(JITSI_EVENTS.TRACK_ADDED, mapTrack(newTrack))
 
             return true
         } catch (error) {
             if (newTrack) {
-                await this._safeDisposeTrack(
-                    newTrack
-                )
+                await this._safeDisposeTrack(newTrack)
             }
 
-            console.warn(
-                '[JitsiController] Video device switch failed:',
-                error
-            )
+            console.warn(`[JitsiController] ${type} device switch failed:`, error)
 
             return false
+        } finally {
+            if (isAudio) this._audioTrackCreating = false
+            else this._videoTrackCreating = false
         }
+    }
+
+    // ترجیح‌های ماندگار کاربر
+    _pref(type) {
+        const prefs = readMediaPrefs()
+        return (type === 'audio' ? prefs.micId : prefs.cameraId) || null
+    }
+
+    // کیفیت تصویر انتخاب‌شده (پیش‌فرض ۳۶۰)؛ هم ارسال دوربین و هم تماشای تایل بزرگ
+    _qualityPref() {
+        return this._manualSendHeight || readMediaPrefs().quality || LOCAL_VIDEO_CONFIG.maxHeight
+    }
+
+    _captureHeight() {
+        return this._qualityPref()
+    }
+
+    _receiveLargeHeight() {
+        return this._qualityPref()
+    }
+
+    getVideoQuality() {
+        return this._qualityPref()
+    }
+
+    /**
+     * شناسه‌ی دستگاه‌های فعلی (برای نمایش انتخاب درست در تنظیمات).
+     */
+    getCurrentDevices() {
+        let audioOutput = null
+
+        try {
+            audioOutput = ensureJitsiInitialized().mediaDevices.getAudioOutputDevice?.() || null
+        } catch {
+            audioOutput = null
+        }
+
+        return {
+            audioInput: this._findLocalTrack('audio')?.getDeviceId?.() || this._pref('audio'),
+            videoInput: this._findCameraTrack()?.getDeviceId?.() || this._pref('video'),
+            audioOutput,
+        }
+    }
+
+    /**
+     * تغییر خروجی صدا همه‌جا پشتیبانی نمی‌شود (Safari و Firefox).
+     */
+    isAudioOutputChangeAvailable() {
+        return typeof HTMLMediaElement !== 'undefined' && 'setSinkId' in HTMLMediaElement.prototype
     }
 
     // =========================================================================
@@ -887,27 +880,20 @@ export class JitsiController {
     async setAudioOutputDevice(
         deviceId
     ) {
-        if (!deviceId) {
+        if (!deviceId || !this.isAudioOutputChangeAvailable()) {
             return false
         }
 
-        const JitsiMeetJS =
-            ensureJitsiInitialized()
-
+        // خودِ lib فقط برای المان‌های «تازه» خروجی را اعمال می‌کند؛ المان‌های فعلیِ
+        // شرکت‌کننده‌ها را VideoTile با setSinkId عوض می‌کند (به selectedAudioOutputId وابسته است).
         try {
-            await JitsiMeetJS.mediaDevices.setAudioOutputDevice(
-                deviceId
-            )
-
-            return true
+            const JitsiMeetJS = ensureJitsiInitialized()
+            await JitsiMeetJS.mediaDevices.setAudioOutputDevice(deviceId)
         } catch (error) {
-            console.warn(
-                '[JitsiController] Audio output switch failed:',
-                error
-            )
-
-            return false
+            console.warn('[JitsiController] Audio output switch (lib) failed:', error)
         }
+
+        return true
     }
 
     // =========================================================================
@@ -937,12 +923,19 @@ export class JitsiController {
             // فقط سورس دوربین. بدون source name این محدودیت به اشتراک صفحه
             // (در حالت multi-stream) هم اعمال می‌شد و متن را ۳۶۰p می‌کرد.
             this._manualSendHeight = normalizedHeight
+            writeMediaPrefs({quality: normalizedHeight})
 
-            await this._setSenderHeight(
+            // track دوربین با رزولوشن ثبت‌شده‌ی خودش ساخته شده؛ برای بالاتر یا پایین‌تر
+            // رفتن، ثبت دوربین هم بهترین‌تلاش عوض می‌شود.
+            this._applyCaptureHeight(this._findCameraTrack(), normalizedHeight)
+
+            await this._conference.setSenderVideoConstraint(
                 this._effectiveSendHeight(),
-                this._findCameraTrack(),
-                'camera'
+                this._findCameraTrack()?.getSourceName?.()
             )
+
+            // تماشای تایل بزرگ هم با همین کیفیت (مصرف دانلود)
+            this._applyReceiverConstraints()
 
             return true
         } catch (error) {
@@ -952,6 +945,27 @@ export class JitsiController {
             )
 
             return false
+        }
+    }
+
+    _applyCaptureHeight(track, height) {
+        try {
+            const mediaTrack = track?.getTrack?.()
+
+            if (!mediaTrack?.applyConstraints || track.isMuted?.()) {
+                return
+            }
+
+            const width = Math.round((height * 16) / 9 / 2) * 2
+
+            mediaTrack
+                .applyConstraints({
+                    width: {ideal: width},
+                    height: {ideal: height},
+                    aspectRatio: {ideal: 16 / 9},
+                })
+                .catch(() => {})
+        } catch {
         }
     }
 
@@ -1062,7 +1076,7 @@ export class JitsiController {
                         maxHeight:
                             videoType === 'desktop'
                                 ? SCREEN_HEIGHT
-                                : RECEIVER_QUALITY.LARGE,
+                                : this._receiveLargeHeight(),
                     }
                 }
             }
@@ -1123,7 +1137,7 @@ export class JitsiController {
                 conference.setLastN?.(message.lastN)
                 conference.setReceiverVideoConstraint?.(
                     intent.onStageIds.length
-                        ? RECEIVER_QUALITY.LARGE
+                        ? this._receiveLargeHeight()
                         : RECEIVER_QUALITY.SMALL
                 )
             }
@@ -1168,7 +1182,7 @@ export class JitsiController {
                 }
 
                 if (needsWide) {
-                    const h = LOCAL_VIDEO_CONFIG.maxHeight
+                    const h = this._qualityPref()
                     const w = Math.round((h * TARGET_RATIO) / 2) * 2
                     constraints.aspectRatio = {ideal: TARGET_RATIO}
                     constraints.width = {ideal: w}
@@ -1192,42 +1206,13 @@ export class JitsiController {
         try {
             // Only the camera source: without a source name this capped the
             // screen share to camera resolution as well.
-            this._setSenderHeight(this._effectiveSendHeight(), track, 'camera')
+            this._conference
+                ?.setSenderVideoConstraint?.(
+                    this._effectiveSendHeight(),
+                    track?.getSourceName?.()
+                )
+                ?.catch?.(() => {})
         } catch {
-        }
-    }
-
-    /**
-     * مستند: JitsiConference.setSenderVideoConstraint(maxFrameHeight) فقط یک پارامتر
-     * دارد (نسخه‌های قدیمی‌تر پارامتر دومِ sourceName هم داشتند). اگر lib پارامتر دوم
-     * را نداشته باشد، آن را نادیده می‌گیرد و عدد برای کل ویدیوی ارسالی اعمال می‌شود.
-     * پس: برای سورس دسکتاپ فقط وقتی صدا می‌زنیم که پارامتر دوم پشتیبانی شود؛ وگرنه
-     * سقف دوربین را (ناخواسته) عوض می‌کرد.
-     */
-    _supportsPerSourceSenderConstraint() {
-        const fn = this._conference?.setSenderVideoConstraint
-        return typeof fn === 'function' && fn.length >= 2
-    }
-
-    _setSenderHeight(height, track, kind) {
-        const conference = this._conference
-
-        if (typeof conference?.setSenderVideoConstraint !== 'function') {
-            return null
-        }
-
-        const perSource = this._supportsPerSourceSenderConstraint()
-
-        if (kind === 'desktop' && !perSource) {
-            return null
-        }
-
-        try {
-            const args = perSource ? [height, track?.getSourceName?.()] : [height]
-
-            return conference.setSenderVideoConstraint(...args)?.catch?.(() => {})
-        } catch {
-            return null
         }
     }
 
@@ -1236,7 +1221,7 @@ export class JitsiController {
      * tier دستگاه؛ و اگر آپلود خراب است سقف کاهش‌یافته‌ی adaptive.
      */
     _effectiveSendHeight() {
-        const base = this._manualSendHeight || LOCAL_VIDEO_CONFIG.maxHeight
+        const base = this._qualityPref()
         return this._uploadCapped
             ? Math.min(ADAPTIVE_UPLOAD.lowHeight, base)
             : base
@@ -1288,7 +1273,12 @@ export class JitsiController {
         state.good = 0
 
         try {
-            this._setSenderHeight(this._effectiveSendHeight(), camera, 'camera')
+            this._conference
+                .setSenderVideoConstraint?.(
+                    this._effectiveSendHeight(),
+                    camera.getSourceName?.()
+                )
+                ?.catch?.(() => {})
         } catch {
         }
     }
@@ -1348,7 +1338,12 @@ export class JitsiController {
         }
 
         try {
-            this._setSenderHeight(profile.maxHeight, track, 'desktop')
+            this._conference
+                ?.setSenderVideoConstraint?.(
+                    profile.maxHeight,
+                    track?.getSourceName?.()
+                )
+                ?.catch?.(() => {})
         } catch {
         }
     }
@@ -1560,7 +1555,7 @@ export class JitsiController {
      * endpoint message). Late, duplicated or out-of-order messages are
      * dropped, so an old "stop" can never wipe a newer share.
      */
-    _acceptScreenShareState(participantId, isSharing, seq, opts = {}) {
+    _acceptScreenShareState(participantId, isSharing, seq) {
         if (!participantId) return false
 
         const numericSeq = Number(seq) || 0
@@ -1568,13 +1563,7 @@ export class JitsiController {
 
         // seq === 0 means "legacy / unknown order" (e.g. cached replay).
         // Never let it override anything we already know about.
-        // استثنا: حالت از presence (participant property) خودش «آخرین مقدار» است و
-        // برای ورود دیرهنگام همیشه معتبر؛ نیازی به seq ندارد.
-        if (
-            !opts.fromPresence &&
-            numericSeq <= lastSeq &&
-            !(numericSeq === 0 && lastSeq === 0)
-        ) {
+        if (numericSeq <= lastSeq && !(numericSeq === 0 && lastSeq === 0)) {
             return false
         }
 
@@ -1776,6 +1765,9 @@ export class JitsiController {
             participantFound = Boolean(participant)
             remoteTracks = participant?.getTracks?.() || []
 
+            if (!remoteTracks.length) {
+                remoteTracks = conference.getRemoteTracks?.(participantId) || []
+            }
         } catch {
             return false
         }
@@ -1859,57 +1851,8 @@ export class JitsiController {
         this._acceptScreenShareState(participantId, isSharing, seq)
     }
 
-    /**
-     * حالت اشتراک صفحه را مثل isTeacher و raisedHand به‌صورت participant property در
-     * presence منتشر می‌کند (setLocalParticipantProperty، مستند). presence حالتِ فعلی را
-     * نگه می‌دارد و هر کسی که بعداً وارد می‌شود خودکار می‌گیرد؛ بدون heartbeat.
-     */
-    _setScreenSharePresence(isSharing) {
-        const conference = this._conference
-
-        if (typeof conference?.setLocalParticipantProperty !== 'function') {
-            return
-        }
-
-        try {
-            if (isSharing) {
-                this._screenSharePresenceId =
-                    this._screenSharePresenceId || String(Date.now())
-                conference.setLocalParticipantProperty('screenShare', this._screenSharePresenceId)
-            } else {
-                this._screenSharePresenceId = null
-                conference.setLocalParticipantProperty('screenShare', '0')
-            }
-        } catch (error) {
-            console.debug('[JitsiController] screenShare presence skipped:', error?.message)
-        }
-    }
-
-    /** گیرنده: اشتراک‌هایی که از قبل در presence ثبت شده‌اند (ورود دیرهنگام). */
-    _syncScreenSharePresence() {
-        const conference = this._conference
-
-        if (!conference) return
-
-        try {
-            for (const participant of conference.getParticipants?.() || []) {
-                const id = participant?.getId?.()
-                const value = participant?.getProperty?.('screenShare')
-
-                if (id && value && value !== '0' && !this._remoteScreenShareActive.has(id)) {
-                    this._acceptScreenShareState(id, true, 0, {fromPresence: true})
-                }
-            }
-        } catch {
-        }
-    }
-
     _broadcastScreenShareState(isSharing, { publish = true } = {}) {
         const seq = this._nextScreenShareSeq()
-
-        if (publish) {
-            this._setScreenSharePresence(isSharing)
-        }
 
         // The classroom WebSocket is the authoritative state source.
         if (publish) {
@@ -2457,14 +2400,9 @@ export class JitsiController {
         }
 
         try {
-            // JitsiConference.muteEveryone در مستند نیست (صدا زدنش خطا می‌داد و
-            // دکمه بی‌صدا کار نمی‌کرد). روش مستند: muteParticipant(id, mediaType).
-            const myId = this._conference.myUserId?.()
-            const others = (this._conference.getParticipants?.() || []).filter(
-                (p) => p?.getId?.() && p.getId() !== myId
+            this._conference.muteEveryone(
+                'audio'
             )
-
-            others.forEach((p) => this._conference.muteParticipant(p.getId(), 'audio'))
 
             return true
         } catch (error) {
@@ -3158,19 +3096,6 @@ export class JitsiController {
                     })
                 }
 
-                // ورود دیرهنگام: اشتراک‌هایی که از قبل در presence هستند را بخوان.
-                if (CE.CONFERENCE_JOINED) {
-                    bind(CE.CONFERENCE_JOINED, () => {
-                        setTimeout(() => this._syncScreenSharePresence(), 1500)
-                    })
-                }
-                if (CE.USER_JOINED) {
-                    bind(CE.USER_JOINED, () => {
-                        setTimeout(() => this._syncScreenSharePresence(), 1000)
-                        setTimeout(() => this._syncScreenSharePresence(), 3500)
-                    })
-                }
-
                 // وضعیت سورس‌های یک شرکت‌کننده‌ی remote عوض شد (mute / videoType).
                 // مستند: participant.getSources() → Map<mediaType, Map<sourceName,
                 // {muted, videoType}>> و برای ورود دیرهنگام از presence خودکار می‌آید.
@@ -3292,16 +3217,6 @@ export class JitsiController {
                             })
                             return
                         }
-                        // اشتراک صفحه: presence مرجع «حالت فعلی» است (ورود دیرهنگام هم می‌گیرد)
-                        if (name === 'screenShare') {
-                            this._acceptScreenShareState(
-                                participant.getId(),
-                                Boolean(value) && value !== '0',
-                                0,
-                                {fromPresence: true}
-                            )
-                            return
-                        }
                         if (name !== 'raisedHand') return
 
                         this._emit(
@@ -3383,14 +3298,8 @@ export class JitsiController {
                 // Participant connection status
                 // =================================================================
 
-                // توجه: PARTICIPANT_CONN_STATUS_CHANGED و participant.getConnectionStatus()
-                // در JitsiConferenceEvents / JitsiParticipant مستند نیستند (حذف‌شده)؛ این
-                // handler در نسخه‌ی فعلی lib هرگز اجرا نمی‌شود. جایگزین‌های مستند:
-                // LAST_N_ENDPOINTS_CHANGED، FORWARDED_SOURCES_CHANGED،
-                // INBOUND_VIDEO_STATS_RECEIVED و connectionQuality.REMOTE_STATS_UPDATED.
                 bind(
-                    JitsiMeetJS.events.conference.PARTICIPANT_CONN_STATUS_CHANGED ||
-                        'unused.participant_conn_status_changed',
+                    JitsiMeetJS.events.conference.PARTICIPANT_CONN_STATUS_CHANGED,
                     (participantId) => {
                         const participant = conference.getParticipantById(participantId)
                         if (!participant) return
@@ -3958,11 +3867,27 @@ export class JitsiController {
             // رزولوشن دوربین ارسالی. قبلاً هیچ محدودیتی اعمال نمی‌شد و
             // دوربین با پیش‌فرض lib (تا ۷۲۰p و بیشتر) باز می‌شد.
             if (type === 'video') {
-                createOptions.resolution = LOCAL_VIDEO_CONFIG.resolution
+                createOptions.resolution = this._captureHeight()
             }
 
-            const tracks =
-                await JitsiMeetJS.createLocalTracks(createOptions)
+            // دستگاهی که کاربر در تنظیمات انتخاب کرده؛ اگر دیگر در دسترس نبود
+            // (مثلاً جدا شده) یک بار با پیش‌فرض سیستم تلاش می‌شود.
+            const preferred = this._pref(type)
+            if (preferred) {
+                if (type === 'audio') createOptions.micDeviceId = preferred
+                else createOptions.cameraDeviceId = preferred
+            }
+
+            let tracks
+            try {
+                tracks = await JitsiMeetJS.createLocalTracks(createOptions)
+            } catch (creationError) {
+                if (!preferred) throw creationError
+                writeMediaPrefs(type === 'audio' ? { micId: null } : { cameraId: null })
+                delete createOptions.micDeviceId
+                delete createOptions.cameraDeviceId
+                tracks = await JitsiMeetJS.createLocalTracks(createOptions)
+            }
 
             track =
                 tracks?.[0]

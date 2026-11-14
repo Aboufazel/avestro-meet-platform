@@ -171,6 +171,10 @@ const IS_MID_DESKTOP =
 
 export const DEVICE_TIER = IS_LOW_END ? 'low' : IS_MOBILE || IS_MID_DESKTOP ? 'medium' : 'high'
 
+// کیفیت پیش‌فرض تصویر برای همه (ارسال و تماشای تایل بزرگ): ۳۶۰p. بالاتر فقط با انتخاب خود کاربر
+// در تنظیمات؛ چون مصرف اینترنت (و هزینه‌ی سرور) را مستقیم بالا می‌برد.
+export const DEFAULT_VIDEO_QUALITY = 360
+
 export const PERF = {
   tier: DEVICE_TIER,
 
@@ -179,13 +183,13 @@ export const PERF = {
   maxRemoteVideos: { low: 4, medium: 6, high: 12 }[DEVICE_TIER],
 
   // ارتفاع ویدیوی ارسالی دوربین خودمان (encode روی CPU/GPU گوشی)
-  sendHeight: { low: 360, medium: 480, high: 720 }[DEVICE_TIER],
+  sendHeight: DEFAULT_VIDEO_QUALITY,
 
   // سقف فریم‌ریت دوربین ارسالی (best-effort؛ پایین‌تر = انکودر خنک‌تر)
   sendMaxFps: { low: 20, medium: 24, high: 30 }[DEVICE_TIER],
 
   // کیفیت دریافتی: تایل بزرگ (focus / active speaker) در مقابل تایل کوچک
-  receiveLargeHeight: { low: 360, medium: 480, high: 720 }[DEVICE_TIER],
+  receiveLargeHeight: DEFAULT_VIDEO_QUALITY,
   receiveSmallHeight: 180,
 
   // اشتراک صفحه در قاب سینمایی بزرگ نمایش داده می‌شود؛ متن باید خوانا بماند
@@ -196,18 +200,36 @@ export const PERF = {
 }
 
 // =============================================================================
+// ترجیح‌های ماندگار صدا و تصویر کاربر در همین مرورگر:
+// { micId, cameraId, quality }. فقط ترجیح است؛ چیزی خودکار روشن نمی‌شود.
+// =============================================================================
+const MEDIA_PREFS_KEY = 'meet:media-prefs'
+
+export function readMediaPrefs() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(MEDIA_PREFS_KEY) || '{}')
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+export function writeMediaPrefs(patch) {
+  try {
+    window.localStorage.setItem(MEDIA_PREFS_KEY, JSON.stringify({ ...readMediaPrefs(), ...patch }))
+  } catch {
+    // حالت خصوصی/ذخیره‌سازی بسته: ترجیح فقط در همین نشست می‌ماند
+  }
+}
+
+// =============================================================================
 // JitsiMeetJS.init()
 //
-// گزینه‌های مستند IJitsiMeetJSOptions: analytics, audioLevelsInterval,
-// desktopSharingSources, disableAudioLevels, disableThirdPartyRequests,
-// enableAnalyticsLogging, enableWindowOnErrorHandler, externalStorage,
-// flags{runInLiteMode, ssrcRewritingEnabled}, pcStatsInterval.
-// `desktopSharingFrameRate` در مستند نیست (فقط برای نسخه‌های قدیمی‌تر lib نگه داشته شده؛
-// روش مستند: conference.setDesktopSharingFrameRate).
+// این گزینه‌ها طبق IJitsiMeetJSOptions مستندات lib-jitsi-meet معتبرند.
 // =============================================================================
 export const JITSI_INIT_OPTIONS = {
   disableAudioLevels: false,
-  // [غیرمستند] مقدار واقعی هر اشتراک با conference.setDesktopSharingFrameRate اعمال می‌شود.
+  // سقف کلی؛ مقدار هر اشتراک بر اساس حالت انتخابی در createLocalTracks می‌آید.
   desktopSharingFrameRate: { min: 5, max: 30 },
   audioLevelsInterval: PERF.audioLevelsInterval,
   disableThirdPartyRequests: true,
@@ -261,8 +283,7 @@ export const CONFERENCE_CONFIG = {
       }
     : {}),
 
-  // [غیرمستند در IConferenceOptions] مقدار واقعی از SCREEN_SHARE_PROFILES و
-  // conference.setDesktopSharingFrameRate می‌آید.
+  // اشتراک صفحه: مقدار واقعی هر اشتراک از SCREEN_SHARE_PROFILES می‌آید.
   desktopSharingFrameRate: { min: 5, max: 30 },
 
   // این دو تشخیص هیچ‌جای اپ استفاده نشده‌اند ولی هرکدام یک پردازش صوتی
