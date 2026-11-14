@@ -14,6 +14,7 @@ import toast from 'react-hot-toast'
 import {useNavigate} from 'react-router-dom'
 import {useAuthStore} from '../../store/authStore'
 import {paymentsService} from '../../services/payments'
+import {referralsService} from '../../services/referrals'
 import InlineOtpDialog from './InlineOtpDialog'
 
 const fa = (value) => Number(value || 0).toLocaleString('fa-IR')
@@ -82,7 +83,8 @@ export default function CustomPlanBuilder() {
     const [duration, setDuration] = useState('month')
     const [requestedStartMode, setStartMode] = useState('now')
     const [codeText, setCodeText] = useState(() => new URLSearchParams(window.location.search).get('ref') || '')
-    const [useReferralCredit, setUseReferralCredit] = useState(false)
+    // null = انتخاب نشده؛ در این حالت اگر کاربر اعتبار/کیف پول معرفی دارد، خودکار در خرید اعمال می‌شود.
+    const [creditChoice, setCreditChoice] = useState(null)
 
     // با اشتراک فعال فقط «رزرو» ممکن است؛ بدون اشتراک فعال، شروع از امروز هم مجاز است.
     const {data: subscriptionInfo, isLoading: subscriptionLoading} = useQuery({
@@ -91,8 +93,18 @@ export default function CustomPlanBuilder() {
         enabled: authenticated,
     })
     const hasActivePlan = Boolean(subscriptionInfo?.active)
+    const {data: referralInfo, isLoading: referralLoading} = useQuery({
+        queryKey: ['my-referral'],
+        queryFn: () => referralsService.me().then((r) => r.data),
+        enabled: authenticated,
+        staleTime: 15000,
+    })
+    const referralCredit = Number(referralInfo?.direct_credit_percent || 0)
+    const referralWallet = Number(referralInfo?.wallet_balance || 0)
+    const hasReferralBalance = referralCredit > 0 || referralWallet > 0
+    const useReferralCredit = creditChoice ?? hasReferralBalance
     const startMode = hasActivePlan ? 'reserved' : requestedStartMode
-    const waitingForSubscription = authenticated && subscriptionLoading
+    const waitingForSubscription = authenticated && (subscriptionLoading || referralLoading)
 
     const {data: config, isLoading, isError} = useQuery({
         queryKey: ['custom-plan-config'],
@@ -125,6 +137,7 @@ export default function CustomPlanBuilder() {
         onSuccess: ({data}) => {
             queryClient.invalidateQueries({queryKey: ['my-subscription']})
             queryClient.invalidateQueries({queryKey: ['payment-orders']})
+            queryClient.invalidateQueries({queryKey: ['my-referral']})
             if (data.payment_url) window.location.assign(data.payment_url)
             else navigate(data.order_id ? `/billing/result?order=${data.order_id}` : '/dashboard/subscription')
         },
@@ -244,13 +257,23 @@ export default function CustomPlanBuilder() {
                                className="mt-2 min-h-11 w-full rounded-xl border border-[#dce4f1] px-3 text-sm outline-none focus:border-[#315bd5]"/>
                     </label>
                     <p className="mt-2 text-[11px] leading-6 text-[#7b879b]">سامانه نوع کد را به‌صورت خودکار تشخیص می‌دهد؛ نیازی به انتخاب جداگانه نیست.</p>
-                    {quote?.referral && (Number(quote.referral.pool_balance || 0) > 0 || Number(quote.referral.wallet_balance || 0) > 0) &&
-                        <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-xl bg-[#f3f6ff] p-3 text-xs leading-6 text-[#46536b]">
-                            <input type="checkbox" checked={useReferralCredit} onChange={(e) => setUseReferralCredit(e.target.checked)} className="mt-1 h-4 w-4 accent-[#315bd5]"/>
-                            <span><b>استفاده از اعتبار و کیف پول معرفی در این خرید</b>
-                                <span className="mt-1 block">اعتبار درصدی: {fa(quote.referral.pool_balance)}٪ · کیف پول: {money(quote.referral.wallet_balance)}</span>
-                            </span>
-                        </label>}
+                    {hasReferralBalance &&
+                        <div className="mt-3 rounded-xl border border-[#cfe0ff] bg-[#f3f6ff] p-3 text-xs leading-6 text-[#46536b]">
+                            <p className="font-extrabold text-[#2b4fb8]">شما اعتبار معرفی دارید</p>
+                            <p className="mt-1">
+                                {referralCredit > 0 && <span>اعتبار تخفیف: <b>{fa(referralCredit)}٪</b></span>}
+                                {referralCredit > 0 && referralWallet > 0 && ' · '}
+                                {referralWallet > 0 && <span>کیف پول: <b>{money(referralWallet)}</b></span>}
+                            </p>
+                            <label className="mt-2 flex cursor-pointer items-start gap-2">
+                                <input type="checkbox" checked={useReferralCredit} onChange={(e) => setCreditChoice(e.target.checked)} className="mt-1 h-4 w-4 accent-[#315bd5]"/>
+                                <span><b>استفاده از اعتبار معرفی در این خرید</b>
+                                    <span className="mt-0.5 block text-[#68758a]">{useReferralCredit
+                                        ? 'اعتبار شما در پیش‌فاکتور اعمال می‌شود (با رعایت سقف هر خرید).'
+                                        : 'اعتبار شما نگه داشته می‌شود و برای خرید بعدی می‌ماند.'}</span>
+                                </span>
+                            </label>
+                        </div>}
                 </div>
 
                 <div className="rounded-2xl border border-[#dce4f1] p-4">
