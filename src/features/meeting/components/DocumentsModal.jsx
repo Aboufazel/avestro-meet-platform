@@ -5,7 +5,6 @@ import toast from 'react-hot-toast'
 import { documentsService } from '../../../services/documents'
 
 const ACCEPT = '.pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.ppt,.pptx,.odt,.odp'
-const MAX_MB = 20
 const faNum = (n) => String(n).replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[d])
 const formatSize = (bytes) => (bytes >= 1024 * 1024 ? `${faNum((bytes / 1024 / 1024).toFixed(1))} مگابایت` : `${faNum(Math.max(1, Math.round(bytes / 1024)))} کیلوبایت`)
 
@@ -40,7 +39,6 @@ export const DocumentsModal = memo(function DocumentsModal({ slug, open, activeI
 
   const upload = async (file) => {
     if (!file) return
-    if (file.size > MAX_MB * 1024 * 1024) { toast.error(`حجم فایل نباید بیشتر از ${faNum(MAX_MB)} مگابایت باشد.`); return }
     setProgress(0)
     try {
       await documentsService.upload(slug, file, setProgress)
@@ -83,7 +81,7 @@ export const DocumentsModal = memo(function DocumentsModal({ slug, open, activeI
           >
             {progress === null ? <Upload size={20} className="text-white/60" /> : <Loader2 size={20} className="animate-spin text-white/60" />}
             <span className="text-xs text-white/80">{progress === null ? 'انتخاب فایل یا رها‌کردن اینجا' : `در حال بارگذاری… ${faNum(progress)}٪`}</span>
-            <span className="text-[10px] text-white/35">عکس، PDF، Word، PowerPoint · حداکثر {faNum(MAX_MB)} مگابایت</span>
+            <span className="text-[10px] text-white/35">عکس، PDF، Word، PowerPoint</span>
             <input ref={inputRef} type="file" accept={ACCEPT} className="sr-only" disabled={progress !== null} onChange={(e) => upload(e.target.files?.[0])} />
           </label>
         </div>

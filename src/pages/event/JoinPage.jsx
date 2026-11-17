@@ -9,8 +9,10 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Avatar } from '../../components/ui/Avatar'
 import { useAuthStore } from '../../store/authStore'
+import { roomsService } from '../../services/rooms'
 import { useRoom } from '../../hooks/useRooms'
 import { appRoutes } from '../../routes/appRoutes'
+import { userDisplayName } from '../../utils/userName'
 
 const guestSchema = yup.object({ guest_name: yup.string().required('نام الزامی است').min(2, 'حداقل ۲ کاراکتر') })
 const classGuestSchema = yup.object({
@@ -27,16 +29,43 @@ export default function JoinPage() {
   const { slug } = useParams()
   const navigate = useNavigate()
   const { token, user } = useAuthStore()
-  const [mode, setMode] = useState(token ? 'select' : 'guest')
+  const [modeOverride, setModeOverride] = useState(null)
+  const [nationalId, setNationalId] = useState('')
+  const [nationalError, setNationalError] = useState('')
+  const [verifying, setVerifying] = useState(false)
   const { data: room, isLoading, isError } = useRoom(slug)
+  // ورود با کد ملی: اگر ورود مهمان بسته باشد اجباری است (میزبانِ حساب معاف است)؛ وگرنه اختیاری
+  const isHostAccount = Boolean(token && room?.host?.id && room.host.id === user?.id)
+  const requiresNationalId = room?.allow_guests === false && !isHostAccount
+  const mode = modeOverride ?? (requiresNationalId ? 'national' : token ? 'select' : 'guest')
+  const setMode = (next) => setModeOverride(next)
   const isEducationalClass = room?.kind === 'class'
   const { register, handleSubmit, formState: { errors } } = useForm({
     resolver: yupResolver(isEducationalClass ? classGuestSchema : guestSchema),
     shouldUnregister: true,
   })
 
-  const handleJoinAsUser = () => navigate(`/room/${slug}`)
+  const clearNationalId = () => sessionStorage.removeItem(`national_id:${slug}`)
+  const handleJoinAsUser = () => { clearNationalId(); navigate(`/room/${slug}`) }
+  const handleJoinWithNationalId = async (event) => {
+    event.preventDefault()
+    const value = nationalId.trim()
+    if (!value) { setNationalError('کد ملی را وارد کنید.'); return }
+    setVerifying(true)
+    setNationalError('')
+    try {
+      const { data } = await roomsService.verifyNationalId(slug, value)
+      sessionStorage.setItem(`national_id:${slug}`, value)
+      sessionStorage.setItem('guest_name', data.name)
+      navigate(`/room/${slug}`)
+    } catch (error) {
+      setNationalError(error.response?.data?.detail || 'بررسی کد ملی انجام نشد. دوباره تلاش کنید.')
+    } finally {
+      setVerifying(false)
+    }
+  }
   const handleJoinAsGuest = (data) => {
+    clearNationalId()
     const guestName = isEducationalClass
       ? `${data.guest_first_name.trim()} ${data.guest_last_name.trim()}`
       : data.guest_name.trim()
@@ -95,7 +124,7 @@ export default function JoinPage() {
                 <h2 className="text-lg sm:text-xl font-bold">ورود</h2><p className="text-xs text-[#8d98aa] mt-2 mb-4 sm:mb-6">روش ورود خود را انتخاب کنید.</p>
                 {token ? (
                   <>
-                    <div className="flex items-center gap-3 p-3.5 bg-[#f8faff] rounded-2xl border border-[#e5eaf2] mb-3"><Avatar name={user?.display_name || user?.username} size="sm" /><div className="min-w-0"><p className="text-sm font-medium truncate">{user?.display_name || user?.username}</p><p className="text-[11px] text-[#9aa4b4] truncate mt-1">{user?.email}</p></div><span className="mr-auto w-2 h-2 rounded-full bg-[#54d9b0]" /></div>
+                    <div className="flex items-center gap-3 p-3.5 bg-[#f8faff] rounded-2xl border border-[#e5eaf2] mb-3"><Avatar name={userDisplayName(user)} size="sm" /><div className="min-w-0"><p className="text-sm font-medium truncate">{userDisplayName(user)}</p><p className="text-[11px] text-[#9aa4b4] truncate mt-1">{user?.email || user?.phone_number}</p></div><span className="mr-auto w-2 h-2 rounded-full bg-[#54d9b0]" /></div>
                     <Button fullWidth size="lg" onClick={handleJoinAsUser} className="!bg-gradient-to-l !from-[#4f7cff] !to-[#6a8fff] !text-white !border-0 !rounded-xl">ورود با حساب کاربری</Button>
                     {/*<Button fullWidth variant="ghost" onClick={() => setMode('guest')} className="!text-[#68758a] hover:!bg-[#f4f7fb] mt-2">ورود</Button>*/}
                   </>
@@ -105,7 +134,24 @@ export default function JoinPage() {
                     {/*<Button fullWidth variant="secondary" size="lg" onClick={() => setMode('guest')} className="!text-[#101827] !border-[#e5eaf2] !bg-white hover:!bg-[#edf2ff] mt-2">ورود</Button>*/}
                   </>
                 )}
+                {!requiresNationalId && !isHostAccount && room.allow_guests !== undefined && <button type="button" onClick={() => setMode('national')} className="mt-3 w-full min-h-11 rounded-xl border-2 border-[#c3cee2] text-sm font-bold text-[#2347b4] hover:bg-[#edf2ff] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#2c55d4]/35">ورود با کد ملی (معلم، مدیر، معاون یا دانش‌آموز ثبت‌شده)</button>}
                 <div className="flex items-center justify-center gap-2 text-[10px] text-[#9aa4b4] mt-7"><ShieldCheck className="w-3.5 h-3.5 text-[#54d9b0]" /> ورود امن و بدون پیچیدگی</div>
+              </div>
+            ) : mode === 'national' ? (
+              <div>
+                {!requiresNationalId && <button type="button" onClick={() => { setModeOverride(null); setNationalError('') }} className="text-xs text-[#68758a] hover:text-[#4f7cff] inline-flex items-center gap-1 mb-6 min-h-11"><ArrowRight className="w-3.5 h-3.5" /> بازگشت به ورود با نام</button>}
+                <div className="w-11 h-11 rounded-2xl bg-[#edf2ff] text-[#2347b4] flex items-center justify-center mb-5"><UserRound className="w-5 h-5" aria-hidden="true" /></div>
+                <h2 className="text-lg sm:text-xl font-bold">ورود با کد ملی</h2>
+                <p className="text-sm text-[#46536b] leading-7 mt-2 mb-5">کد ملی خود را وارد کنید. نام و نام خانوادگی ثبت‌شده‌ی شما در جلسه نمایش داده می‌شود.</p>
+                <form onSubmit={handleJoinWithNationalId} noValidate className="flex flex-col gap-4">
+                  <div>
+                    <label htmlFor="join-national-id" className="block text-sm font-bold mb-1.5">کد ملی</label>
+                    <input id="join-national-id" value={nationalId} onChange={(e) => { setNationalId(e.target.value); setNationalError('') }} inputMode="numeric" autoComplete="off" dir="ltr" maxLength={20} placeholder="۱۰ رقم" aria-invalid={Boolean(nationalError)} aria-describedby={nationalError ? 'join-national-error' : undefined} className="w-full min-h-11 rounded-xl border-2 border-[#c3cee2] bg-white px-3 py-2 text-base text-[#101827] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#2c55d4]/35" />
+                    {nationalError && <p id="join-national-error" role="alert" className="mt-1.5 text-sm font-bold text-[#a3182b]">{nationalError}</p>}
+                  </div>
+                  <Button type="submit" fullWidth size="lg" disabled={verifying} className="!bg-gradient-to-l !from-[#4f7cff] !to-[#6a8fff] !text-white !border-0 !rounded-xl">{verifying ? 'در حال بررسی…' : 'ورود به جلسه'}</Button>
+                </form>
+                {isHostAccount === false && token && <p className="text-xs text-[#68758a] mt-4">برای این جلسه، حتی با حساب کاربری هم ورود با کد ملی لازم است.</p>}
               </div>
             ) : (
               <div>
@@ -122,6 +168,7 @@ export default function JoinPage() {
                   )}
                   <Button type="submit" fullWidth size="lg" className="!bg-gradient-to-l !from-[#4f7cff] !to-[#6a8fff] !text-white !border-0 !rounded-xl">ورود</Button>
                 </form>
+                {room.allow_guests !== undefined && <button type="button" onClick={() => setMode('national')} className="mt-3 w-full min-h-11 rounded-xl border-2 border-[#c3cee2] text-sm font-bold text-[#2347b4] hover:bg-[#edf2ff] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#2c55d4]/35">ورود با کد ملی (معلم، مدیر، معاون یا دانش‌آموز ثبت‌شده)</button>}
               </div>
             )}
           </section>

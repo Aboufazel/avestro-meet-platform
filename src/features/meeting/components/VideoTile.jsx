@@ -26,6 +26,7 @@ import {useMeetingStore} from '../store/meeting-store'
 
 import {
     selectIsMeetingMuted,
+    selectSelectedAudioOutputId,
 } from '../store/meeting-selectors'
 
 export const VideoTile = memo(
@@ -82,6 +83,13 @@ export const VideoTile = memo(
         const isMeetingMuted =
             useMeetingStore(
                 selectIsMeetingMuted
+            )
+
+        // خروجی صدای انتخاب‌شده در تنظیمات؛ lib فقط روی المان‌های تازه اعمالش می‌کند،
+        // پس برای المان‌های فعلی خودمان setSinkId می‌زنیم.
+        const selectedAudioOutputId =
+            useMeetingStore(
+                selectSelectedAudioOutputId
             )
 
         const isSafariOrIOS =
@@ -203,6 +211,31 @@ export const VideoTile = memo(
         }, [
             audioTrack?.jitsiTrack,
             participant?.isLocal,
+            playAudio,
+        ])
+
+        useEffect(() => {
+            const element = audioRef.current
+
+            if (
+                !element ||
+                !selectedAudioOutputId ||
+                typeof element.setSinkId !== 'function'
+            ) {
+                return
+            }
+
+            element
+                .setSinkId(selectedAudioOutputId)
+                .catch((error) => {
+                    console.warn(
+                        '[VideoTile] setSinkId failed:',
+                        error
+                    )
+                })
+        }, [
+            selectedAudioOutputId,
+            audioTrack?.jitsiTrack,
             playAudio,
         ])
 

@@ -110,7 +110,7 @@ function useDocumentPages(slug, doc) {
  * ورق می‌زند یا می‌نویسد.
  */
 export const DocumentStage = memo(function DocumentStage({
-  slug, state, canControl, onPage, onClose, onSettings, onClearPage, onAnnotate,
+  slug, state, canControl, onPage, onClose, onSettings, onClearPage, onAnnotate, views, onView,
 }) {
   const doc = state.document
   const { status, pageCount, getPage } = useDocumentPages(slug, doc)
@@ -155,6 +155,15 @@ export const DocumentStage = memo(function DocumentStage({
     </>
   ) : null
 
+  // نمای زوم/جابه‌جایی: میزبان می‌فرستد؛ دانش‌آموزِ روی صفحه‌ی معلم دنبال می‌کند؛
+  // دانش‌آموزِ در حال ورق‌زدنِ آزاد از آخرین نمای معلم شروع می‌کند و نمای محلی دارد.
+  const pageView = views?.[String(current)] || null
+  const viewProps = canControl
+    ? { initialView: pageView, onViewChange: (next, final) => onView?.(current, next, final) }
+    : current !== teacherPage
+      ? { initialView: pageView }
+      : { followView: pageView }
+
   const moreExtra = canControl ? (
     <>
       <button type="button" role="menuitemcheckbox" aria-checked={Boolean(state.students_can_annotate)} className="wb-pop-item" onClick={() => onSettings?.({ students_can_annotate: !state.students_can_annotate })}>
@@ -187,6 +196,7 @@ export const DocumentStage = memo(function DocumentStage({
             background={background}
             labels={LABELS}
             moreExtra={moreExtra}
+            {...viewProps}
           />
           <div className="ds-pager" dir="ltr" role="group" aria-label="صفحه‌های سند">
             {canBrowse && <button type="button" onClick={() => goTo(current + 1)} disabled={current >= pageCount} aria-label="صفحه‌ی بعد"><ChevronLeft size={18} /></button>}

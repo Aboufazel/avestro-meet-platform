@@ -1,19 +1,29 @@
-import { useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, CheckCircle2, Loader2, PenTool, Settings2 } from 'lucide-react'
+import { AlertCircle, Loader2, Settings2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import { roomsService } from '../../services/rooms'
+import { PLAN_FEATURE_KEYS } from '../../constants/planFeatures'
 
-const FEATURE_KEY = 'whiteboard'
+const HINTS = {
+  whiteboard: 'فضای نوشتن و ترسیم هم‌زمان برای کلاس',
+  documents: 'نمایش عکس، PDF، Word و PowerPoint داخل کلاس',
+  speak_permission: 'میکروفون و دوربین شرکت‌کنندگان با اجازه‌ی مدیر باز شود',
+  raise_hand: 'درخواست صحبت و مدیریت صف',
+  attendance: 'ثبت حضور و غیاب شرکت‌کنندگان',
+}
+
+const MODES = [
+  { value: 'inherit', label: 'طبق تنظیمات حساب' },
+  { value: 'enabled', label: 'فعال در این کلاس' },
+  { value: 'disabled', label: 'غیرفعال در این کلاس' },
+]
+
+const focusRing = 'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#4f7cff]/30'
 
 export default function ClassFeatureSettings({ slug }) {
   const queryClient = useQueryClient()
-
-  const accountQuery = useQuery({
-    queryKey: ['account-features'],
-    queryFn: () => roomsService.accountFeatures().then((response) => response.data),
-  })
 
   const roomQuery = useQuery({
     queryKey: ['room-features', slug],
@@ -21,127 +31,85 @@ export default function ClassFeatureSettings({ slug }) {
     enabled: Boolean(slug),
   })
 
-  const accountFeature = useMemo(
-    () => accountQuery.data?.find((feature) => feature.key === FEATURE_KEY),
-    [accountQuery.data],
-  )
-  const roomFeature = roomQuery.data?.features?.[FEATURE_KEY]
-
-  const accountMutation = useMutation({
-    mutationFn: (enabled) => roomsService.updateAccountFeature(FEATURE_KEY, { enabled }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['account-features'] })
-      queryClient.invalidateQueries({ queryKey: ['room-features'] })
-      toast.success('وضعیت قابلیت در حساب ذخیره شد')
-    },
-    onError: (error) => toast.error(error.response?.data?.detail || 'ذخیره تنظیم حساب ناموفق بود'),
-  })
-
-  const roomMutation = useMutation({
-    mutationFn: (mode) => roomsService.updateRoomFeature(slug, FEATURE_KEY, { mode }),
+  const mutation = useMutation({
+    mutationFn: ({ key, mode }) => roomsService.updateRoomFeature(slug, key, { mode }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['room-features', slug] })
-      toast.success('تنظیم تخته سفید برای این جلسه ذخیره شد')
+      toast.success('تنظیم امکان برای این کلاس ذخیره شد')
     },
-    onError: (error) => toast.error(error.response?.data?.detail || 'ذخیره تنظیم جلسه ناموفق بود'),
+    onError: (error) => toast.error(error.response?.data?.detail || 'ذخیره تنظیم ناموفق بود'),
   })
 
-  const isLoading = accountQuery.isLoading || roomQuery.isLoading
-  const hasError = accountQuery.isError || roomQuery.isError
-
-  if (isLoading) {
+  if (roomQuery.isLoading) {
     return (
-      <section className="rounded-2xl border border-[#e5eaf2] bg-[#f8faff] p-5">
-        <div className="flex items-center gap-2 text-sm text-[#68758a]">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          در حال دریافت تنظیمات امکانات آموزشی…
+      <section className="rounded-2xl border border-[#e5eaf2] bg-[#f8faff] p-5" role="status">
+        <div className="flex items-center gap-2 text-sm text-[#4b586d]">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          در حال دریافت امکانات کلاس…
         </div>
       </section>
     )
   }
 
-  if (hasError || !accountFeature || !roomFeature) {
+  const features = roomQuery.data?.features
+  if (roomQuery.isError || !features) {
     return (
-      <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
-        <div className="flex items-start gap-2 text-sm text-amber-800">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          تنظیمات تخته سفید دریافت نشد. صفحه را تازه‌سازی کنید؛ اگر مشکل ادامه داشت، دسترسی API تنظیمات قابلیت‌ها بررسی شود.
-        </div>
+      <section role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+        <span className="flex items-start gap-2"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />دریافت امکانات کلاس ممکن نشد. صفحه را تازه‌سازی کنید.</span>
       </section>
     )
   }
 
-  const accountEnabled = Boolean(accountFeature.configured_enabled)
-  const roomMode = roomFeature.room_mode || 'inherit'
-  const busy = accountMutation.isPending || roomMutation.isPending
+  const rows = PLAN_FEATURE_KEYS.map((key) => features[key]).filter(Boolean)
+  const pendingKey = mutation.isPending ? mutation.variables?.key : null
 
   return (
-    <section className="rounded-2xl border border-[#dfe7f5] bg-white p-5 sm:p-6">
-      <div className="mb-5 flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#edf2ff] text-[#4f7cff]">
-          <PenTool className="h-5 w-5" />
-        </div>
+    <section aria-labelledby="class-features-title" className="rounded-2xl border border-[#dfe7f5] bg-white p-5 sm:p-6">
+      <div className="mb-4 flex items-start gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#edf2ff] text-[#2f55d4]"><Settings2 className="h-5 w-5" aria-hidden="true" /></span>
         <div className="min-w-0 flex-1">
-          <h2 className="font-bold text-[#101827]">تنظیمات تخته سفید</h2>
-          <p className="mt-1 text-sm leading-6 text-[#7b8799]">
-            فعال‌سازی در حساب و وضعیت استفاده در همین کلاس را جداگانه کنترل کنید.
+          <h2 id="class-features-title" className="font-bold text-[#101827]">امکانات این کلاس</h2>
+          <p className="mt-1 text-sm leading-6 text-[#4b586d]">
+            برای هر امکان مشخص کنید در همین کلاس چطور باشد. «طبق تنظیمات حساب» یعنی همان‌چه در{' '}
+            <Link to="/dashboard/settings" className="font-bold text-[#2347b4] underline">تنظیمات حساب</Link> انتخاب کرده‌اید.
           </p>
         </div>
-        <Settings2 className="h-5 w-5 text-[#9aa4b4]" />
       </div>
 
-      <div className="flex flex-col gap-4">
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#e5eaf2] bg-[#f8faff] p-4">
-          <input
-            type="checkbox"
-            checked={accountEnabled}
-            disabled={busy}
-            onChange={(event) => accountMutation.mutate(event.target.checked)}
-            className="mt-1 h-4 w-4 accent-[#4f7cff]"
-          />
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-[#101827]">قابلیت تخته سفید در حساب فعال باشد</span>
-            <span className="mt-1 block text-xs leading-5 text-[#7b8799]">
-              این گزینه سطح حساب را تغییر می‌دهد و می‌تواند روی کلاس‌های دیگری که تنظیمشان روی «ارث‌بری» است هم اثر بگذارد؛ سمینارها به‌صورت پیش‌فرض تخته سفید نمی‌گیرند.
-            </span>
-          </span>
-        </label>
-
-        <div className="rounded-xl border border-[#e5eaf2] p-4">
-          <label htmlFor="whiteboard-room-mode" className="mb-2 block text-sm font-semibold text-[#101827]">
-            وضعیت تخته سفید در همین کلاس
-          </label>
-          <select
-            id="whiteboard-room-mode"
-            value={roomMode}
-            disabled={busy}
-            onChange={(event) => roomMutation.mutate(event.target.value)}
-            className="w-full rounded-xl border border-[#dfe5ef] bg-white px-3 py-2.5 text-sm text-[#101827] outline-none transition focus:border-[#9eb6ff] focus:ring-2 focus:ring-[#4f7cff]/15 disabled:opacity-60"
-          >
-            <option value="inherit">ارث‌بری از تنظیم حساب</option>
-            <option value="enabled">فعال در این کلاس</option>
-            <option value="disabled">غیرفعال در این کلاس</option>
-          </select>
-          {!accountEnabled && roomMode === 'enabled' ? (
-            <p className="mt-2 flex items-start gap-1.5 text-xs leading-5 text-amber-700">
-              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              تا زمانی که قابلیت در سطح حساب فعال نباشد، انتخاب این جلسه به‌تنهایی آن را فعال نمی‌کند.
-            </p>
-          ) : (
-            <p className="mt-2 flex items-start gap-1.5 text-xs leading-5 text-[#7b8799]">
-              <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              این تنظیم فقط برای همین کلاس ذخیره می‌شود.
-            </p>
-          )}
-        </div>
-
-        {busy && (
-          <div className="flex items-center gap-2 text-xs text-[#7b8799]" role="status">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            در حال ذخیره تنظیمات…
-          </div>
-        )}
-      </div>
+      <ul className="space-y-3">
+        {rows.map((feature) => {
+          const locked = feature.reason === 'not_in_plan'
+          const id = `room-feature-${feature.key}`
+          return (
+            <li key={feature.key} className="rounded-xl border border-[#e5eaf2] p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <label htmlFor={id} className="block text-sm font-bold text-[#101827]">{feature.title}</label>
+                  <p className="mt-1 text-[13px] leading-5 text-[#4b586d]">{HINTS[feature.key]}</p>
+                </div>
+                <div className="flex items-center gap-2 sm:w-60 sm:shrink-0">
+                  <select
+                    id={id}
+                    value={feature.room_mode || 'inherit'}
+                    disabled={locked || pendingKey === feature.key}
+                    onChange={(event) => mutation.mutate({ key: feature.key, mode: event.target.value })}
+                    className={`min-h-11 w-full rounded-xl border-2 border-[#c3cee2] bg-white px-3 py-2 text-sm text-[#101827] disabled:opacity-60 ${focusRing}`}
+                  >
+                    {MODES.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}
+                  </select>
+                  {pendingKey === feature.key && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#2f55d4]" aria-hidden="true" />}
+                </div>
+              </div>
+              {locked && (
+                <p className="mt-2 text-[13px] leading-5 text-[#7a4a05]">
+                  این امکان در پلن فعلی شما نیست.{' '}
+                  <Link to="/pricing" className="font-bold underline">مشاهده پلن‌های دارای این امکان</Link>
+                </p>
+              )}
+            </li>
+          )
+        })}
+      </ul>
     </section>
   )
 }

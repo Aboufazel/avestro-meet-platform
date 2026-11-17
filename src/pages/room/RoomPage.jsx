@@ -42,7 +42,7 @@ import {useHandRequests} from '../../features/meeting/hooks/useHandRequests'
 import {ClassAccessContext} from '../../features/meeting/ClassAccessContext'
 import {ClassViewportContext} from '../../features/meeting/ClassViewportContext'
 import {PenTool} from 'lucide-react'
-import WhiteboardPanel from '../../features/whiteboard/WhiteboardPanel'
+import {WhiteboardStage} from '../../features/whiteboard/WhiteboardStage'
 import {DocumentStage} from '../../features/meeting/components/DocumentStage'
 import {DocumentsModal} from '../../features/meeting/components/DocumentsModal'
 
@@ -83,10 +83,10 @@ export default function RoomPage() {
     const [attendanceOpen, setAttendanceOpen] = useState(false)
     const [endOpen, setEndOpen] = useState(false)
     const [guard, setGuard] = useState(null) // null | 'exit' | 'reload'
+    const [planNotice, setPlanNotice] = useState(null) // توضیح میزبان: چرا این جلسه بدون تصویر شروع شد
     const allowUnloadRef = useRef(false)
     const [documentsOpen, setDocumentsOpen] = useState(false)
     const [whiteboardOpen, setWhiteboardOpen] = useState(false)
-    const [whiteboardObjects, setWhiteboardObjects] = useState([])
     const storeHand = useMeetingStore((s) => !!s.participants.get(s.localParticipantId)?.isHandRaised)
 
     const {
@@ -131,8 +131,44 @@ export default function RoomPage() {
         }
     }, [guardActive])
     const {participants} = useParticipants()
-    const access = useClassAccess(roomName, {enabled: isConnected && (classLayout || moderated || handFeature || canWhiteboard)})
+    const access = useClassAccess(roomName, {enabled: isConnected})
+    // پایان جلسه از سمت میزبان: کلاینت شرکت‌کننده باید Jitsi را ترک کند تا ترک‌های رسانه‌ای
+    // بازِ قبلی در مرورگر/اتاق باقی نمانند.
+    useEffect(() => {
+        const onSessionEnded = () => {
+            toast('جلسه توسط میزبان پایان یافت.')
+            leave()
+        }
+        window.addEventListener('meet:session-ended', onSessionEnded)
+        return () => window.removeEventListener('meet:session-ended', onSessionEnded)
+    }, [leave])
     // صحنه‌ی سند و تخته هم‌زمان نیستند؛ سرور هم همین را تضمین می‌کند.
+    useEffect(() => {
+        if (!access.connected) return
+        const canUseVideo = isHostRole || Boolean(access.me?.video)
+        access.setVideoActive(!isVideoMuted && canUseVideo)
+    }, [access.connected, access.setVideoActive, access.me?.video, isHostRole, isVideoMuted])
+
+    useEffect(() => {
+        const forceMuteVideo = () => {
+            if (!isVideoMuted) toggleVideo()
+            toast.error('تمام تصاویر پلن میزبان در جلسه‌های زنده روشن است؛ تا آزاد شدن یک تصویر نمی‌توانید دوربین را روشن کنید.')
+        }
+        const forceMuteForPermission = () => {
+            if (!isVideoMuted) toggleVideo()
+            toast.error('اجازه استفاده از دوربین برای شما فعال نیست.')
+        }
+        const showPlanNotice = (event) => setPlanNotice(event.detail || null)
+        window.addEventListener('meet:plan-notice', showPlanNotice)
+        window.addEventListener('meet:video-limit-reached', forceMuteVideo)
+        window.addEventListener('meet:video-permission-required', forceMuteForPermission)
+        return () => {
+            window.removeEventListener('meet:plan-notice', showPlanNotice)
+            window.removeEventListener('meet:video-limit-reached', forceMuteVideo)
+            window.removeEventListener('meet:video-permission-required', forceMuteForPermission)
+        }
+    }, [isVideoMuted, toggleVideo])
+
     const docState = access.documentState
     const docOpen = canDocuments && Boolean(docState?.is_open && docState?.document)
     const boardOpen = canWhiteboard && whiteboardOpen && !docOpen
@@ -189,7 +225,6 @@ export default function RoomPage() {
 
     useEffect(() => {
         if (!access.whiteboardState) return
-        setWhiteboardObjects(access.whiteboardState.objects || [])
         setWhiteboardOpen(Boolean(access.whiteboardState.is_open))
     }, [access.whiteboardState])
 
@@ -275,19 +310,16 @@ export default function RoomPage() {
 
     // تخته (فقط وقتی باز است). همگام‌سازی و مجوز نوشتن مثل قبل از props می‌آید.
     const board = boardOpen ? (
-        <WhiteboardPanel
-            initialObjects={whiteboardObjects}
-            onObjectsChange={(next) => {
-                setWhiteboardObjects(next)
-                access.updateWhiteboardObjects(next)
-            }}
+        <WhiteboardStage
+            state={access.whiteboardState}
+            views={access.whiteboardViews}
+            canControl={isHostRole}
+            studentsCanDraw={studentsCanDraw}
             onClose={closeWhiteboard}
-            onClear={() => {
-                setWhiteboardObjects([])
-                access.clearWhiteboard()
-            }}
-            readOnly={!isHostRole && !studentsCanDraw}
-            isHost={isHostRole}
+            onObjects={access.updateWhiteboardObjects}
+            onPage={access.setWhiteboardPage}
+            onAddPage={access.addWhiteboardPage}
+            onView={access.sendWhiteboardView}
         />
     ) : null
 
@@ -301,6 +333,8 @@ export default function RoomPage() {
             onSettings={access.setDocumentSettings}
             onClearPage={access.clearDocumentPage}
             onAnnotate={access.annotateDocument}
+            views={access.documentViews}
+            onView={access.sendDocumentView}
         />
     ) : null
 
@@ -316,6 +350,19 @@ export default function RoomPage() {
             <div
                 className="flex items-center gap-2 rounded-full bg-[var(--room-surface)] border room-border px-4 py-2 text-xs shadow-xl">
                 <span className="w-2 h-2 rounded-full bg-[var(--room-warning)] animate-pulse"/><span>اتصال ضعیف است؛ در حال برقراری مجدد...</span>
+            </div>
+        </div>
+    )
+
+    const planNoticeBanner = planNotice && isHostRole && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 room-pop w-[min(560px,calc(100%-24px))]">
+            <div role="status"
+                 className="flex items-start gap-3 rounded-2xl bg-[var(--room-surface)] border room-border px-4 py-3 text-xs leading-6 shadow-xl">
+                <span className="mt-2 w-2 h-2 shrink-0 rounded-full bg-[var(--room-warning)]"/>
+                <p className="flex-1">{planNotice.message}</p>
+                <button type="button" onClick={() => setPlanNotice(null)} aria-label="بستن پیام"
+                        className="shrink-0 rounded-lg px-2 text-white/60 hover:text-white">✕
+                </button>
             </div>
         </div>
     )
@@ -371,7 +418,7 @@ export default function RoomPage() {
         <ClassViewportContext.Provider value={viewportValue}>
             <ClassAccessContext.Provider value={access}>
                 <div dir="rtl" className={shellClass} style={classLayout ? viewport.shellStyle : undefined}>
-                    <RoomHeader showFullscreen={compactClass} canRecord={canRecord} slug={roomName}
+                    <RoomHeader showFullscreen={compactClass} canRecord={canRecord} isHostRole={isHostRole} slug={roomName}
                                 isConnected={isConnected} onCopyLink={handleCopyLink} isMeetingMuted={isMeetingMuted}
                                 onToggleMeetingMute={toggleMeetingMute} isRecording={isRecording}
                                 recordingSeconds={recordingSeconds} onToggleRecording={handleToggleRecording}
@@ -391,6 +438,7 @@ export default function RoomPage() {
                                                  canControl={canControlMedia}
                                                  onOpenAttendance={canAttendance ? () => setAttendanceOpen(true) : undefined}/>
                                     {reconnectBanner}
+                                    {planNoticeBanner}
                                 </main>
                             </div>
                         ) : (
@@ -410,6 +458,7 @@ export default function RoomPage() {
                                                     aria-label="بازکردن تخته تعاملی"><PenTool size={16}/><span>تخته تعاملی</span>
                                             </button>}
                                         {reconnectBanner}
+                                    {planNoticeBanner}
                                         <MeetingControls {...controlProps} />
                                     </main>
                                 </div>

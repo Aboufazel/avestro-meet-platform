@@ -140,8 +140,12 @@ export async function joinMeeting({roomName, displayName, email = ''}) {
     const allowed = await _checkRoomCapacity(roomName, externalId, displayName)
     if (generation !== _joinGeneration) return
     if (!allowed.ok) {
-        store._setError({message: allowed.message})
+        store._setError({title: allowed.title, message: allowed.message})
         return
+    }
+    // تصاویر پلن در جلسه‌ی دیگری پر است: به میزبان می‌گوییم این جلسه چه ویژگی‌ای دارد و چرا
+    if (allowed.planNotice) {
+        window.dispatchEvent(new CustomEvent('meet:plan-notice', {detail: allowed.planNotice}))
     }
     _startHeartbeat(roomName, externalId)
 
@@ -639,6 +643,14 @@ async function _refreshJitsiToken(roomName, externalId) {
     return data.jitsi_token || null
 }
 
+function _nationalIdFor(roomName) {
+    try {
+        return sessionStorage.getItem(`national_id:${roomName}`) || ''
+    } catch {
+        return ''
+    }
+}
+
 async function _checkRoomCapacity(roomName, externalId, displayName) {
     try {
         const res = await _postWithAuth(
@@ -646,18 +658,29 @@ async function _checkRoomCapacity(roomName, externalId, displayName) {
             JSON.stringify({
                 external_participant_id: externalId,
                 guest_name: displayName || '',
+                national_id: _nationalIdFor(roomName),
             })
         )
 
         if (res.ok) {
             const data = await res.json().catch(() => ({}))
+            // شناسه‌ی این شرکت‌کننده برای عملیات REST داخل جلسه (معلم/مدیر/معاونِ بدون حساب)
+            try {
+                sessionStorage.setItem('participant_id', externalId)
+                window.dispatchEvent(new Event('meet:participant-ready'))
+            } catch {
+                // ignore
+            }
             // null = سرور Jitsi هنوز بدون JWT است (ورود آزاد)
-            return {ok: true, token: data.jitsi_token || null}
+            return {ok: true, token: data.jitsi_token || null, planNotice: data.plan_notice || null}
         }
 
         let detail = ''
+        let code = ''
         try {
-            detail = (await res.json())?.detail || ''
+            const body = await res.json()
+            detail = body?.detail || ''
+            code = body?.code || ''
         } catch {
             // پاسخ JSON نبود
         }
@@ -665,9 +688,11 @@ async function _checkRoomCapacity(roomName, externalId, displayName) {
         return {
             ok: false,
             status: res.status,
+            code,
+            title: code === 'plan_users_full' ? 'ظرفیت کاربران پلن تکمیل است' : undefined,
             message:
                 res.status === 409
-                    ? 'ظرفیت این جلسه بر اساس پلن میزبان تکمیل شده است.'
+                    ? detail || 'ظرفیت این جلسه بر اساس پلن میزبان تکمیل شده است.'
                     : res.status === 401
                         ? 'نشست شما منقضی شده است؛ لطفاً دوباره وارد شوید.'
                         : detail || 'ورود به جلسه ممکن نشد.',
@@ -725,6 +750,9 @@ function _startHeartbeat(roomName, externalId) {
             // 410: میزبان کلاس را پایان داده → بقیه‌ی شرکت‌کنندگان هم باید بیرون بروند
             if (res.status === 410) {
                 _stopHeartbeat()
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('meet:session-ended'))
+                }
                 useMeetingStore.getState()._setError({
                     title: 'جلسه پایان یافت',
                     message: 'میزبان جلسه را به پایان رساند. برای جلسه‌ی بعد دوباره از همان لینک وارد شوید.',
@@ -773,6 +801,21 @@ export async function toggleVideo() {
  */
 export async function getDevices() {
     return jitsiController.getDevices()
+}
+
+/**
+ * دستگاه‌های فعلی (برای انتخاب درست در تنظیمات) و پشتیبانی تغییر خروجی صدا
+ */
+export function getCurrentDevices() {
+    return jitsiController.getCurrentDevices()
+}
+
+export function isAudioOutputChangeAvailable() {
+    return jitsiController.isAudioOutputChangeAvailable()
+}
+
+export function getVideoQuality() {
+    return jitsiController.getVideoQuality()
 }
 
 /**
@@ -825,6 +868,14 @@ export function applyAuthoritativeScreenShareState(state) {
 
 export async function startScreenShare() {
     return jitsiController.startScreenShare()
+}
+
+/**
+ * حالت اشتراک صفحه: 'text' | 'balanced' | 'motion'
+ * اگر اشتراک فعال باشد همان لحظه اعمال می‌شود.
+ */
+export function setScreenShareMode(mode) {
+    return jitsiController.setScreenShareMode(mode)
 }
 
 /**

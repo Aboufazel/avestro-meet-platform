@@ -1,5 +1,7 @@
 import {Link, useNavigate, useParams} from 'react-router-dom'
-import {useEffect} from 'react'
+import {useEffect, useState} from 'react'
+import {useQuery} from '@tanstack/react-query'
+import toast from 'react-hot-toast'
 import {useForm, Controller} from 'react-hook-form'
 import {yupResolver} from '@hookform/resolvers/yup'
 import * as yup from 'yup'
@@ -11,6 +13,9 @@ import {Card} from '../../components/ui/Card'
 import {JalaliDateTimePicker} from '../../components/ui/JalaliDateTimePicker'
 import {isoToLocalValue} from '../../utils/jalali'
 import {useRoom, useUpdateRoom} from '../../hooks/useRooms'
+import {paymentsService} from '../../services/payments'
+import {readRoomBudget, limitHint, faNumber} from '../../utils/roomBudget'
+import {RoomAccessSettings} from '../../components/shared/RoomAccessSettings'
 import ClassFeatureSettings from './ClassFeatureSettings'
 
 
@@ -44,8 +49,9 @@ const schema = yup.object({
         .number()
         .typeError('عدد وارد کنید')
         .min(2, 'حداقل ۲ نفر')
-        .max(500, 'حداکثر ۵۰۰ نفر')
+        .max(3000, 'حداکثر ۳۰۰۰ نفر')
         .required('ظرفیت الزامی است'),
+    allocated_video_streams: yup.number().typeError('عدد وارد کنید').min(1, 'حداقل یک تصویر').max(500, 'حداکثر ۵۰۰ تصویر').required('سهم تصاویر الزامی است'),
 
     is_private: yup
         .boolean(),
@@ -67,6 +73,15 @@ export default function EditEventPage() {
         isPending: isUpdating,
     } = useUpdateRoom(slug)
 
+    // سقف این اتاق = کل پلن (تعداد اتاق‌ها و سهم اتاق‌های دیگر مهم نیست)
+    const {data: subscriptionInfo} = useQuery({
+        queryKey: ['my-subscription'],
+        queryFn: () => paymentsService.me().then((response) => response.data),
+    })
+    const budget = readRoomBudget(subscriptionInfo)
+    const usersCap = budget.usersTotal
+    const imagesCap = budget.imagesTotal
+
 
     const {
         register,
@@ -84,13 +99,19 @@ export default function EditEventPage() {
             teacher_name: '',
             scheduled_at: '',
             max_participants: 100,
+            allocated_video_streams: 1,
             is_private: false,
         },
     })
 
 
+    const [allowGuests, setAllowGuests] = useState(true)
+    const [invitedPeople, setInvitedPeople] = useState([])
+
     useEffect(() => {
         if (!room) return
+        setAllowGuests(room.allow_guests !== false)
+        setInvitedPeople(room.invited_people || [])
 
         reset({
             slug: room.slug || '',
@@ -101,12 +122,25 @@ export default function EditEventPage() {
                 ? isoToLocalValue(room.scheduled_at)
                 : '',
             max_participants: room.max_participants || 100,
+            allocated_video_streams: room.allocated_video_streams || 1,
             is_private: Boolean(room.is_private),
         })
     }, [room, reset])
 
 
     function onSubmit(data) {
+        if (!allowGuests && invitedPeople.length === 0) {
+            toast.error('با غیرفعال‌بودن ورود مهمان، حداقل یک نفر را برای جلسه انتخاب کنید')
+            return
+        }
+        if (usersCap != null && Number(data.max_participants) > usersCap) {
+            toast.error(`ظرفیت این اتاق حداکثر ${faNumber(usersCap)} نفر می‌تواند باشد (کل پلن)`)
+            return
+        }
+        if (imagesCap != null && Number(data.allocated_video_streams) > imagesCap) {
+            toast.error(`سهم تصاویر این اتاق حداکثر ${faNumber(imagesCap)} می‌تواند باشد (کل پلن)`)
+            return
+        }
         updateRoom(
             {
                 slug: data.slug,
@@ -114,7 +148,10 @@ export default function EditEventPage() {
                 description: data.description || '',
                 teacher_name: (data.teacher_name || '').trim(),
                 max_participants: Number(data.max_participants),
+                allocated_video_streams: Number(data.allocated_video_streams),
                 is_private: Boolean(data.is_private),
+                allow_guests: allowGuests,
+                invited_people: invitedPeople,
                 scheduled_at: data.scheduled_at
                     ? new Date(data.scheduled_at).toISOString()
                     : null,
@@ -320,6 +357,17 @@ export default function EditEventPage() {
                                 error={errors.max_participants?.message}
                                 {...register('max_participants')}
                             />
+                            <Input
+                                className="meet-auth-input"
+                                label="سهم تصاویر هم‌زمان اتاق"
+                                type="number"
+                                error={errors.allocated_video_streams?.message}
+                                {...register('allocated_video_streams')}
+                            />
+                            <div className="space-y-1 text-xs leading-6 text-[#8d98aa] sm:col-span-2">
+                                <p>{limitHint({total: budget.usersTotal, unit: 'نفر'})}</p>
+                                <p>{limitHint({total: budget.imagesTotal, unit: 'تصویر'})}</p>
+                            </div>
 
                         </div>
 
@@ -352,6 +400,13 @@ export default function EditEventPage() {
 
                         </div>
 
+
+                        <RoomAccessSettings
+                            allowGuests={allowGuests}
+                            onAllowGuests={setAllowGuests}
+                            selected={invitedPeople}
+                            onSelected={setInvitedPeople}
+                        />
 
                         {/* Actions */}
                         <div className="flex gap-3 pt-2">

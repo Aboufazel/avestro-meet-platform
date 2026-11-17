@@ -148,3 +148,23 @@ export function useEndRoom() {
     },
   })
 }
+
+
+export function useDeleteRoom() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (slug) => roomsService.remove(slug),
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rooms'] })
+      // با حذف اتاق، سهم کاربر و تصویر آن به بودجه‌ی پلن برمی‌گردد
+      queryClient.invalidateQueries({ queryKey: ['my-subscription'] })
+      toast.success('اتاق حذف شد و سهم آن به پلن برگشت')
+    },
+
+    onError: (error) => {
+      toast.error(error.response?.data?.detail || 'حذف اتاق انجام نشد')
+    },
+  })
+}

@@ -1,4 +1,4 @@
-// نام فایل را از هدر Content-Disposition می‌خواند (filename* = نام فارسی)؛ اگر نبود null.
+// نام فایل را از هدر Content-Disposition می‌خواند (filename* = نام پارسی)؛ اگر نبود null.
 export function pdfFilename(header) {
   if (!header) return null
   const star = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(header)
