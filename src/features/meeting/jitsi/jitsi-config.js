@@ -175,18 +175,28 @@ export const DEVICE_TIER = IS_LOW_END ? 'low' : IS_MOBILE || IS_MID_DESKTOP ? 'm
 // در تنظیمات؛ چون مصرف اینترنت (و هزینه‌ی سرور) را مستقیم بالا می‌برد.
 export const DEFAULT_VIDEO_QUALITY = 360
 
+// کنترل مصرف بدون تغییر کد: VITE_MAX_REMOTE_VIDEOS (۱ تا ۲۴) و VITE_SEND_MAX_FPS (۱۰ تا ۳۰)
+function envInt(raw, min, max) {
+  const n = Number(raw)
+  return Number.isFinite(n) && n >= min && n <= max ? Math.round(n) : null
+}
+
 export const PERF = {
   tier: DEVICE_TIER,
 
   // حداکثر تعداد ویدیوی «زنده» که هم‌زمان decode می‌شود (دریافتی از bridge).
   // بقیه‌ی شرکت‌کننده‌ها فقط صدا + آواتار دارند.
-  maxRemoteVideos: { low: 4, medium: 6, high: 12 }[DEVICE_TIER],
+  maxRemoteVideos:
+    envInt(import.meta.env.VITE_MAX_REMOTE_VIDEOS, 1, 24) ??
+    { low: 4, medium: 6, high: 12 }[DEVICE_TIER],
 
   // ارتفاع ویدیوی ارسالی دوربین خودمان (encode روی CPU/GPU گوشی)
   sendHeight: DEFAULT_VIDEO_QUALITY,
 
   // سقف فریم‌ریت دوربین ارسالی (best-effort؛ پایین‌تر = انکودر خنک‌تر)
-  sendMaxFps: { low: 20, medium: 24, high: 30 }[DEVICE_TIER],
+  sendMaxFps:
+    envInt(import.meta.env.VITE_SEND_MAX_FPS, 10, 30) ??
+    { low: 20, medium: 24, high: 30 }[DEVICE_TIER],
 
   // کیفیت دریافتی: تایل بزرگ (focus / active speaker) در مقابل تایل کوچک
   receiveLargeHeight: DEFAULT_VIDEO_QUALITY,
@@ -225,11 +235,16 @@ export function writeMediaPrefs(patch) {
 // =============================================================================
 // JitsiMeetJS.init()
 //
-// این گزینه‌ها طبق IJitsiMeetJSOptions مستندات lib-jitsi-meet معتبرند.
+// گزینه‌های مستند IJitsiMeetJSOptions: analytics, audioLevelsInterval,
+// desktopSharingSources, disableAudioLevels, disableThirdPartyRequests,
+// enableAnalyticsLogging, enableWindowOnErrorHandler, externalStorage,
+// flags{runInLiteMode, ssrcRewritingEnabled}, pcStatsInterval.
+// `desktopSharingFrameRate` در مستند نیست (فقط برای نسخه‌های قدیمی‌تر lib نگه داشته شده؛
+// روش مستند: conference.setDesktopSharingFrameRate).
 // =============================================================================
 export const JITSI_INIT_OPTIONS = {
   disableAudioLevels: false,
-  // سقف کلی؛ مقدار هر اشتراک بر اساس حالت انتخابی در createLocalTracks می‌آید.
+  // [غیرمستند] مقدار واقعی هر اشتراک با conference.setDesktopSharingFrameRate اعمال می‌شود.
   desktopSharingFrameRate: { min: 5, max: 30 },
   audioLevelsInterval: PERF.audioLevelsInterval,
   disableThirdPartyRequests: true,
@@ -283,7 +298,8 @@ export const CONFERENCE_CONFIG = {
       }
     : {}),
 
-  // اشتراک صفحه: مقدار واقعی هر اشتراک از SCREEN_SHARE_PROFILES می‌آید.
+  // [غیرمستند در IConferenceOptions] مقدار واقعی از SCREEN_SHARE_PROFILES و
+  // conference.setDesktopSharingFrameRate می‌آید.
   desktopSharingFrameRate: { min: 5, max: 30 },
 
   // این دو تشخیص هیچ‌جای اپ استفاده نشده‌اند ولی هرکدام یک پردازش صوتی
@@ -329,5 +345,7 @@ export const ADAPTIVE_UPLOAD = {
   lossLow: 2, // پایین‌تر از این = شبکه دوباره خوب شده
   downSamples: 2, // چند نمونه‌ی پشت‌سرهم برای پایین‌آوردن
   upSamples: 8, // چند نمونه‌ی پشت‌سرهم برای برگرداندن (محتاط‌تر)
-  lowHeight: 360,
+  // وقتی packet loss بالاست، دوربین به ۱۸۰p می‌رود. (قبلاً ۳۶۰ بود؛ چون پیش‌فرض کیفیت
+  // ارسال هم ۳۶۰ است، این کاهش خودکار هیچ اثری نداشت.)
+  lowHeight: 180,
 }

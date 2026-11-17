@@ -168,6 +168,7 @@ export class JitsiController {
         this._receiverWatchdog = null
         this._onBrowserOnline = null
         this._onBrowserOffline = null
+        this._screenSharePresenceId = null
         this._localScreenShareSeq = 0
         this._trackVideoTypeListeners = new Map()
         this._receiverIntent = null
@@ -836,6 +837,14 @@ export class JitsiController {
         return this._qualityPref()
     }
 
+    // تماشای اشتراک صفحه: پیش‌فرض حداکثر ۷۲۰p (اسلاید/متن خوانا می‌ماند ولی مصرف
+    // دانلود، یعنی خروجی سرور، حدود نصف ۱۰۸۰p است). ۱۰۸۰p فقط وقتی کاربر خودش در
+    // تنظیمات کیفیت ≥ ۷۲۰ انتخاب کرده باشد.
+    _receiveScreenHeight() {
+        const cap = RECEIVER_QUALITY.SCREEN
+        return this._qualityPref() >= 720 ? cap : Math.min(cap, 720)
+    }
+
     getVideoQuality() {
         return this._qualityPref()
     }
@@ -929,9 +938,10 @@ export class JitsiController {
             // رفتن، ثبت دوربین هم بهترین‌تلاش عوض می‌شود.
             this._applyCaptureHeight(this._findCameraTrack(), normalizedHeight)
 
-            await this._conference.setSenderVideoConstraint(
+            await this._setSenderHeight(
                 this._effectiveSendHeight(),
-                this._findCameraTrack()?.getSourceName?.()
+                this._findCameraTrack(),
+                'camera'
             )
 
             // تماشای تایل بزرگ هم با همین کیفیت (مصرف دانلود)
@@ -1045,7 +1055,7 @@ export class JitsiController {
         }
 
         const maxVideos = PERF.maxRemoteVideos
-        const SCREEN_HEIGHT = RECEIVER_QUALITY.SCREEN
+        const SCREEN_HEIGHT = this._receiveScreenHeight()
 
         let message
 
@@ -1206,13 +1216,54 @@ export class JitsiController {
         try {
             // Only the camera source: without a source name this capped the
             // screen share to camera resolution as well.
-            this._conference
-                ?.setSenderVideoConstraint?.(
-                    this._effectiveSendHeight(),
-                    track?.getSourceName?.()
-                )
-                ?.catch?.(() => {})
+            this._setSenderHeight(this._effectiveSendHeight(), track, 'camera')
         } catch {
+        }
+    }
+
+    /**
+     * مستند: JitsiConference.setSenderVideoConstraint(maxFrameHeight) فقط یک پارامتر
+     * دارد (نسخه‌های قدیمی‌تر پارامتر دومِ sourceName هم داشتند). اگر lib پارامتر دوم
+     * را نداشته باشد، آن را نادیده می‌گیرد و عدد برای کل ویدیوی ارسالی اعمال می‌شود.
+     * پس: برای سورس دسکتاپ فقط وقتی صدا می‌زنیم که پارامتر دوم پشتیبانی شود؛ وگرنه
+     * سقف دوربین را (ناخواسته) عوض می‌کرد.
+     */
+    _supportsPerSourceSenderConstraint() {
+        const fn = this._conference?.setSenderVideoConstraint
+        const supported = typeof fn === 'function' && fn.length >= 2
+
+        // یک بار نسخه‌ی واقعی lib و تعداد پارامترهای متد روی همین conference را ثبت کن.
+        if (!this._loggedSenderConstraintSupport && typeof fn === 'function') {
+            this._loggedSenderConstraintSupport = true
+            console.info('[Lib] sender constraint support', {
+                libVersion: window.JitsiMeetJS?.version,
+                setSenderVideoConstraintParams: fn.length,
+                perSourceSupported: supported,
+            })
+        }
+
+        return supported
+    }
+
+    _setSenderHeight(height, track, kind) {
+        const conference = this._conference
+
+        if (typeof conference?.setSenderVideoConstraint !== 'function') {
+            return null
+        }
+
+        const perSource = this._supportsPerSourceSenderConstraint()
+
+        if (kind === 'desktop' && !perSource) {
+            return null
+        }
+
+        try {
+            const args = perSource ? [height, track?.getSourceName?.()] : [height]
+
+            return conference.setSenderVideoConstraint(...args)?.catch?.(() => {})
+        } catch {
+            return null
         }
     }
 
@@ -1239,6 +1290,12 @@ export class JitsiController {
         const camera = this._findCameraTrack()
 
         if (!camera || camera.isMuted?.()) {
+            return
+        }
+
+        // اگر lib سقف ارسال را فقط «سراسری» می‌پذیرد، پایین‌آوردنِ دوربین اشتراک صفحه
+        // را هم خراب می‌کند؛ پس وسط اشتراک کیفیت دوربین را خودکار پایین نمی‌آوریم.
+        if (this._screenShare?.active && !this._supportsPerSourceSenderConstraint()) {
             return
         }
 
@@ -1273,12 +1330,7 @@ export class JitsiController {
         state.good = 0
 
         try {
-            this._conference
-                .setSenderVideoConstraint?.(
-                    this._effectiveSendHeight(),
-                    camera.getSourceName?.()
-                )
-                ?.catch?.(() => {})
+            this._setSenderHeight(this._effectiveSendHeight(), camera, 'camera')
         } catch {
         }
     }
@@ -1338,12 +1390,7 @@ export class JitsiController {
         }
 
         try {
-            this._conference
-                ?.setSenderVideoConstraint?.(
-                    profile.maxHeight,
-                    track?.getSourceName?.()
-                )
-                ?.catch?.(() => {})
+            this._setSenderHeight(profile.maxHeight, track, 'desktop')
         } catch {
         }
     }
@@ -1555,7 +1602,7 @@ export class JitsiController {
      * endpoint message). Late, duplicated or out-of-order messages are
      * dropped, so an old "stop" can never wipe a newer share.
      */
-    _acceptScreenShareState(participantId, isSharing, seq) {
+    _acceptScreenShareState(participantId, isSharing, seq, opts = {}) {
         if (!participantId) return false
 
         const numericSeq = Number(seq) || 0
@@ -1563,7 +1610,13 @@ export class JitsiController {
 
         // seq === 0 means "legacy / unknown order" (e.g. cached replay).
         // Never let it override anything we already know about.
-        if (numericSeq <= lastSeq && !(numericSeq === 0 && lastSeq === 0)) {
+        // استثنا: حالت از presence (participant property) خودش «آخرین مقدار» است و
+        // برای ورود دیرهنگام همیشه معتبر؛ نیازی به seq ندارد.
+        if (
+            !opts.fromPresence &&
+            numericSeq <= lastSeq &&
+            !(numericSeq === 0 && lastSeq === 0)
+        ) {
             return false
         }
 
@@ -1765,9 +1818,6 @@ export class JitsiController {
             participantFound = Boolean(participant)
             remoteTracks = participant?.getTracks?.() || []
 
-            if (!remoteTracks.length) {
-                remoteTracks = conference.getRemoteTracks?.(participantId) || []
-            }
         } catch {
             return false
         }
@@ -1851,8 +1901,57 @@ export class JitsiController {
         this._acceptScreenShareState(participantId, isSharing, seq)
     }
 
+    /**
+     * حالت اشتراک صفحه را مثل isTeacher و raisedHand به‌صورت participant property در
+     * presence منتشر می‌کند (setLocalParticipantProperty، مستند). presence حالتِ فعلی را
+     * نگه می‌دارد و هر کسی که بعداً وارد می‌شود خودکار می‌گیرد؛ بدون heartbeat.
+     */
+    _setScreenSharePresence(isSharing) {
+        const conference = this._conference
+
+        if (typeof conference?.setLocalParticipantProperty !== 'function') {
+            return
+        }
+
+        try {
+            if (isSharing) {
+                this._screenSharePresenceId =
+                    this._screenSharePresenceId || String(Date.now())
+                conference.setLocalParticipantProperty('screenShare', this._screenSharePresenceId)
+            } else {
+                this._screenSharePresenceId = null
+                conference.setLocalParticipantProperty('screenShare', '0')
+            }
+        } catch (error) {
+            console.debug('[JitsiController] screenShare presence skipped:', error?.message)
+        }
+    }
+
+    /** گیرنده: اشتراک‌هایی که از قبل در presence ثبت شده‌اند (ورود دیرهنگام). */
+    _syncScreenSharePresence() {
+        const conference = this._conference
+
+        if (!conference) return
+
+        try {
+            for (const participant of conference.getParticipants?.() || []) {
+                const id = participant?.getId?.()
+                const value = participant?.getProperty?.('screenShare')
+
+                if (id && value && value !== '0' && !this._remoteScreenShareActive.has(id)) {
+                    this._acceptScreenShareState(id, true, 0, {fromPresence: true})
+                }
+            }
+        } catch {
+        }
+    }
+
     _broadcastScreenShareState(isSharing, { publish = true } = {}) {
         const seq = this._nextScreenShareSeq()
+
+        if (publish) {
+            this._setScreenSharePresence(isSharing)
+        }
 
         // The classroom WebSocket is the authoritative state source.
         if (publish) {
@@ -2400,9 +2499,14 @@ export class JitsiController {
         }
 
         try {
-            this._conference.muteEveryone(
-                'audio'
+            // JitsiConference.muteEveryone در مستند نیست (صدا زدنش خطا می‌داد و
+            // دکمه بی‌صدا کار نمی‌کرد). روش مستند: muteParticipant(id, mediaType).
+            const myId = this._conference.myUserId?.()
+            const others = (this._conference.getParticipants?.() || []).filter(
+                (p) => p?.getId?.() && p.getId() !== myId
             )
+
+            others.forEach((p) => this._conference.muteParticipant(p.getId(), 'audio'))
 
             return true
         } catch (error) {
@@ -3096,6 +3200,19 @@ export class JitsiController {
                     })
                 }
 
+                // ورود دیرهنگام: اشتراک‌هایی که از قبل در presence هستند را بخوان.
+                if (CE.CONFERENCE_JOINED) {
+                    bind(CE.CONFERENCE_JOINED, () => {
+                        setTimeout(() => this._syncScreenSharePresence(), 1500)
+                    })
+                }
+                if (CE.USER_JOINED) {
+                    bind(CE.USER_JOINED, () => {
+                        setTimeout(() => this._syncScreenSharePresence(), 1000)
+                        setTimeout(() => this._syncScreenSharePresence(), 3500)
+                    })
+                }
+
                 // وضعیت سورس‌های یک شرکت‌کننده‌ی remote عوض شد (mute / videoType).
                 // مستند: participant.getSources() → Map<mediaType, Map<sourceName,
                 // {muted, videoType}>> و برای ورود دیرهنگام از presence خودکار می‌آید.
@@ -3217,6 +3334,16 @@ export class JitsiController {
                             })
                             return
                         }
+                        // اشتراک صفحه: presence مرجع «حالت فعلی» است (ورود دیرهنگام هم می‌گیرد)
+                        if (name === 'screenShare') {
+                            this._acceptScreenShareState(
+                                participant.getId(),
+                                Boolean(value) && value !== '0',
+                                0,
+                                {fromPresence: true}
+                            )
+                            return
+                        }
                         if (name !== 'raisedHand') return
 
                         this._emit(
@@ -3298,8 +3425,14 @@ export class JitsiController {
                 // Participant connection status
                 // =================================================================
 
+                // توجه: PARTICIPANT_CONN_STATUS_CHANGED و participant.getConnectionStatus()
+                // در JitsiConferenceEvents / JitsiParticipant مستند نیستند (حذف‌شده)؛ این
+                // handler در نسخه‌ی فعلی lib هرگز اجرا نمی‌شود. جایگزین‌های مستند:
+                // LAST_N_ENDPOINTS_CHANGED، FORWARDED_SOURCES_CHANGED،
+                // INBOUND_VIDEO_STATS_RECEIVED و connectionQuality.REMOTE_STATS_UPDATED.
                 bind(
-                    JitsiMeetJS.events.conference.PARTICIPANT_CONN_STATUS_CHANGED,
+                    JitsiMeetJS.events.conference.PARTICIPANT_CONN_STATUS_CHANGED ||
+                        'unused.participant_conn_status_changed',
                     (participantId) => {
                         const participant = conference.getParticipantById(participantId)
                         if (!participant) return
