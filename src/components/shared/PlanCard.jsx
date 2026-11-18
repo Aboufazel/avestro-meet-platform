@@ -1,6 +1,7 @@
 import { CalendarClock, Check, CheckCircle2, Infinity as InfinityIcon, Minus, ArrowLeft } from 'lucide-react'
 import { formatIsoJalali } from '../../utils/jalali'
 import { onlyPlanFeatures } from '../../constants/planFeatures'
+import { formatUsageDuration } from '../../utils/freePlan'
 
 /*
  * کارت پلن مشترک بین «تعرفه‌ها» و «اشتراک‌های داشبورد».
@@ -204,6 +205,8 @@ export function SubscriptionPlanCard({ subscription, reserved = false, usage = {
   const limits = effectiveLimits(subscription, usage, reserved)
   const features = effectiveFeatures(subscription)
   const date = (iso) => (iso ? formatIsoJalali(iso) : '—')
+  const hourly = !reserved && subscription.usage
+  const usedPercent = hourly && hourly.limit_seconds ? Math.min(100, Math.round((hourly.used_seconds / hourly.limit_seconds) * 100)) : 0
   return (
     <article aria-labelledby={`${uid}-title`} className="rounded-2xl border border-[#e5eaf2] bg-white p-5 sm:p-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -217,6 +220,23 @@ export function SubscriptionPlanCard({ subscription, reserved = false, usage = {
         </span>
       </header>
 
+      {hourly ? (
+        <div className="mt-5 rounded-xl bg-[#f3f6fc] p-4">
+          <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div><dt className="text-[13px] text-[#46536b]">ساعت استفاده‌ی پلن</dt><dd className="mt-1 text-sm font-extrabold text-[#101827]">{formatUsageDuration(hourly.limit_seconds)}</dd></div>
+            <div><dt className="text-[13px] text-[#46536b]">مصرف‌شده</dt><dd className="mt-1 text-sm font-extrabold text-[#101827]">{formatUsageDuration(hourly.used_seconds)}</dd></div>
+            <div><dt className="text-[13px] text-[#46536b]">باقی‌مانده</dt><dd className="mt-1 text-sm font-extrabold text-[#101827]">{hourly.exhausted ? 'تمام شده' : formatUsageDuration(hourly.remaining_seconds)}</dd></div>
+          </dl>
+          <div role="progressbar" aria-label="مصرف ساعت استفاده" aria-valuemin={0} aria-valuemax={100} aria-valuenow={usedPercent} className="mt-3 h-2.5 overflow-hidden rounded-full bg-[#dfe6f3]">
+            <div className={`h-full rounded-full ${hourly.exhausted ? 'bg-[#d6455d]' : 'bg-[#2eaf89]'}`} style={{ width: `${usedPercent}%` }} />
+          </div>
+          <p className="mt-3 text-xs leading-6 text-[#46536b]">
+            {hourly.exhausted
+              ? 'ساعت استفاده‌ی شما تمام شده است؛ جلسه‌ی در حال برگزاری تا پایان ادامه می‌یابد ولی جلسه‌ی جدید نیاز به پلن دارد.'
+              : 'این پلن تاریخ پایان ندارد؛ هر زمان خواستید تا سقف ساعت بالا جلسه برگزار کنید. فقط زمان واقعی لایوبودن جلسه‌ها حساب می‌شود.'}
+          </p>
+        </div>
+      ) : (
       <dl className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded-xl bg-[#f3f6fc] p-3.5">
           <dt className="text-[13px] text-[#46536b]">شروع</dt>
@@ -233,6 +253,7 @@ export function SubscriptionPlanCard({ subscription, reserved = false, usage = {
           </div>
         )}
       </dl>
+      )}
 
       {plan.description && !reserved && <p className="mt-4 text-sm leading-7 text-[#46536b]">{plan.description}</p>}
 

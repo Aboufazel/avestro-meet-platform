@@ -1,14 +1,16 @@
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {useNavigate} from 'react-router-dom'
-import {Gift, Loader2, Users, Video, CalendarClock, GraduationCap, MonitorPlay} from 'lucide-react'
+import {Gift, Loader2, Users, Video, CalendarClock, Clock3, GraduationCap, MonitorPlay} from 'lucide-react'
 import toast from 'react-hot-toast'
 import {paymentsService} from '../../services/payments'
 import {useAuthStore} from '../../store/authStore'
+import {freePlanExplanation, isHoursPlan} from '../../utils/freePlan'
 
 const fa = (n) => Number(n).toLocaleString('fa-IR')
 
 function Card({plan, busy, onClaim}) {
     const Icon = plan.room_kind === 'class' ? GraduationCap : MonitorPlay
+    const hours = isHoursPlan(plan)
     return <article className="flex flex-col rounded-[24px] border border-[#cfeee2] bg-white p-5 shadow-[0_12px_36px_rgba(20,35,65,.05)]">
         <div className="mb-4 flex items-start justify-between gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#e8faf4] text-[#2eaf89]"><Icon size={20}/></span>
@@ -19,8 +21,11 @@ function Card({plan, busy, onClaim}) {
         <ul className="my-4 grid grid-cols-3 gap-2 text-center">
             <li className="rounded-xl bg-[#f6f8fc] px-2 py-3"><Users size={16} className="mx-auto mb-1.5 text-[#4f7cff]"/><b className="block text-sm">{fa(plan.users)}</b><span className="text-[11px] text-[#8d98aa]">کاربر</span></li>
             <li className="rounded-xl bg-[#f6f8fc] px-2 py-3"><Video size={16} className="mx-auto mb-1.5 text-[#4f7cff]"/><b className="block text-sm">{fa(plan.images)}</b><span className="text-[11px] text-[#8d98aa]">تصویر</span></li>
-            <li className="rounded-xl bg-[#f6f8fc] px-2 py-3"><CalendarClock size={16} className="mx-auto mb-1.5 text-[#4f7cff]"/><b className="block text-sm">{fa(plan.duration_days)}</b><span className="text-[11px] text-[#8d98aa]">روز</span></li>
+            {hours
+                ? <li className="rounded-xl bg-[#f6f8fc] px-2 py-3"><Clock3 size={16} className="mx-auto mb-1.5 text-[#4f7cff]"/><b className="block text-sm">{fa(plan.usage_hours)}</b><span className="text-[11px] text-[#8d98aa]">ساعت استفاده</span></li>
+                : <li className="rounded-xl bg-[#f6f8fc] px-2 py-3"><CalendarClock size={16} className="mx-auto mb-1.5 text-[#4f7cff]"/><b className="block text-sm">{fa(plan.duration_days)}</b><span className="text-[11px] text-[#8d98aa]">روز</span></li>}
         </ul>
+        <p className="mb-4 rounded-xl bg-[#f0fbf7] px-3 py-2.5 text-xs leading-6 text-[#2f6b58]">{freePlanExplanation(plan)}</p>
         <button type="button" disabled={busy} onClick={() => onClaim(plan)}
                 className="meet-primary-btn mt-auto inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold disabled:opacity-60">
             {busy ? <Loader2 size={16} className="animate-spin"/> : <Gift size={16}/>} دریافت رایگان

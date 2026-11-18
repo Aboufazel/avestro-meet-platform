@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { CalendarClock, CreditCard, History, Loader2, RefreshCw, ShieldCheck, Clock3, ReceiptText } from 'lucide-react'
 import { paymentsService } from '../../services/payments'
 import { formatIsoJalali } from '../../utils/jalali'
+import { formatUsageDuration } from '../../utils/freePlan'
 import { SubscriptionPlanCard, formatMoney, primaryButtonClass } from '../../components/shared/PlanCard'
 
 const fa = (value) => Number(value || 0).toLocaleString('fa-IR')
@@ -50,6 +51,7 @@ export default function SubscriptionPage() {
     if (reserved.length && tab === 'history' && !orders.length) setTab('reserved')
   }, [reserved.length, orders.length, tab])
   const daysLeft = active?.expires_at ? Math.max(0, Math.ceil((new Date(active.expires_at).getTime() - Date.now()) / 86400000)) : null
+  const hourly = active?.usage || null
   const tabs = [
     { id: 'history', label: 'سوابق پرداخت', icon: History, count: orders.length },
     { id: 'reserved', label: 'رزروشده‌ها', icon: CalendarClock, count: reserved.length },
@@ -87,9 +89,16 @@ export default function SubscriptionPage() {
               <p className="mt-1 text-xs text-[#8d98aa]">{active?.plan?.name || reserved[0]?.plan?.name || 'برای شروع، پلن انتخاب کنید'}</p>
             </article>
             <article className="rounded-2xl border border-[#e5eaf2] bg-white p-4 sm:p-5">
-              <div className="flex items-center gap-2 text-[#239b79]"><Clock3 size={18} aria-hidden="true"/><span className="text-xs font-bold text-[#68758a]">اعتبار باقی‌مانده</span></div>
-              <p className="mt-3 text-base font-extrabold text-[#101827]">{daysLeft == null ? (reserved.length ? 'پس از شروع' : '—') : daysLeft === 0 ? 'پایان‌یافته' : `${fa(daysLeft)} روز`}</p>
-              <p className="mt-1 text-xs text-[#8d98aa]">{active?.expires_at ? `تا ${date(active.expires_at)}` : 'بر اساس تاریخ اشتراک فعال'}</p>
+              <div className="flex items-center gap-2 text-[#239b79]"><Clock3 size={18} aria-hidden="true"/><span className="text-xs font-bold text-[#68758a]">{hourly ? 'ساعت باقی‌مانده' : 'اعتبار باقی‌مانده'}</span></div>
+              {hourly
+                ? <>
+                  <p className="mt-3 text-base font-extrabold text-[#101827]">{hourly.exhausted ? 'تمام شده' : formatUsageDuration(hourly.remaining_seconds)}</p>
+                  <p className="mt-1 text-xs text-[#8d98aa]">از {formatUsageDuration(hourly.limit_seconds)} · بدون تاریخ پایان</p>
+                </>
+                : <>
+                  <p className="mt-3 text-base font-extrabold text-[#101827]">{daysLeft == null ? (reserved.length ? 'پس از شروع' : '—') : daysLeft === 0 ? 'پایان‌یافته' : `${fa(daysLeft)} روز`}</p>
+                  <p className="mt-1 text-xs text-[#8d98aa]">{active?.expires_at ? `تا ${date(active.expires_at)}` : 'بر اساس تاریخ اشتراک فعال'}</p>
+                </>}
             </article>
             <article className="rounded-2xl border border-[#e5eaf2] bg-white p-4 sm:p-5">
               <div className="flex items-center gap-2 text-[#8067d8]"><ReceiptText size={18} aria-hidden="true"/><span className="text-xs font-bold text-[#68758a]">سفارش‌ها و رزروها</span></div>

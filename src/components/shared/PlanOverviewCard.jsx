@@ -1,4 +1,5 @@
 import {Link} from 'react-router-dom'
+import {formatUsageDuration} from '../../utils/freePlan'
 import {CalendarClock, Gauge, Image as ImageIcon, Infinity as InfinityIcon, Loader2, Users, Video} from 'lucide-react'
 import {faNumber, readRoomBudget} from '../../utils/roomBudget'
 
@@ -90,7 +91,7 @@ export default function PlanOverviewCard({subscription, loading}) {
                                 <span
                                     className="font-bold text-[#34415a]">{active?.plan?.name || reserved?.plan?.name || 'پلنی انتخاب نشده است'}</span>
                                 {active && <span className="inline-flex items-center gap-1"><CalendarClock size={13}
-                                                                                                           aria-hidden="true"/>{days == null ? 'تاریخ پایان نامشخص' : days === 0 ? 'کمتر از یک روز اعتبار' : `${faNumber(days)} روز تا پایان اعتبار`}</span>}
+                                                                                                           aria-hidden="true"/>{active.usage ? (active.usage.exhausted ? 'ساعت استفاده تمام شده' : `${formatUsageDuration(active.usage.remaining_seconds)} استفاده باقی‌مانده`) : days == null ? 'تاریخ پایان نامشخص' : days === 0 ? 'کمتر از یک روز اعتبار' : `${faNumber(days)} روز تا پایان اعتبار`}</span>}
                                 {active && <span className="inline-flex items-center gap-1"><Video size={13}
                                                                                                    aria-hidden="true"/>{faNumber(budget.roomsCount)} اتاق</span>}
                             </p>}
